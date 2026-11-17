@@ -6,6 +6,7 @@ from backend.app.api.v1.endpoints import (
     academic,
     quizzes,
     question_bank,
+    question_import_export,
     dashboard_super_admin,
     dashboard_user_admin,
 )
@@ -32,7 +33,14 @@ api_router.include_router(
     tags=["Academic Structure Management"],
 )
 
-# 5. Question Bank Management System (Phase 6)
+# 5. Bulk Question Import & Export System (Phase 7) - registered before parameterized /{question_id}
+api_router.include_router(
+    question_import_export.router,
+    prefix="/questions",
+    tags=["Bulk Question Import & Export System"],
+)
+
+# 5.1. Question Bank Management System (Phase 6)
 api_router.include_router(
     question_bank.router,
     prefix="/questions",

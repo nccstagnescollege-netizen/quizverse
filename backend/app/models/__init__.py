@@ -40,6 +40,11 @@ from backend.app.models.question_bank import (
     QuestionReview,
     PlatformSetting,
 )
+from backend.app.models.question_import_export import (
+    QuestionImportJob,
+    QuestionImportRow,
+    QuestionExportJob,
+)
 from backend.app.models.quiz import (
     Quiz,
     QuizQuestion,
@@ -116,6 +121,10 @@ __all__ = [
     "QuestionAttachment",
     "QuestionReview",
     "PlatformSetting",
+    # Question Import & Export
+    "QuestionImportJob",
+    "QuestionImportRow",
+    "QuestionExportJob",
     # Quiz
     "Quiz",
     "QuizQuestion",

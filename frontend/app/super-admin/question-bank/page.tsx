@@ -276,18 +276,39 @@ export default function SuperAdminQuestionBankPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/super-admin/question-bank/bulk-import"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition"
+          >
+            <span>📥</span>
+            <span>Import</span>
+          </Link>
+          <Link
+            href="/super-admin/question-bank/bulk-export"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition"
+          >
+            <span>📤</span>
+            <span>Export</span>
+          </Link>
+          <Link
+            href="/super-admin/question-bank/import-history"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition"
+            title="Import History"
+          >
+            <span>📜</span>
+          </Link>
           <button
             onClick={fetchData}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors"
             title="Refresh Question Bank"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <Link
             href="/super-admin/question-bank/create"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all shadow-md shadow-primary-500/20"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-all shadow-md shadow-primary-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>Create New Question</span>

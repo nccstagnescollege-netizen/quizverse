@@ -23,6 +23,7 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    external_id = Column(String(128), nullable=True, index=True)
     title = Column(String(255), nullable=True)
     institution_id = Column(Uuid, ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True, index=True)
     subject_id = Column(Uuid, ForeignKey("subjects.id", ondelete="RESTRICT"), nullable=True, index=True)

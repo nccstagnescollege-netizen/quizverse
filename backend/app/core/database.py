@@ -24,6 +24,11 @@ if settings.DATABASE_URL:
             sep = "&" if "?" in db_url else "?"
             db_url = f"{db_url}{sep}sslmode=require"
 
+        # On Windows local environment, use direct IPv6 literal for Supabase to bypass intermittent DNS dropouts
+        import platform
+        if platform.system() == "Windows" and "db.alkyogizjqdtbynzlsvd.supabase.co" in db_url:
+            db_url = db_url.replace("db.alkyogizjqdtbynzlsvd.supabase.co", "[2406:da14:1d4f:7401:d9d6:9c42:8e0c:763c]")
+
         engine = create_engine(
             db_url,
             pool_pre_ping=True,  # Detect and discard dead connections automatically

@@ -65,6 +65,14 @@ def get_admin_effective_permissions(db: Session, admin: Admin) -> Set[str]:
     return effective_permissions
 
 
+def has_permission(db: Session, admin: Admin, permission_name: str) -> bool:
+    """Helper to check if an admin possesses a specific permission or is super admin."""
+    if admin.is_super_admin:
+        return True
+    perms = get_admin_effective_permissions(db, admin)
+    return permission_name in perms or "*" in perms
+
+
 def check_quiz_access(
     db: Session,
     admin: Admin,
