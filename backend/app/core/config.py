@@ -31,6 +31,21 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None  # Server-side privileged key
     SUPABASE_JWT_SECRET: Optional[str] = None
 
+    # Security & RBAC Configuration
+    SECRET_KEY: str = "quizverse-jwt-secret-key-change-in-production-only-super-safe-32b"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
+
+    # Super Admin Bootstrap Settings
+    SUPER_ADMIN_DEFAULT_EMAIL: str = "superadmin@quizverse.io"
+    SUPER_ADMIN_DEFAULT_PASSWORD: str = "QuizverseSuperAdmin2026!"
+    SUPER_ADMIN_DEFAULT_NAME: str = "System Super Administrator"
+
+    @property
+    def effective_jwt_secret(self) -> str:
+        """Returns the configured Supabase JWT secret or fallback system secret key."""
+        return self.SUPABASE_JWT_SECRET or self.SECRET_KEY
+
     # Optional Future Integrations
     REDIS_URL: Optional[str] = None
 

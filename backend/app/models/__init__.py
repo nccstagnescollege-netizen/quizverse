@@ -11,6 +11,10 @@ from backend.app.models.auth_rbac import (
     Permission,
     AdminRole,
     RolePermission,
+    AdminQuizAssignment,
+    AdminAcademicScope,
+    AdminPermissionOverride,
+    AdminSession,
 )
 from backend.app.models.academic import (
     Unit,
@@ -74,6 +78,10 @@ __all__ = [
     "Permission",
     "AdminRole",
     "RolePermission",
+    "AdminQuizAssignment",
+    "AdminAcademicScope",
+    "AdminPermissionOverride",
+    "AdminSession",
     # Academic
     "Unit",
     "Chapter",

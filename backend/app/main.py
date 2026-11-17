@@ -13,6 +13,16 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"🚀 {settings.PROJECT_NAME} v{settings.VERSION} started in {settings.ENVIRONMENT} mode."
     )
+    # Attempt server-side super admin bootstrap if database is accessible
+    try:
+        from backend.app.core.database import SessionLocal
+        from backend.app.services.bootstrap_service import ensure_super_admin_exists
+        if SessionLocal:
+            with SessionLocal() as db:
+                ensure_super_admin_exists(db)
+    except Exception as e:
+        logger.warning(f"Super admin bootstrap deferred or skipped: {e}")
+
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
 

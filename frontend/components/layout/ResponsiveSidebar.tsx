@@ -14,6 +14,7 @@ import {
   Layers,
   ArrowLeft,
   ShieldAlert,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,17 @@ export const ADMIN_NAV_ITEMS = [
     href: '/admin/dashboard',
     icon: LayoutDashboard,
     badge: 'v1.0',
+  },
+  {
+    label: 'Super Admin Hub',
+    href: '/super-admin/dashboard',
+    icon: ShieldAlert,
+    badge: 'Super',
+  },
+  {
+    label: 'User Admins',
+    href: '/super-admin/admins',
+    icon: Users,
   },
   {
     label: 'Question Bank',

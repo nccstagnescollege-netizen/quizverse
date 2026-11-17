@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'QUIZVERSE | Next-Gen 3D Examination Platform',
@@ -26,7 +27,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-surface-base text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-brand-500 selection:text-white">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

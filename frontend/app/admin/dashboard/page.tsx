@@ -36,6 +36,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { ChartContainer } from '@/components/ui/ChartContainer';
 import { ResponsiveTable, TableColumn } from '@/components/ui/ResponsiveTable';
+import { useAuth } from '@/contexts/AuthContext';
 
 const MOCK_ACTIVITY_DATA = [
   { name: '08:00', candidates: 14, submissions: 10 },
@@ -106,6 +107,7 @@ const MOCK_RECENT_QUIZZES: RecentQuiz[] = [
 
 export default function AdminDashboardPage() {
   const [activeChartTab, setActiveChartTab] = useState<'concurrency' | 'proficiency'>('concurrency');
+  const { user, isSuperAdmin, hasPermission } = useAuth();
 
   const columns: TableColumn<RecentQuiz>[] = [
     {
@@ -203,6 +205,39 @@ export default function AdminDashboardPage() {
           </div>
         }
       />
+
+      {/* Role & Access Scope Indicator */}
+      {isSuperAdmin ? (
+        <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-lg bg-purple-500/20 text-purple-300">
+              <ShieldAlert className="w-4 h-4" />
+            </span>
+            <div>
+              <div className="font-semibold text-white">Super Administrator Session Active</div>
+              <p className="text-slate-400">You have unrestricted global platform authority across all operational domains.</p>
+            </div>
+          </div>
+          <Link
+            href="/super-admin/dashboard"
+            className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs self-start sm:self-auto transition-colors"
+          >
+            Super Admin Command Hub &rarr;
+          </Link>
+        </div>
+      ) : (
+        <div className="p-3.5 rounded-xl bg-surface-card border border-surface-border flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            <span className="text-slate-300">
+              Operational Scope: <strong>{user?.full_name || 'Assigned User Administrator'}</strong> ({user?.roles?.join(', ') || 'user_admin'})
+            </span>
+          </div>
+          <span className="font-mono text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+            {user ? `${user.permissions.length} granular permissions` : 'Default-deny RBAC active'}
+          </span>
+        </div>
+      )}
 
       {/* 1. KPI Stats Grid (Adaptive 1 col on phone, 2 on tablet, 4 on desktop) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
