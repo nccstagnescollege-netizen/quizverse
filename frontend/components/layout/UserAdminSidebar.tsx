@@ -65,9 +65,9 @@ export function UserAdminSidebar({
       },
       {
         label: 'Academic Structure',
-        href: '/admin/dashboard#academic',
+        href: '/admin/academic',
         icon: Layers,
-        authorized: true,
+        authorized: hasPermission('academic.view'),
       },
       {
         label: 'Student Registrations',

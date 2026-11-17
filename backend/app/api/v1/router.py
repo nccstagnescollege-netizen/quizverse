@@ -3,6 +3,7 @@ from backend.app.api.v1.endpoints import (
     health,
     auth,
     admin_management,
+    academic,
     quizzes,
     dashboard_super_admin,
     dashboard_user_admin,
@@ -21,6 +22,13 @@ api_router.include_router(
     admin_management.router,
     prefix="/admin-management",
     tags=["Super Admin Administration & RBAC"],
+)
+
+# 4. Academic Structure Management System (Phase 5)
+api_router.include_router(
+    academic.router,
+    prefix="/academic",
+    tags=["Academic Structure Management"],
 )
 
 # 4. Scoped Quiz Management

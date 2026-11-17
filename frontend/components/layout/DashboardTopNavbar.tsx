@@ -19,14 +19,14 @@ import { ThemeToggle } from '../ui/ThemeToggle';
 import { NotificationPanel } from '../ui/NotificationPanel';
 
 interface DashboardTopNavbarProps {
-  title: string;
+  title?: string;
   breadcrumbs?: { label: string; href?: string }[];
   onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
 }
 
 export function DashboardTopNavbar({
-  title,
+  title = 'QUIZVERSE Portal',
   breadcrumbs,
   onToggleSidebar,
   isSidebarOpen,

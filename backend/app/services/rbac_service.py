@@ -188,30 +188,128 @@ def enforce_quiz_access(
     return quiz
 
 
+def get_admin_academic_scopes(db: Session, admin: Admin) -> dict:
+    """Returns a dict of all academic entity IDs explicitly assigned to this admin."""
+    if admin.is_super_admin:
+        return {"all": True}
+    
+    scopes = db.query(AdminAcademicScope).filter(AdminAcademicScope.admin_id == admin.id).all()
+    return {
+        "all": False,
+        "institutions": {s.institution_id for s in scopes if s.institution_id},
+        "programmes": {s.programme_id for s in scopes if s.programme_id},
+        "curricula": {s.curriculum_id for s in scopes if s.curriculum_id},
+        "subjects": {s.subject_id for s in scopes if s.subject_id},
+        "units": {s.unit_id for s in scopes if s.unit_id},
+        "topics": {s.topic_id for s in scopes if s.topic_id},
+        "has_any_scope": len(scopes) > 0,
+    }
+
+
 def check_academic_scope(
     db: Session,
     admin: Admin,
+    institution_id: Optional[uuid.UUID] = None,
+    programme_id: Optional[uuid.UUID] = None,
+    curriculum_id: Optional[uuid.UUID] = None,
+    subject_id: Optional[uuid.UUID] = None,
     unit_id: Optional[uuid.UUID] = None,
     topic_id: Optional[uuid.UUID] = None,
+    strict_for_user_admin: bool = False,
 ) -> bool:
     """
-    Validates whether an administrator is authorized for questions within an academic unit/topic.
+    Validates whether an administrator is authorized for an academic entity or sub-hierarchy.
     Super Admins are unrestricted.
-    If scopes are configured for the admin, they must encompass the target unit or topic.
+    User Admins are validated against their configured academic scopes, including hierarchical inheritance.
     """
     if admin.is_super_admin:
         return True
 
     scopes = db.query(AdminAcademicScope).filter(AdminAcademicScope.admin_id == admin.id).all()
     if not scopes:
-        # If no explicit academic restrictions exist, allow access by default
+        # If no explicit academic restrictions exist and strict mode is off, allow access
+        return not strict_for_user_admin
+
+    allowed_institutions = {s.institution_id for s in scopes if s.institution_id}
+    allowed_programmes = {s.programme_id for s in scopes if s.programme_id}
+    allowed_curricula = {s.curriculum_id for s in scopes if s.curriculum_id}
+    allowed_subjects = {s.subject_id for s in scopes if s.subject_id}
+    allowed_units = {s.unit_id for s in scopes if s.unit_id}
+    allowed_topics = {s.topic_id for s in scopes if s.topic_id}
+
+    # 1. Direct matches
+    if institution_id and institution_id in allowed_institutions:
+        return True
+    if programme_id and programme_id in allowed_programmes:
+        return True
+    if curriculum_id and curriculum_id in allowed_curricula:
+        return True
+    if subject_id and subject_id in allowed_subjects:
+        return True
+    if unit_id and unit_id in allowed_units:
+        return True
+    if topic_id and topic_id in allowed_topics:
         return True
 
-    for scope in scopes:
-        if unit_id and scope.unit_id == unit_id:
+    # 2. Hierarchical inheritance checks
+    from backend.app.models.academic import Programme, Curriculum, CurriculumSubject, Unit, Chapter, Topic
+
+    # If checking programme, check if its parent institution is in allowed_institutions
+    if programme_id:
+        prog = db.query(Programme).filter(Programme.id == programme_id).first()
+        if prog and prog.institution_id in allowed_institutions:
             return True
-        if topic_id and scope.topic_id == topic_id:
+
+    # If checking curriculum, check if its parent programme or institution is allowed
+    if curriculum_id:
+        curr = db.query(Curriculum).filter(Curriculum.id == curriculum_id).first()
+        if curr:
+            if curr.programme_id in allowed_programmes:
+                return True
+            prog = db.query(Programme).filter(Programme.id == curr.programme_id).first()
+            if prog and prog.institution_id in allowed_institutions:
+                return True
+
+    # If checking subject, check if its institution is allowed, or if it is part of an allowed programme/curriculum
+    if subject_id:
+        from backend.app.models.academic import Subject
+        subj = db.query(Subject).filter(Subject.id == subject_id).first()
+        if subj and subj.institution_id and subj.institution_id in allowed_institutions:
             return True
+        # Check if allocated to any curriculum of an allowed programme
+        if allowed_programmes or allowed_curricula:
+            alloc = (
+                db.query(CurriculumSubject)
+                .join(Curriculum, Curriculum.id == CurriculumSubject.curriculum_id)
+                .filter(
+                    CurriculumSubject.subject_id == subject_id,
+                    or_(
+                        CurriculumSubject.curriculum_id.in_(allowed_curricula) if allowed_curricula else False,
+                        Curriculum.programme_id.in_(allowed_programmes) if allowed_programmes else False,
+                    )
+                )
+                .first()
+            )
+            if alloc:
+                return True
+
+    # If checking unit, check if parent subject is allowed
+    if unit_id:
+        u = db.query(Unit).filter(Unit.id == unit_id).first()
+        if u and u.subject_id and (u.subject_id in allowed_subjects or check_academic_scope(db, admin, subject_id=u.subject_id)):
+            return True
+
+    # If checking topic, check chapter -> unit -> subject
+    if topic_id:
+        t = db.query(Topic).filter(Topic.id == topic_id).first()
+        if t:
+            chap = db.query(Chapter).filter(Chapter.id == t.chapter_id).first()
+            if chap:
+                if chap.unit_id in allowed_units:
+                    return True
+                u = db.query(Unit).filter(Unit.id == chap.unit_id).first()
+                if u and u.subject_id and (u.subject_id in allowed_subjects or check_academic_scope(db, admin, subject_id=u.subject_id)):
+                    return True
 
     return False
 
@@ -329,3 +427,30 @@ def require_permission(permission_name: str) -> Callable:
         return current_admin
 
     return _permission_dependency
+
+
+def require_any_permission(permission_names: List[str]) -> Callable:
+    """
+    FastAPI dependency factory enforcing that the authenticated administrator possesses
+    at least one of the specified granular permissions.
+    Super Admins always pass.
+    """
+    async def _any_permission_dependency(
+        current_admin: Admin = Depends(get_current_admin),
+    ) -> Admin:
+        if current_admin.is_super_admin:
+            return current_admin
+
+        effective_perms = getattr(current_admin, "_effective_permissions", set())
+        if "*" in effective_perms or any(p in effective_perms for p in permission_names):
+            return current_admin
+
+        logger.warning(
+            f"Permission denied: Admin [{current_admin.email}] lacks any of required permissions {permission_names}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: Missing required permission (one of {permission_names} required).",
+        )
+
+    return _any_permission_dependency

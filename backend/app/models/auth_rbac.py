@@ -118,12 +118,20 @@ class AdminAcademicScope(Base):
 
     id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     admin_id = Column(Uuid, ForeignKey("admins.id", ondelete="CASCADE"), nullable=False, index=True)
+    institution_id = Column(Uuid, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=True, index=True)
+    programme_id = Column(Uuid, ForeignKey("programmes.id", ondelete="CASCADE"), nullable=True, index=True)
+    curriculum_id = Column(Uuid, ForeignKey("curricula.id", ondelete="CASCADE"), nullable=True, index=True)
+    subject_id = Column(Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True, index=True)
     unit_id = Column(Uuid, ForeignKey("units.id", ondelete="CASCADE"), nullable=True, index=True)
     topic_id = Column(Uuid, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
 
     # Relationships
     admin = relationship("Admin", back_populates="academic_scopes")
+    institution = relationship("Institution")
+    programme = relationship("Programme")
+    curriculum = relationship("Curriculum")
+    subject = relationship("Subject")
     unit = relationship("Unit")
     topic = relationship("Topic")
 

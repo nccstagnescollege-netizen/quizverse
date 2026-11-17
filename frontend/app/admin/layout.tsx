@@ -25,6 +25,7 @@ export default function AdminLayout({
 
   const getPageTitle = () => {
     if (pathname === '/admin/dashboard') return 'Operational Administrator Dashboard';
+    if (pathname.startsWith('/admin/academic')) return 'Assigned Academic Structure';
     if (pathname.startsWith('/admin/quiz')) return 'Quiz Management';
     if (pathname.startsWith('/admin/question-bank')) return 'Question Bank Central';
     if (pathname.startsWith('/admin/analytics')) return 'Performance Analytics & Results';

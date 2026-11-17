@@ -3,9 +3,11 @@ import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 
 interface StatCardProps {
-  label: string;
+  label?: string;
+  title?: string;
   value: string | number;
   subtitle?: string;
+  description?: string;
   icon: LucideIcon;
   variant?: 'cyan' | 'brand' | 'purple' | 'emerald';
   trend?: string;
@@ -14,13 +16,17 @@ interface StatCardProps {
 
 export function StatCard({
   label,
+  title,
   value,
   subtitle,
+  description,
   icon: Icon,
   variant = 'brand',
   trend,
   className,
 }: StatCardProps) {
+  const displayLabel = label || title || '';
+  const displaySubtitle = subtitle || description;
   const iconVariants = {
     cyan: 'bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan',
     brand: 'bg-brand-500/10 border-brand-500/30 text-brand-400',
@@ -36,7 +42,7 @@ export function StatCard({
       )}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-mono uppercase tracking-wider text-slate-400">{label}</span>
+        <span className="text-xs font-mono uppercase tracking-wider text-slate-400">{displayLabel}</span>
         <div className={cn('p-2.5 rounded-xl border', iconVariants[variant])}>
           <Icon className="w-4 h-4" />
         </div>
@@ -53,8 +59,8 @@ export function StatCard({
         )}
       </div>
 
-      {subtitle && (
-        <p className="mt-1 text-xs text-slate-400 font-sans">{subtitle}</p>
+      {displaySubtitle && (
+        <p className="mt-1 text-xs text-slate-400 font-sans">{displaySubtitle}</p>
       )}
     </div>
   );

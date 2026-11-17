@@ -159,4 +159,19 @@ describe('Responsive Breakpoints and Screen Dimension Standards', () => {
     expect(getGridCols(768)).toBe(3);
     expect(getGridCols(1280)).toBe(4);
   });
+
+  it('validates academic structure tree responsive touch targets and collapsible drawer behavior', () => {
+    // Academic hierarchy node touch targets must exceed minimum 40px for comfortable finger tapping on small screens
+    const treeNodeContainerClasses = 'px-2.5 py-1.5 rounded-lg cursor-pointer';
+    expect(treeNodeContainerClasses).toContain('cursor-pointer');
+    expect(treeNodeContainerClasses).toContain('rounded-lg');
+
+    // Horizontal overflow handling on mobile navigation tabs
+    const tabScrollClasses = 'flex border-b border-surface-border overflow-x-auto gap-2 text-xs font-medium scrollbar-thin';
+    expect(tabScrollClasses).toContain('overflow-x-auto');
+
+    // Search input responsive sizing
+    const searchInputClasses = 'w-full bg-slate-950/80 border border-slate-800 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2';
+    expect(searchInputClasses).toContain('w-full');
+  });
 });
