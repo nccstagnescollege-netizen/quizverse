@@ -54,7 +54,7 @@ export function QuestionCard({
 
   return (
     <div
-      className={`relative p-5 rounded-2xl border transition-all hover:shadow-lg flex flex-col justify-between gap-4 ${
+      className={`relative p-5 rounded-2xl border transition-all hover:shadow-lg flex flex-col justify-between gap-3.5 overflow-hidden ${
         isArchived
           ? 'bg-slate-950/40 border-slate-800/80 opacity-75'
           : 'bg-surface-elevated border-surface-border hover:border-slate-600'
@@ -107,7 +107,7 @@ export function QuestionCard({
 
         {/* Status Badge */}
         <span
-          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border shrink-0 ${
             q.status === 'approved'
               ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
               : q.status === 'pending_review'
@@ -122,13 +122,13 @@ export function QuestionCard({
       </div>
 
       {/* Main Content: Title & Text */}
-      <div className="space-y-1.5 flex-1">
+      <div className="space-y-1.5 flex-1 min-w-0">
         {q.title && (
-          <h3 className="text-sm font-semibold text-white line-clamp-1 hover:text-primary-300 transition-colors">
+          <h3 className="text-sm font-semibold text-white line-clamp-1 hover:text-primary-300 transition-colors break-words">
             {q.title}
           </h3>
         )}
-        <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
+        <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed break-words">
           {q.question_text}
         </p>
       </div>
@@ -137,20 +137,20 @@ export function QuestionCard({
       <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5 pt-1 border-t border-surface-border/60">
         <span className="text-slate-500 font-medium">Path:</span>
         {q.subject_name && (
-          <span className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 font-medium">
+          <span className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 font-medium max-w-[200px] truncate" title={q.subject_name}>
             {q.subject_name}
           </span>
         )}
         {q.unit_name && (
           <>
             <span className="text-slate-600">&rsaquo;</span>
-            <span className="text-slate-400">{q.unit_name}</span>
+            <span className="text-slate-400 max-w-[150px] truncate" title={q.unit_name}>{q.unit_name}</span>
           </>
         )}
         {q.topic_name && (
           <>
             <span className="text-slate-600">&rsaquo;</span>
-            <span className="text-primary-400 font-medium">{q.topic_name}</span>
+            <span className="text-primary-400 font-medium max-w-[150px] truncate" title={q.topic_name}>{q.topic_name}</span>
           </>
         )}
       </div>
@@ -161,7 +161,8 @@ export function QuestionCard({
           {q.tags.map((t, idx) => (
             <span
               key={idx}
-              className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 border border-slate-700"
+              className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 border border-slate-700 max-w-[120px] truncate"
+              title={`#${t}`}
             >
               #{t}
             </span>
@@ -169,21 +170,29 @@ export function QuestionCard({
         </div>
       )}
 
-      {/* Footer Info & Actions */}
-      <div className="flex items-center justify-between gap-2 pt-2 border-t border-surface-border/60">
-        <div className="text-[10px] text-slate-400 flex items-center gap-2">
-          <span>{q.options_count} options</span>
-          <span>•</span>
-          <span>{new Date(q.created_at).toLocaleDateString()}</span>
+      {/* Footer Info & Actions - 2-Tier Clean Responsive Layout */}
+      <div className="pt-2.5 border-t border-surface-border/60 flex flex-col gap-2 mt-auto">
+        {/* Tier 1: Metadata Row (options count, date) */}
+        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-300 font-semibold">{q.options_count} options</span>
+            <span className="text-slate-600">•</span>
+            <span>{new Date(q.created_at).toLocaleDateString()}</span>
+          </div>
+          {q.created_by_name && (
+            <span className="text-[10px] text-slate-500 truncate max-w-[120px]" title={`By ${q.created_by_name}`}>
+              {q.created_by_name}
+            </span>
+          )}
         </div>
 
-        {/* Action Buttons with touch-friendly min targets */}
-        <div className="flex items-center gap-1">
+        {/* Tier 2: Action Buttons Bar */}
+        <div className="flex items-center justify-end gap-1 flex-wrap pt-1 border-t border-surface-border/30">
           {/* Preview */}
           <button
             onClick={() => onPreview(q)}
             title="Preview Question"
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+            className="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -193,7 +202,7 @@ export function QuestionCard({
             <button
               onClick={() => onReview(q)}
               title="Review / Approval Workflow"
-              className="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="w-8 h-8 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors flex items-center justify-center shrink-0"
             >
               <MessageSquare className="w-4 h-4" />
             </button>
@@ -203,7 +212,7 @@ export function QuestionCard({
           <button
             onClick={() => onHistory(q)}
             title="Version History & Snapshots"
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+            className="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
           >
             <History className="w-4 h-4" />
           </button>
@@ -212,7 +221,7 @@ export function QuestionCard({
           <button
             onClick={() => onDuplicate(q)}
             title="Duplicate Question"
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+            className="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
           >
             <Copy className="w-4 h-4" />
           </button>
@@ -222,7 +231,7 @@ export function QuestionCard({
             <Link
               href={`${basePath}/${q.id}/edit`}
               title="Edit Question"
-              className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="w-8 h-8 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors flex items-center justify-center shrink-0"
             >
               <Edit className="w-4 h-4" />
             </Link>
@@ -233,7 +242,7 @@ export function QuestionCard({
             <button
               onClick={() => onRestore(q)}
               title="Restore from Archive"
-              className="p-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="w-8 h-8 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors flex items-center justify-center shrink-0"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -241,7 +250,7 @@ export function QuestionCard({
             <button
               onClick={() => onArchive(q)}
               title="Archive Question"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
             >
               <Archive className="w-4 h-4" />
             </button>
@@ -252,7 +261,7 @@ export function QuestionCard({
             <button
               onClick={() => onDelete(q)}
               title="Permanently Delete Question"
-              className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="w-8 h-8 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center justify-center shrink-0"
             >
               <Trash2 className="w-4 h-4" />
             </button>
