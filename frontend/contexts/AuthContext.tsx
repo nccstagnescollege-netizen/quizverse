@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export interface AdminProfile {
   id: string;
@@ -30,6 +31,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+function setAuthCookie(token: string) {
+  if (typeof document !== 'undefined') {
+    document.cookie = `quizverse_auth_token=${token}; path=/; max-age=604800; SameSite=Lax;`;
+  }
+}
+
+function clearAuthCookie() {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'quizverse_auth_token=; path=/; max-age=0; SameSite=Lax;';
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AdminProfile | null>(null);
@@ -62,27 +75,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       // Token invalid or revoked
       localStorage.removeItem('quizverse_admin_token');
+      clearAuthCookie();
       setToken(null);
       setUser(null);
     }
   }, [token, fetchProfile]);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('quizverse_admin_token');
-    if (savedToken) {
-      setToken(savedToken);
-      fetchProfile(savedToken).then((profile) => {
-        if (profile) {
-          setUser(profile);
-        } else {
-          localStorage.removeItem('quizverse_admin_token');
-          setToken(null);
+    let isMounted = true;
+
+    async function initializeSession() {
+      // 1. Check Supabase Auth active session first if available
+      if (supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            const profile = await fetchProfile(session.access_token);
+            if (profile && isMounted) {
+              localStorage.setItem('quizverse_admin_token', session.access_token);
+              setAuthCookie(session.access_token);
+              setToken(session.access_token);
+              setUser(profile);
+              setIsLoading(false);
+              return;
+            } else if (!profile && isMounted) {
+              // User has Supabase session but is not an administrator
+              await supabase.auth.signOut();
+            }
+          }
+        } catch {
+          // Fall through to stored token verification
         }
+      }
+
+      // 2. Check saved localStorage token
+      const savedToken = localStorage.getItem('quizverse_admin_token');
+      if (savedToken) {
+        setToken(savedToken);
+        const profile = await fetchProfile(savedToken);
+        if (profile && isMounted) {
+          setAuthCookie(savedToken);
+          setUser(profile);
+        } else if (isMounted) {
+          localStorage.removeItem('quizverse_admin_token');
+          clearAuthCookie();
+          setToken(null);
+          setUser(null);
+        }
+      }
+
+      if (isMounted) {
         setIsLoading(false);
-      });
-    } else {
-      setIsLoading(false);
+      }
     }
+
+    initializeSession();
+
+    // 3. Listen to Supabase Auth state changes if available
+    let authListener: { unsubscribe: () => void } | null = null;
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!isMounted) return;
+
+        if (event === 'SIGNED_OUT') {
+          localStorage.removeItem('quizverse_admin_token');
+          clearAuthCookie();
+          setToken(null);
+          setUser(null);
+        } else if (event === 'SIGNED_IN' && session?.access_token) {
+          const profile = await fetchProfile(session.access_token);
+          if (profile && isMounted) {
+            localStorage.setItem('quizverse_admin_token', session.access_token);
+            setAuthCookie(session.access_token);
+            setToken(session.access_token);
+            setUser(profile);
+          }
+        }
+      });
+      authListener = data.subscription;
+    }
+
+    return () => {
+      isMounted = false;
+      if (authListener) {
+        authListener.unsubscribe();
+      }
+    };
   }, [fetchProfile]);
 
   const hasPermission = useCallback(
@@ -99,24 +177,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+    const normalizedEmail = email.trim().toLowerCase();
 
-      const data = await res.json();
-      if (!res.ok) {
-        setIsLoading(false);
-        const errMsg = data.error?.message || data.detail || 'Authentication failed.';
-        return { success: false, error: errMsg };
+    try {
+      let authToken: string | null = null;
+      let adminProfile: AdminProfile | null = null;
+
+      // 1. Try Supabase Auth first if configured
+      if (supabase) {
+        try {
+          const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
+          });
+
+          if (!sbError && sbData?.session?.access_token) {
+            authToken = sbData.session.access_token;
+            // Validate that this Supabase user is an administrator in QUIZVERSE database
+            adminProfile = await fetchProfile(authToken);
+
+            if (!adminProfile) {
+              // Public user exists in Supabase Auth, but is not an administrator in QUIZVERSE
+              await supabase.auth.signOut();
+              clearAuthCookie();
+              localStorage.removeItem('quizverse_admin_token');
+              setIsLoading(false);
+              return {
+                success: false,
+                error: 'Access Denied: This account is not authorized as an administrator. Public users cannot access the admin console.',
+              };
+            }
+          }
+        } catch {
+          // Fall through to backend login
+        }
       }
 
-      const authToken = data.access_token;
-      const adminProfile = data.user;
+      // 2. Fallback to QUIZVERSE Backend API Auth
+      if (!authToken || !adminProfile) {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, password }),
+        });
 
+        const data = await res.json();
+        if (!res.ok) {
+          setIsLoading(false);
+          const errMsg = data.error?.message || data.detail || 'Authentication failed. Please verify credentials.';
+          return { success: false, error: errMsg };
+        }
+
+        authToken = data.access_token;
+        adminProfile = data.user;
+      }
+
+      if (!authToken || !adminProfile) {
+        setIsLoading(false);
+        return { success: false, error: 'Authentication failed. No administrator record found.' };
+      }
+
+      // Check account status
+      if (adminProfile.status !== 'active') {
+        setIsLoading(false);
+        return {
+          success: false,
+          error: `Administrator account is ${adminProfile.status}. Access denied.`,
+        };
+      }
+
+      // Persist token in localStorage and cookie for Next.js middleware protection
       localStorage.setItem('quizverse_admin_token', authToken);
+      setAuthCookie(authToken);
       setToken(authToken);
       setUser(adminProfile);
       setIsLoading(false);
@@ -136,6 +268,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Proceed with logout
+      }
+    }
+
     if (token) {
       try {
         await fetch(`${API_BASE}/auth/logout`, {
@@ -146,7 +286,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Proceed with client logout even if backend unreachable
       }
     }
+
     localStorage.removeItem('quizverse_admin_token');
+    clearAuthCookie();
     setToken(null);
     setUser(null);
     router.push('/login');

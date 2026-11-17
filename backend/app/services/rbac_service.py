@@ -372,12 +372,26 @@ async def get_current_admin(
             )
         touch_session(db, token_jti)
 
-    # 2. Retrieve Admin from database
-    admin = db.query(Admin).filter(Admin.id == admin_id).first()
+    # 2. Retrieve Admin from database (Supports both native and Supabase Auth tokens)
+    admin = db.query(Admin).filter(
+        or_(Admin.id == admin_id, Admin.auth_user_id == admin_id)
+    ).first()
+
+    if not admin:
+        email = payload.get("email")
+        if email:
+            admin = db.query(Admin).filter(Admin.email == email.lower()).first()
+            if admin and not admin.auth_user_id:
+                try:
+                    admin.auth_user_id = admin_id
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
     if not admin:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Administrator account not found.",
+            detail="Administrator account not found. Public users are not permitted access to administrative consoles.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

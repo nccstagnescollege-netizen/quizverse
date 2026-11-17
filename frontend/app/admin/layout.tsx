@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { UserAdminSidebar } from '@/components/layout/UserAdminSidebar';
 import { DashboardTopNavbar } from '@/components/layout/DashboardTopNavbar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { useAuth } from '@/contexts/AuthContext';
+import { ShieldAlert, RefreshCw } from 'lucide-react';
 
 export default function AdminLayout({
   children,
@@ -13,6 +15,36 @@ export default function AdminLayout({
 }) {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated || !user) {
+        router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router, pathname]);
+
+  // Loading state while verifying authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-base text-slate-300 gap-3">
+        <RefreshCw className="w-8 h-8 text-cyan-500 animate-spin" />
+        <p className="text-xs text-slate-400 font-mono tracking-wider">VERIFYING ADMIN ACCESS...</p>
+      </div>
+    );
+  }
+
+  // Deny access if unauthenticated or no admin profile
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-base text-slate-300 gap-3">
+        <ShieldAlert className="w-10 h-10 text-rose-500" />
+        <p className="text-xs text-rose-400 font-mono tracking-wider">ACCESS RESTRICTED — REDIRECTING TO LOGIN...</p>
+      </div>
+    );
+  }
 
   const getBreadcrumbs = (): { label: string; href?: string }[] => {
     const segments = pathname.split('/').filter(Boolean);
