@@ -65,3 +65,26 @@ Where:
 | **Assigned Editor** | `access_level: 'editor'` | Full editing, question composition, and preview capabilities; cannot delete quiz |
 | **Assigned Viewer** | `access_level: 'viewer'` | Read-only inspection of quiz configurations, questions, and attempt reports |
 | **Unassigned** | No row in `admin_quiz_assignments` | **Zero Access**: Filtered out of all queries; direct API calls return `403 Forbidden` |
+
+---
+
+## 4. Operation-to-Permission Mapping for Quiz Sub-Resources
+
+Every quiz sub-resource requires both a valid database relationship (`created_by` or `admin_quiz_assignments`) and the corresponding granular permission:
+
+| Quiz Operational Domain | Endpoint(s) | Required Access Level | Required Permission |
+| :--- | :--- | :---: | :--- |
+| **Viewing Questions** | `GET /quizzes/{id}/questions` | `viewer` | `quiz.view` |
+| **Editing Questions** | `POST /quizzes/{id}/questions`<br>`DELETE /quizzes/{id}/questions/{qid}` | `editor` | `quiz.edit` |
+| **Publishing Quiz** | `POST /quizzes/{id}/publish` | `editor` | `quiz.publish` |
+| **Scheduling Quiz** | `POST /quizzes/{id}/schedule` | `editor` | `quiz.schedule` |
+| **Viewing Invitations** | `GET /quizzes/{id}/invitations` | `viewer` | `student.view` |
+| **Generating Invitations** | `POST /quizzes/{id}/invitations` | `editor` | `invitation.generate` |
+| **Revoking Invitations** | `POST /quizzes/{id}/invitations/{iid}/revoke` | `editor` | `invitation.revoke` |
+| **Student Registrations** | `GET /quizzes/{id}/registrations` | `viewer` | `student.view` |
+| **Exporting Registrations**| `GET /quizzes/{id}/registrations/export` | `viewer` | `student.export` |
+| **Live Exam Monitoring** | `GET /quizzes/{id}/monitoring/live` | `viewer` | `examination.monitor` |
+| **Session Interventions** | `POST /quizzes/{id}/monitoring/terminate/{aid}`<br>`POST /quizzes/{id}/monitoring/extend-time/{aid}` | `editor` | `examination.terminate`<br>`examination.extend_time` |
+| **Results & Summary** | `GET /quizzes/{id}/results` | `viewer` | `analytics.view` |
+| **Psychometric Analytics** | `GET /quizzes/{id}/analytics` | `viewer` | `analytics.view` |
+| **Exporting Reports** | `GET /quizzes/{id}/reports/export` | `viewer` | `analytics.export` |

@@ -71,7 +71,7 @@ When an administrator's privileges are modified or account is suspended:
 
 ---
 
-## 4. Security Verification Matrix (15 Scenarios)
+## 4. Security Verification Matrix (23 Scenarios)
 
 The automated test suite in `backend/tests/test_auth_rbac_security.py` programmatically tests and validates each scenario:
 
@@ -92,3 +92,22 @@ The automated test suite in `backend/tests/test_auth_rbac_security.py` programma
 | **13**| Direct API Bypass Defense | Direct HTTP client requests cannot bypass RBAC rules | `test_13_direct_api_calls_cannot_bypass_permissions` |
 | **14**| Super Admin Authority | Super Admin retains unrestricted access across all 14 platform domains | `test_14_super_admin_has_unrestricted_access` |
 | **15**| Immutable Audit Logging | Administrative actions produce immutable records in `audit_logs` | `test_15_audit_logs_record_actions` |
+| **16**| Viewing & Editing Questions | Unassigned admins blocked with `403`; assigned viewers can view questions; assigned editors can add questions | `test_16_viewing_and_editing_questions_scoped` |
+| **17**| Publishing & Scheduling | Unassigned admins blocked with `403`; assigned editors can publish (validates $\ge 1$ question) and schedule (validates time windows) | `test_17_publishing_and_scheduling_scoped` |
+| **18**| Invitation Link Management | Unassigned admins blocked with `403`; assigned viewers view links; editors generate cryptographic SHA-256 hashed links & revoke | `test_18_invitation_link_management_scoped` |
+| **19**| Student Registration Records | Unassigned admins blocked with `403`; assigned viewers view registrations; editors/export-permissioned admins export records | `test_19_student_registration_records_scoped` |
+| **20**| Examination Monitoring | Unassigned admins blocked with `403`; assigned viewers access live heartbeats/telemetry; editors terminate attempts or extend time | `test_20_examination_monitoring_scoped` |
+| **21**| Results, Analytics & Export | Unassigned admins blocked with `403`; assigned viewers access individual results and psychometric summaries; export requires permission | `test_21_results_analytics_and_export_scoped` |
+| **22**| Delegation Assignment | Admin explicitly assigned in `admin_quiz_assignments` gains scoped access to previously inaccessible quiz | `test_22_delegation_assignment_grants_access` |
+| **23**| Super Admin Global Subresource Bypass | Super Admin has global bypass to inspect, publish, and monitor quizzes created by any User Admin | `test_23_super_admin_unrestricted_subresource_access` |
+
+---
+
+## 5. Backend Database Enforcement of Quiz Sub-Resources
+
+All quiz-related sub-resource endpoints invoke `enforce_quiz_access(db, admin, quiz_id, required_level, required_permission)`:
+1. **Ownership verification**: Evaluates `Quiz.created_by == current_admin.id`.
+2. **Assignment verification**: Queries `admin_quiz_assignments` table to check if `(admin_id, quiz_id)` exists with `access_level >= required_level` (`viewer` = 1, `editor` = 2, `owner` = 3).
+3. **Permission verification**: Ensures effective permissions calculated from roles and overrides include `required_permission`.
+4. **Super Admin Bypass**: Administrators with `is_super_admin == True` bypass scoping checks while still logging audit records.
+5. **No Frontend Reliance**: Any direct REST API request by an unassigned administrator returns `HTTP 403 Forbidden`, protecting database rows from unauthorized exposure or manipulation.

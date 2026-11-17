@@ -50,7 +50,7 @@ https://quizverse-api.<your-subdomain>.workers.dev
 
 ### Step 4: Verify Deployment
 ```bash
-curl https://quizverse-api.<your-subdomain>.workers.dev/api/v1/health
+curl https://quizverse.nccstagnescollege.workers.dev/api/v1/health
 ```
 
 ---

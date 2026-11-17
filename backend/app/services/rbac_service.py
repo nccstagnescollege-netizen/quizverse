@@ -110,6 +110,61 @@ def check_quiz_access(
     return assigned_rank >= required_rank
 
 
+def enforce_quiz_access(
+    db: Session,
+    admin: Admin,
+    quiz_id: uuid.UUID,
+    required_level: str = "viewer",
+    required_permission: Optional[str] = None,
+) -> Quiz:
+    """
+    Enforces authorization using database relationships and granular permissions.
+    - Verifies quiz existence (HTTP 404 if not found).
+    - Enforces permission checks (e.g. quiz.publish, examination.monitor, analytics.export).
+    - Enforces database relationship: quiz ownership (quiz.created_by == admin.id) or assignment in admin_quiz_assignments.
+    - Super Admins bypass ordinary restrictions.
+    Raises HTTPException(403) if permission or ownership/assignment is missing.
+    Returns the loaded Quiz entity.
+    """
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Quiz '{quiz_id}' not found.",
+        )
+
+    if admin.is_super_admin:
+        return quiz
+
+    # 1. Verify granular permission
+    if required_permission:
+        effective_perms = getattr(admin, "_effective_permissions", None)
+        if effective_perms is None:
+            effective_perms = get_admin_effective_permissions(db, admin)
+            admin._effective_permissions = effective_perms
+
+        if required_permission not in effective_perms and "*" not in effective_perms:
+            logger.warning(
+                f"Permission denied: Admin [{admin.email}] lacks required permission [{required_permission}] for quiz [{quiz_id}]"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access forbidden: Missing required permission '{required_permission}'.",
+            )
+
+    # 2. Verify ownership or database assignment
+    if not check_quiz_access(db, admin, quiz_id, required_level=required_level):
+        logger.warning(
+            f"Scope denied: Admin [{admin.email}] does not possess [{required_level}] access for quiz [{quiz_id}]"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access forbidden: You do not have '{required_level}' access to this quiz.",
+        )
+
+    return quiz
+
+
 def check_academic_scope(
     db: Session,
     admin: Admin,
