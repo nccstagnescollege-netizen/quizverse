@@ -100,6 +100,9 @@ def phase7_seed_data(db_session: Session):
         )
         db_session.add(super_admin)
         db_session.flush()
+    else:
+        super_admin.status = "active"
+        db_session.flush()
 
     # 5. User Admin (Scoped to CS_P7 only)
     user_admin = db_session.query(Admin).filter(Admin.email == "useradmin.p7@quizverse.io").first()
@@ -126,6 +129,9 @@ def phase7_seed_data(db_session: Session):
             admin_id=user_admin.id,
             subject_id=subj.id,
         ))
+    else:
+        user_admin.status = "active"
+        db_session.flush()
 
     # Clean up test artifacts from prior runs to guarantee idempotent test execution
     p7_q_ids = [q.id for q in db_session.query(Question.id).filter((Question.subject_id == subj.id) | (Question.external_id.like("P7-%"))).all()]

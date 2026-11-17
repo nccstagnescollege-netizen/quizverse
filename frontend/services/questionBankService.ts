@@ -212,7 +212,7 @@ async function fetchWithAuth<T>(
 
 export const questionBankService = {
   // Query questions
-  getQuestions: (params: QuestionFilterParams = {}, token?: string | null) => {
+  getQuestions: async (params: QuestionFilterParams = {}, token?: string | null): Promise<QuestionListItem[]> => {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, val]) => {
       if (val !== undefined && val !== null && val !== '') {
@@ -220,43 +220,80 @@ export const questionBankService = {
       }
     });
     const qs = searchParams.toString();
-    return fetchWithAuth<QuestionListItem[]>(`/questions${qs ? `?${qs}` : ''}`, token);
+    const res = await fetchWithAuth<any>(`/questions${qs ? `?${qs}` : ''}`, token);
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data?.items)) return res.data.items;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.items)) return res.items;
+    return [];
   },
 
   // Stats
-  getStats: (token?: string | null) => fetchWithAuth<QuestionStats>('/questions/stats', token),
+  getStats: async (token?: string | null): Promise<QuestionStats> => {
+    const raw: any = await fetchWithAuth<any>('/questions/stats', token);
+    const data = raw?.data || raw || {};
+    return {
+      total_questions: data.total_questions ?? 0,
+      draft: data.draft_questions ?? data.draft ?? 0,
+      pending_review: data.pending_review_questions ?? data.pending_review ?? 0,
+      approved: data.approved_questions ?? data.approved ?? 0,
+      archived: data.archived_questions ?? data.archived ?? 0,
+      by_type: {
+        single_choice: data.single_choice_count ?? data.by_type?.single_choice ?? 0,
+        multiple_choice: data.multiple_choice_count ?? data.by_type?.multiple_choice ?? 0,
+        true_false: data.true_false_count ?? data.by_type?.true_false ?? 0,
+        short_answer: data.short_answer_count ?? data.by_type?.short_answer ?? 0,
+      },
+      by_difficulty: {
+        easy: data.easy_count ?? data.by_difficulty?.easy ?? 0,
+        medium: data.medium_count ?? data.by_difficulty?.medium ?? 0,
+        hard: data.hard_count ?? data.by_difficulty?.hard ?? 0,
+      },
+    };
+  },
 
   // Single Question detail (includes answers if authorized)
-  getQuestion: (id: string, token?: string | null) =>
-    fetchWithAuth<QuestionDetail>(`/questions/${id}`, token),
+  getQuestion: async (id: string, token?: string | null): Promise<QuestionDetail> => {
+    const res: any = await fetchWithAuth<any>(`/questions/${id}`, token);
+    return res?.data ?? res;
+  },
 
   // Student-safe preview (never leaks answers/explanations)
-  getPreview: (id: string, token?: string | null) =>
-    fetchWithAuth<QuestionDetail>(`/questions/${id}/preview`, token),
+  getPreview: async (id: string, token?: string | null): Promise<QuestionDetail> => {
+    const res: any = await fetchWithAuth<any>(`/questions/${id}/preview`, token);
+    return res?.data ?? res;
+  },
 
   // Explicit Administrative Answer Key
-  getAnswerKey: (id: string, token: string) =>
-    fetchWithAuth<{
-      question_id: string;
-      question_type: QuestionType;
-      explanation?: string;
-      options: QuestionOption[];
-      short_answer_config?: ShortAnswerConfig;
-    }>(`/questions/${id}/answer-key`, token),
+  getAnswerKey: async (id: string, token: string) => {
+    const res: any = await fetchWithAuth<any>(`/questions/${id}/answer-key`, token);
+    const data = res?.data ?? res;
+    return {
+      question_id: data.question_id,
+      question_type: data.question_type,
+      explanation: data.explanation,
+      options: data.options || data.all_options || data.correct_options || [],
+      short_answer_config: data.short_answer_config,
+    };
+  },
 
   // Create
-  createQuestion: (payload: QuestionCreatePayload, token: string) =>
-    fetchWithAuth<QuestionDetail>('/questions', token, {
+  createQuestion: async (payload: QuestionCreatePayload, token: string): Promise<QuestionDetail> => {
+    const res: any = await fetchWithAuth<any>('/questions', token, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+    });
+    return res?.data ?? res;
+  },
 
   // Update
-  updateQuestion: (id: string, payload: QuestionUpdatePayload, token: string) =>
-    fetchWithAuth<QuestionDetail>(`/questions/${id}`, token, {
-      method: 'PUT',
+  updateQuestion: async (id: string, payload: QuestionUpdatePayload, token: string): Promise<QuestionDetail> => {
+    const res: any = await fetchWithAuth<any>(`/questions/${id}`, token, {
+      method: 'PATCH',
       body: JSON.stringify(payload),
-    }),
+    });
+    return res?.data ?? res;
+  },
 
   // Delete
   deleteQuestion: (id: string, token: string) =>
@@ -315,18 +352,25 @@ export const questionBankService = {
     ),
 
   // Version History
-  getVersionHistory: (id: string, token: string) =>
-    fetchWithAuth<{ success: boolean; data: QuestionVersion[] }>(`/questions/${id}/history`, token),
+  getVersionHistory: async (id: string, token: string): Promise<{ success: boolean; data: QuestionVersion[] }> => {
+    const res: any = await fetchWithAuth<any>(`/questions/${id}/history`, token);
+    const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    return { success: true, data };
+  },
 
   // Tags
-  getTags: (search?: string, token?: string | null) =>
-    fetchWithAuth<QuestionTag[]>(`/questions/tags/list${search ? `?search=${encodeURIComponent(search)}` : ''}`, token),
+  getTags: async (search?: string, token?: string | null): Promise<QuestionTag[]> => {
+    const res: any = await fetchWithAuth<any>(`/questions/tags/all${search ? `?search=${encodeURIComponent(search)}` : ''}`, token);
+    return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+  },
 
-  createTag: (tag_name: string, description?: string, token?: string) =>
-    fetchWithAuth<QuestionTag>('/questions/tags', token, {
+  createTag: async (tag_name: string, description?: string, token?: string): Promise<QuestionTag> => {
+    const res: any = await fetchWithAuth<any>('/questions/tags', token, {
       method: 'POST',
       body: JSON.stringify({ tag_name, description }),
-    }),
+    });
+    return res?.data ?? res;
+  },
 
   // Attachments
   uploadAttachment: (questionId: string, file: File, isStudentVisible: boolean = true, token: string) => {

@@ -32,8 +32,9 @@ export function ResponsiveTable<T>({
   allowViewToggle = true,
 }: ResponsiveTableProps<T>) {
   const [viewMode, setViewMode] = useState<'auto' | 'table' | 'cards'>('auto');
+  const safeData = Array.isArray(data) ? data : [];
 
-  if (data.length === 0) {
+  if (safeData.length === 0) {
     return (
       <div className={cn('w-full rounded-2xl border border-surface-border glass-card p-8 text-center text-slate-400', className)}>
         {emptyMessage}
@@ -68,7 +69,7 @@ export function ResponsiveTable<T>({
 
       {/* 1. Mobile Cards View (Active on mobile unless forced to table) */}
       <div className={cn('space-y-3', viewMode === 'table' ? 'hidden' : viewMode === 'cards' ? 'block' : 'block md:hidden')}>
-        {data.map((row) => (
+        {safeData.map((row) => (
           <div
             key={keyExtractor(row)}
             className="glass-card rounded-2xl border border-surface-border p-4 space-y-3 transition-colors hover:border-slate-500/40"
@@ -117,7 +118,7 @@ export function ResponsiveTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border/60">
-            {data.map((row) => (
+            {safeData.map((row) => (
               <tr key={keyExtractor(row)} className="hover:bg-white/[0.03] transition-colors group">
                 {columns.map((col) => (
                   <td

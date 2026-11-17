@@ -83,7 +83,8 @@ export function QuestionPreviewModal({
 
   const q = questionData;
   const isKeyView = activeTab === 'answer_key' && canViewAnswerKey;
-  const activeOptions = isKeyView && answerKeyData ? answerKeyData.options : (q?.options || []);
+  const rawOptions = isKeyView && answerKeyData ? (answerKeyData.options || (answerKeyData as any).all_options || []) : (q?.options || []);
+  const activeOptions = Array.isArray(rawOptions) ? rawOptions : [];
   const activeExplanation = isKeyView && answerKeyData ? answerKeyData.explanation : null;
 
   return (
@@ -216,7 +217,7 @@ export function QuestionPreviewModal({
                     placeholder="Candidate will type their answer here..."
                     className="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-400 italic"
                   />
-                  {isKeyView && answerKeyData?.short_answer_config && (
+                  {isKeyView && answerKeyData?.short_answer_config && Array.isArray(answerKeyData.short_answer_config.accepted_answers) && (
                     <div className="mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
                         <Key className="w-4 h-4" />
@@ -313,7 +314,7 @@ export function QuestionPreviewModal({
               </div>
 
               {/* Tags */}
-              {q.tags && q.tags.length > 0 && (
+              {Array.isArray(q.tags) && q.tags.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-slate-400 flex items-center gap-1">
                     <Tag className="w-3.5 h-3.5" /> Tags:

@@ -156,7 +156,7 @@ export function QuestionCard({
       </div>
 
       {/* Tags row */}
-      {q.tags && q.tags.length > 0 && (
+      {Array.isArray(q.tags) && q.tags.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
           {q.tags.map((t, idx) => (
             <span

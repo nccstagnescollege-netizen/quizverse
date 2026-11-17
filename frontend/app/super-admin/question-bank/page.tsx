@@ -83,7 +83,7 @@ export default function SuperAdminQuestionBankPage() {
         questionBankService.getStats(token),
       ]);
 
-      setQuestions(qList);
+      setQuestions(Array.isArray(qList) ? qList : []);
       setStats(sData);
     } catch (err: any) {
       setError(err.message || 'Failed to load question bank data.');
@@ -440,7 +440,7 @@ export default function SuperAdminQuestionBankPage() {
         <LoadingSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchData} />
-      ) : questions.length === 0 ? (
+      ) : !Array.isArray(questions) || questions.length === 0 ? (
         <div className="text-center py-16 p-8 rounded-2xl bg-surface-elevated border border-surface-border space-y-3">
           <HelpCircle className="w-12 h-12 text-slate-600 mx-auto" />
           <h3 className="text-base font-semibold text-slate-200">No Questions Found</h3>
@@ -458,7 +458,7 @@ export default function SuperAdminQuestionBankPage() {
       ) : viewMode === 'table' ? (
         <ResponsiveTable
           columns={tableColumns}
-          data={questions}
+          data={Array.isArray(questions) ? questions : []}
           keyExtractor={(q) => q.id}
           mobileCardRender={(q) => (
             <QuestionCard
@@ -476,7 +476,7 @@ export default function SuperAdminQuestionBankPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {questions.map((q) => (
+          {(Array.isArray(questions) ? questions : []).map((q) => (
             <QuestionCard
               key={q.id}
               question={q}

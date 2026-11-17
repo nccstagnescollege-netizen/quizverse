@@ -1,6 +1,7 @@
 import uuid
+from pathlib import Path
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
@@ -355,6 +356,7 @@ def get_question_answer_key(
 # ==============================================================================
 
 @router.patch("/{question_id}", response_model=dict)
+@router.put("/{question_id}", response_model=dict)
 def update_question(
     question_id: uuid.UUID,
     payload: QuestionUpdate,
@@ -527,6 +529,7 @@ def get_question_history(
 # ==============================================================================
 
 @router.get("/tags/all", response_model=dict)
+@router.get("/tags/list", response_model=dict)
 def list_tags(
     search: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -611,3 +614,52 @@ def delete_attachment(
 ):
     QuestionBankService.delete_attachment(db, admin, question_id, attachment_id)
     return None
+
+
+@router.post("/{question_id}/attachments", response_model=dict, status_code=status.HTTP_201_CREATED)
+def upload_attachment(
+    question_id: uuid.UUID,
+    file: UploadFile = File(...),
+    is_student_visible: bool = Form(True),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Uploads a new attachment file for the given question.
+    """
+    content = file.file.read()
+    file_size = len(content)
+    file_name = file.filename or "attachment"
+    file_type = file.content_type or "application/octet-stream"
+
+    uploads_dir = Path("uploads/questions")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex}_{file_name}"
+    file_path = str(uploads_dir / stored_name)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    att = QuestionBankService.add_attachment(
+        db=db,
+        admin=admin,
+        question_id=question_id,
+        file_name=file_name,
+        file_path=file_path,
+        file_type=file_type,
+        file_size_bytes=file_size,
+        is_student_visible=is_student_visible,
+    )
+    return {
+        "success": True,
+        "message": "Attachment uploaded successfully.",
+        "data": {
+            "id": str(att.id),
+            "question_id": str(att.question_id),
+            "file_name": att.file_name,
+            "file_path": att.file_path,
+            "file_type": att.file_type,
+            "file_size_bytes": att.file_size_bytes,
+            "is_student_visible": att.is_student_visible,
+            "created_at": att.created_at.isoformat() if att.created_at else None,
+        },
+    }
