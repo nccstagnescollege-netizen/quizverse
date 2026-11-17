@@ -2,68 +2,77 @@
 
 ## 1. High-Level Architecture Overview
 
-QUIZVERSE is an enterprise-grade 3D interactive online quiz and examination platform. It is engineered with a modern decoupled monorepo architecture designed for zero cold-start latency, high concurrency, and zero deployment overhead on free-tier infrastructure.
+QUIZVERSE is an advanced 3D interactive online quiz and examination platform. It is engineered with a decoupled monorepo architecture:
+
+- **Frontend**: Next.js 14 with App Router, React, TypeScript, Tailwind CSS, Three.js, React Three Fiber, Drei, Recharts, and Framer Motion.
+- **Backend**: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2.0, and Alembic database migrations.
+- **Database & Auth**: Supabase PostgreSQL 15, Supabase Auth (JWT), and Supabase Storage.
+- **Deployment**: Vercel Free Tier (Frontend), Render Free Instance (Backend), Supabase Free (Database).
 
 ```
 +-------------------------------------------------------------------------+
-|                              CLIENT TIER                                |
+|                        FRONTEND CLIENT TIER                             |
 |                                                                         |
-|  React 18 SPA (Vite + TypeScript + Tailwind CSS)                         |
-|  - Three.js / React Three Fiber / Drei (3D Spatial Canvas)              |
-|  - Framer Motion (Glassmorphism & Micro-animations)                     |
-|  - TanStack Query (Realtime Server State Caching)                       |
-|  - React Router (Route Split: Public vs Admin Workspace)                |
+|  Next.js 14 App Router (React 18 + TypeScript + Tailwind CSS)           |
+|  - Three.js / React Three Fiber / Drei (Spatial 3D Canvas)              |
+|  - Recharts (Real-time psychometric & concurrency analytics)            |
+|  - Framer Motion (Glassmorphic cards & micro-interactions)              |
+|  - Responsive Shell (Desktop multi-column vs Mobile-first drawer)       |
 +------------------------------------+------------------------------------+
                                      |
-                                     | HTTPS / WSS
+                                     | HTTPS REST (/api/v1/*)
                                      v
 +------------------------------------+------------------------------------+
-|                         EDGE / API TIER                                 |
+|                         BACKEND API TIER                                |
 |                                                                         |
-|  Hono Web Framework (TypeScript)                                        |
-|  - Runtime: Cloudflare Workers (Edge) / Node.js (Dev)                   |
-|  - Middleware: Request ID, Security Headers, CORS, Structured Logger    |
-|  - Validation: Zod schema-driven input enforcement                      |
-|  - API Gateway: /api/v1/* (Health, Status, Future Business Endpoints)   |
+|  FastAPI Framework (Python 3.13)                                        |
+|  - Pydantic v2 schema-driven input validation                           |
+|  - Request Context Middleware (X-Request-Id, X-Process-Time-Ms)         |
+|  - Structured JSON Logging & Centralized Error Masking                  |
+|  - Automated OpenAPI documentation (/docs, /redoc)                      |
 +------------------------------------+------------------------------------+
                                      |
-                                     | Privileged Supabase SDK
+                                     | SQLAlchemy 2.0 Connection Pool
                                      v
 +------------------------------------+------------------------------------+
-|                         DATA & AUTH TIER                                |
+|                         DATA & STORAGE TIER                             |
 |                                                                         |
 |  Supabase Cloud (PostgreSQL 15 Free Tier)                               |
-|  - Supabase Auth (JWT session management, RBAC)                         |
-|  - Supabase PostgreSQL (Row-Level Security, ACID transactions)           |
-|  - Supabase Realtime (WebSockets for exam heartbeat & anti-cheat)       |
-|  - Supabase Storage (3D GLTF/GLB models & question asset media)         |
+|  - Row Level Security (RLS) enforcement                                 |
+|  - Alembic revision-controlled migrations                               |
+|  - Transaction pooler (Port 6543) for serverless resilience             |
+|  - Supabase Storage (Exam attachments, 3D GLTF/GLB models)              |
 +-------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Core Architectural Pillars
+## 2. Frontend Architectural Principles
 
-### 2.1 Edge-First Execution
-The backend API is authored on top of Hono, a lightweight, ultra-fast web framework that complies with Web Standards (Fetch API, Request, Response). This enables single-codebase parity between local Node.js development and global edge deployment on Cloudflare Workers without modification.
+### 2.1 Next.js 14 App Router
+The frontend leverages Next.js 14 App Router with explicit route groupings:
+- **Public**: `/`, `/login`, `/about`
+- **Admin**: `/admin/dashboard`, `/admin/question-bank`, `/admin/quiz`, `/admin/analytics`, `/admin/settings`
+- **Candidate Exam**: `/exam/[token]`, `/exam/[token]/instructions`, `/exam/[token]/attempt`, `/exam/[token]/result`
 
-### 2.2 Client-Side 3D Spatial Rendering
-Rather than static flat forms, QUIZVERSE features interactive 3D WebGL/WebGPU scenes driven by Three.js and React Three Fiber.
-- Canvas lifecycle managed with React Suspense for smooth loading.
-- Optimized geometry buffers and low draw-call overhead to sustain 60 FPS on low-spec hardware.
+### 2.2 Lightweight 3D Graphics
+3D scenes are encapsulated in client components with `next/dynamic` lazy loading (`ssr: false`) and automatic fallback to prevent thread blocking. A `useReducedMotion` hook disables rotation and particle distortion when accessibility preferences are detected.
 
-### 2.3 Strict Separation of Concerns
-- `apps/web`: Zero access to database credentials or service-role keys. Communicates purely via standard HTTP requests and anon-scoped Supabase client queries.
-- `apps/api`: The sovereign authority for privileged operations (exam grading, answer verification, audit generation).
-- `packages/shared`: Shared TypeScript types, status enums, and Zod validator contracts shared across both apps.
+### 2.3 Mobile-First Responsive Design
+Components adapt gracefully from 320px mobile screens to large desktop monitors:
+- Single-column touch-friendly candidate workflows on mobile.
+- Expandable responsive sidebar, top navbar, and multi-column dashboards on desktop.
 
 ---
 
-## 3. Communication Protocols
+## 3. Backend Architectural Principles
 
-| Channel | Source &rarr; Destination | Purpose |
-| :--- | :--- | :--- |
-| **HTTPS REST** | Web App &rarr; Hono API | Command execution, quiz management, status probes |
-| **HTTPS REST** | Web App &rarr; Supabase | Public asset loading, authentication token exchange |
-| **WebSocket** | Web App &harr; Supabase Realtime | Live exam telemetry, candidate connectivity heartbeats |
-| **PostgreSQL Pool** | Hono API &rarr; Supabase DB | High-throughput server-side transactions |
+### 3.1 High-Throughput Async Execution
+FastAPI endpoints leverage native Python `async/await` coroutines for non-blocking I/O operations.
+
+### 3.2 Strict Separation of Secrets
+- `NEXT_PUBLIC_*` variables are strictly limited to the backend base URL and Supabase public anon key.
+- The `SUPABASE_SERVICE_ROLE_KEY` and direct database connection credentials are retained exclusively within the FastAPI backend container.
+
+### 3.3 Relational Persistence & Connection Pooling
+SQLAlchemy 2.0 engine uses `pool_pre_ping=True` and `pool_recycle=300` to automatically drop stale connections when interfacing with Supabase PostgreSQL connection poolers on free hosting instances.

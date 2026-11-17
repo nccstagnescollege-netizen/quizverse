@@ -1,0 +1,24 @@
+# Render Infrastructure Blueprint for QUIZVERSE Backend (FastAPI Free Tier)
+services:
+  - type: web
+    name: quizverse-api
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: BACKEND_CORS_ORIGINS
+        value: "https://quizverse.vercel.app,http://localhost:3000"

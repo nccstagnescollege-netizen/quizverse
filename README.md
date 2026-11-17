@@ -2,222 +2,222 @@
 
 <div align="center">
   <h3>Advanced 3D Interactive Online Quiz &amp; Examination Platform</h3>
-  <p>Engineered for low-latency, immersive WebGL/WebGPU assessments, strict proctoring, and zero-cost serverless edge deployment.</p>
+  <p>Engineered for high-concurrency spatial assessments, WebGPU/WebGL 3D interaction, and zero-cost serverless deployment.</p>
 </div>
 
 ---
 
-## 🚀 Quick Navigation
-- [Architecture Overview](#-architecture-overview)
-- [Technology Stack](#-technology-stack)
-- [Monorepo Structure](#-monorepo-structure)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [Available Commands](#-available-commands)
-- [Database Setup](#-database-setup)
-- [Testing & Quality Assurance](#-testing--quality-assurance)
-- [Free Cloud Deployment](#-free-cloud-deployment)
-- [Project Documentation](#-project-documentation)
+## 🏛 1. Project Overview & Architecture
+
+QUIZVERSE is an enterprise online examination platform featuring:
+- **Next-Gen Spatial Assessment**: Interactive 3D models and environments rendered via Three.js, React Three Fiber, and Drei with automatic reduced-motion accessibility fallbacks.
+- **Decoupled Architecture**: High-speed Next.js 14 App Router frontend paired with a Python 3.13 FastAPI backend and Supabase PostgreSQL.
+- **Free Cloud Deployment**: Designed for $0.00 infrastructure costs on Vercel (Frontend), Render Free Instance (Backend), and Supabase Free Tier (Database).
 
 ---
 
-## 🏛 Architecture Overview
+## 🛠 2. Technology Stack
 
-QUIZVERSE is organized as an enterprise monorepo using `pnpm` workspaces:
-
-* **Frontend (`apps/web`)**: React 18, Vite, TypeScript strict mode, Three.js, React Three Fiber, Drei, Tailwind CSS, Framer Motion, TanStack Query, and Lucide React.
-* **Backend API (`apps/api`)**: Node.js & Cloudflare Workers edge-compatible REST API built on Hono with Zod schema validation, structured JSON logging, security headers, CORS allowlisting, and health telemetry.
-* **Shared Package (`packages/shared`)**: Contract-first design containing common TypeScript interfaces, user roles, exam statuses, and Zod input validators.
-* **Database (`database/`)**: Supabase PostgreSQL integration blueprint, baseline schema migrations, deterministic seeds, and Row-Level Security (RLS) policies.
-
----
-
-## 🛠 Technology Stack
-
-### Frontend
-- **Framework**: React 18 + Vite (SPA)
-- **Language**: TypeScript (Strict Mode)
-- **Styling**: Tailwind CSS + Custom Futuristic Glassmorphism Tokens
-- **3D Graphics**: Three.js + React Three Fiber (`@react-three/fiber`) + Drei (`@react-three/drei`)
-- **Animation**: Framer Motion
-- **State & Data Fetching**: TanStack Query v5
-- **Routing**: React Router v6
+### Frontend (`frontend/`)
+- **Framework**: Next.js 14 (App Router)
+- **UI Library**: React 18 + TypeScript
+- **Styling**: Tailwind CSS + Custom Dark Glassmorphism Design Tokens
+- **3D Engine**: Three.js + React Three Fiber (`@react-three/fiber`) + Drei (`@react-three/drei`)
+- **Analytics & Charts**: Recharts
+- **Animations**: Framer Motion
 - **Icons**: Lucide React
 
-### Backend
-- **Framework**: Hono Web Framework
-- **Runtime**: Cloudflare Workers (Edge Production) / Node.js (Local Dev)
-- **Language**: TypeScript
-- **Validation**: Zod
-- **Database Client**: `@supabase/supabase-js`
+### Backend (`backend/`)
+- **Framework**: FastAPI (Python 3.13)
+- **Schema Validation**: Pydantic v2
+- **ORM**: SQLAlchemy 2.0 (with serverless connection pooling)
+- **Database Migrations**: Alembic 1.14
+- **Testing**: Pytest + HTTPX AsyncClient
 
 ### Database & Auth
-- **Provider**: Supabase Free Tier (PostgreSQL 15)
-- **Security**: Row-Level Security (RLS) + JWT Auth
-
-### Deployment & CI
-- **Frontend**: Cloudflare Pages (`*.pages.dev`)
-- **Backend**: Cloudflare Workers (`*.workers.dev`)
-- **CI/CD**: GitHub Actions
+- **Primary Database**: Supabase PostgreSQL 15
+- **Authentication**: Supabase Auth (JWT)
+- **File Storage**: Supabase Storage
+- **Caching**: Optional Redis-compatible integration (future phases)
 
 ---
 
-## 📂 Monorepo Structure
+## 📂 3. Repository Structure
 
 ```
 quizverse/
-├── apps/
-│   ├── web/                     # React 18 + Three.js 3D web application
-│   └── api/                     # Cloudflare Workers / Node.js Hono REST API
-├── packages/
-│   └── shared/                  # Universal TypeScript types & Zod schemas
-├── database/
-│   ├── migrations/              # SQL migration scripts
-│   ├── schema/                  # Initial PostgreSQL schema blueprints
-│   └── seeds/                   # Seed data
-├── docs/                        # Architecture, API, Security, & Deployment docs
-├── tests/
-│   ├── integration/             # Multi-package integration tests
-│   └── e2e/                     # End-to-end browser specifications
-├── package.json                 # Monorepo root scripts
-└── pnpm-workspace.yaml          # pnpm workspace configuration
+├── frontend/                    # Next.js 14 App Router Web Application
+│   ├── app/                     # App Router pages & layouts
+│   │   ├── (public)/            # Public routes (/, /about, /login)
+│   │   ├── admin/               # Admin routes (/dashboard, /question-bank, /quiz, /analytics, /settings)
+│   │   └── exam/[token]/        # Student exam portal (/instructions, /attempt, /result)
+│   ├── components/
+│   │   ├── 3d/                  # Lazy-loaded Three.js R3F canvas components
+│   │   ├── layout/              # TopNavbar, ResponsiveSidebar, MobileNavigation
+│   │   └── ui/                  # DashboardCard, StatCard, ChartContainer, FormField, etc.
+│   ├── hooks/                   # useReducedMotion & state hooks
+│   ├── lib/                     # Supabase client & class mergers
+│   ├── services/                # Backend API fetchers
+│   ├── styles/                  # Tailwind & glassmorphism globals
+│   └── types/                   # TypeScript interfaces
+│
+├── backend/                     # Python 3.13 FastAPI REST API
+│   ├── app/
+│   │   ├── api/v1/endpoints/    # Modular route handlers (/health)
+│   │   ├── core/                # Config (Pydantic), logging, database, exceptions
+│   │   ├── middleware/          # Request context, ID tracking, timing
+│   │   ├── models/              # SQLAlchemy 2.0 ORM models
+│   │   └── schemas/             # Pydantic v2 request/response schemas
+│   ├── migrations/              # Alembic revision migrations
+│   ├── tests/                   # Pytest automated test suite
+│   ├── alembic.ini              # Alembic configuration
+│   └── requirements.txt         # Python package dependencies
+│
+├── docs/                        # Architecture, API conventions, and DB plans
+├── infrastructure/              # Deployment specs (render.yaml, vercel.json, migration scripts)
+├── .github/workflows/           # Automated CI workflow
+├── .env.example                 # Root environment blueprint
+├── package.json                 # Monorepo command runner
+└── README.md
 ```
 
 ---
 
-## 💻 Getting Started
+## 💻 4. Local Installation & Setup
 
 ### Prerequisites
-- **Node.js**: `v20.0.0` or higher (verified on Node v24)
-- **pnpm**: `v9.0.0` or higher
+- **Node.js**: `v20.0.0+`
+- **pnpm**: `v9.0.0+`
+- **Python**: `v3.13+`
 
 ```bash
-# Verify versions
+# Verify environments
 node -v
 pnpm -v
+python --version
 ```
 
-### 1. Install Dependencies
+### 1. Install Backend Dependencies
 ```bash
-pnpm install
+# Create virtual environment (if not already created)
+python -m venv backend/venv
+
+# Activate virtual environment
+# Windows PowerShell:
+.\backend\venv\Scripts\Activate.ps1
+# macOS/Linux:
+source backend/venv/bin/activate
+
+# Install dependencies
+pip install -r backend/requirements.txt
 ```
 
-### 2. Configure Environment Files
-Copy the `.env.example` templates to `.env` in both applications:
-
+### 2. Install Frontend Dependencies
 ```bash
-# Frontend
-cp apps/web/.env.example apps/web/.env
-
-# Backend
-cp apps/api/.env.example apps/api/.env
-```
-
-### 3. Build Shared Package First
-```bash
-pnpm build:shared
-```
-
-### 4. Run Both Applications in Parallel
-```bash
-pnpm dev
-```
-* **Frontend Web App**: `http://localhost:5173`
-* **Backend API**: `http://localhost:8787`
-* **API Health Check**: `http://localhost:8787/api/v1/health`
-* **API Status**: `http://localhost:8787/api/v1/status`
-
-Or run them individually:
-```bash
-# Run web only
-pnpm dev:web
-
-# Run api only
-pnpm dev:api
+pnpm --dir frontend install
 ```
 
 ---
 
-## 🔐 Environment Variables
+## 🚀 5. Starting the Applications
 
-### Frontend (`apps/web/.env`)
-| Variable | Description | Example |
-| :--- | :--- | :--- |
-| `VITE_API_BASE_URL` | Hono Backend API root URL | `http://localhost:8787` |
-| `VITE_SUPABASE_URL` | Supabase project URL | `https://your-project.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Public Supabase anon key | `eyJhbGciOi...` |
+### Run Backend API
+```bash
+# In the virtual environment:
+uvicorn backend.app.main:app --reload --port 8000
+
+# Or using the root shortcut:
+pnpm dev:backend
+```
+* **API Root**: `http://localhost:8000`
+* **Swagger Documentation**: `http://localhost:8000/docs`
+* **ReDoc Documentation**: `http://localhost:8000/redoc`
+* **Health Check**: `http://localhost:8000/api/v1/health`
+
+### Run Frontend Web App
+```bash
+# In a separate terminal:
+pnpm --dir frontend dev
+
+# Or using the root shortcut:
+pnpm dev:frontend
+```
+* **Frontend Application**: `http://localhost:3000`
+* **Admin Command Center**: `http://localhost:3000/admin/dashboard`
+* **Candidate Examination Portal**: `http://localhost:3000/exam/demo-test`
+
+---
+
+## 🔐 6. Environment Variables
+
+### Frontend Configuration (`frontend/.env.local`)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-public-anon-key
+```
+
+### Backend Configuration (`backend/.env`)
+```env
+PROJECT_NAME="QUIZVERSE API"
+VERSION="1.0.0"
+ENVIRONMENT=development
+HOST=0.0.0.0
+PORT=8000
+BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://quizverse.vercel.app
+
+# Supabase PostgreSQL Pooler URI (Confidential)
+DATABASE_URL=postgresql://postgres.your-project-ref:your-db-password@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+
+# Supabase Server-Side Privileged Credentials (Confidential)
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_KEY=your-supabase-public-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-secret-key
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+```
 
 > [!CAUTION]
-> Never place the Supabase `service_role` key in `apps/web/.env`. That key is strictly server-side.
-
-### Backend (`apps/api/.env`)
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `PORT` | Local server port | `8787` |
-| `ENVIRONMENT` | Runtime environment (`development`, `test`, `production`) | `development` |
-| `FRONTEND_ORIGIN` | CORS allowlisted web origin | `http://localhost:5173` |
-| `SUPABASE_URL` | Supabase project URL | `https://your-project.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret key | `eyJhbGciOi...` |
-| `SUPABASE_DB_URL` | PostgreSQL direct pooler URI | `postgresql://postgres...` |
+> Never expose `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL` in the frontend application or repository commits.
 
 ---
 
-## 📜 Available Commands
+## 🗄 7. Database & Alembic Migrations
 
-| Command | Action |
-| :--- | :--- |
-| `pnpm dev` | Run all applications concurrently in development mode |
-| `pnpm dev:web` | Run the React 18 + Vite frontend only |
-| `pnpm dev:api` | Run the Hono API backend with hot reload |
-| `pnpm build` | Build shared package, web application, and API |
-| `pnpm build:shared` | Compile `@quizverse/shared` TypeScript definitions |
-| `pnpm build:web` | Production build of the Vite React application |
-| `pnpm build:api` | Type-check and compile backend API |
-| `pnpm typecheck` | Run TypeScript checks across all packages |
-| `pnpm test` | Execute unit and integration tests with Vitest |
-| `pnpm format` | Format source code with Prettier |
-
----
-
-## 🗄 Database Setup
-
-Follow the detailed instructions in [database/supabase_setup.md](database/supabase_setup.md) to initialize your free Supabase instance:
-1. Create a project at [https://database.new](https://database.new).
-2. Execute `database/migrations/00000000000000_init_readme.sql` in the Supabase SQL Editor.
-3. Verify `_quizverse_meta` table creation.
-
----
-
-## 🧪 Testing & Quality Assurance
-
-Run the test suite across packages:
+To apply database migrations to your Supabase PostgreSQL instance:
 ```bash
-# Run all tests
-pnpm test
+# Run migrations using the venv alembic binary:
+backend/venv/Scripts/alembic -c backend/alembic.ini upgrade head
 
-# Run type check across monorepo
-pnpm typecheck
+# Generate a new migration:
+backend/venv/Scripts/alembic -c backend/alembic.ini revision -m "migration_name"
 ```
 
 ---
 
-## ☁ Free Cloud Deployment
+## 🧪 8. Automated Testing
 
-For end-to-end instructions on deploying for free without unexpected costs:
-- **Frontend &rarr; Cloudflare Pages**: Free CDN, zero bandwidth billing.
-- **Backend &rarr; Cloudflare Workers**: 100,000 free requests/day edge compute.
-- **Database &rarr; Supabase**: Free PostgreSQL 15, Auth, Storage, and Realtime.
+### Backend Test Suite (Pytest)
+```bash
+backend/venv/Scripts/pytest -c backend/pytest.ini backend/tests
+```
 
-See full guide: [docs/deployment/free-deployment-plan.md](docs/deployment/free-deployment-plan.md).
+### Frontend Typecheck & Build
+```bash
+pnpm --dir frontend typecheck
+pnpm --dir frontend build
+```
 
 ---
 
-## 📚 Project Documentation
+## ☁ 9. Free Cloud Deployment
 
-* [System Architecture](docs/architecture/system-architecture.md)
-* [Project Structure](docs/architecture/project-structure.md)
-* [Security Baseline](docs/security/security-baseline.md)
-* [Database Plan](docs/database/database-plan.md)
-* [API Conventions](docs/api/api-conventions.md)
-* [Free Deployment Plan](docs/deployment/free-deployment-plan.md)
-* [Supabase Provisioning](database/supabase_setup.md)
+- **Frontend &rarr; Vercel Free**:
+  - Connect GitHub repository.
+  - Set root directory to `frontend`.
+  - Add environment variables: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- **Backend &rarr; Render Free Instance**:
+  - Deploy using `infrastructure/deployment/render.yaml` or connect GitHub repository as a Python Web Service.
+  - Build command: `pip install -r backend/requirements.txt`
+  - Start command: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+- **Database &rarr; Supabase Free Tier**:
+  - PostgreSQL 15, Auth, Storage, and Realtime with Row Level Security.
