@@ -242,7 +242,7 @@ class CurriculumResponse(BaseModel):
 
 
 class CurriculumSubjectAllocate(BaseModel):
-    curriculum_id: uuid.UUID
+    curriculum_id: Optional[uuid.UUID] = None
     semester_id: uuid.UUID
     subject_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None

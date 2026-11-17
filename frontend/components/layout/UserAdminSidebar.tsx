@@ -143,6 +143,7 @@ export function UserAdminSidebar({
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            suppressHydrationWarning
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-elevated transition-colors"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -151,6 +152,7 @@ export function UserAdminSidebar({
           <button
             onClick={onCloseMobileDrawer}
             aria-label="Close navigation menu"
+            suppressHydrationWarning
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <X className="w-5 h-5" />

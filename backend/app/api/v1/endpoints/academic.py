@@ -428,6 +428,17 @@ async def create_programme(
         )
         db.add(sem_obj)
 
+    # Automatically provision default initial curriculum
+    initial_curr = Curriculum(
+        programme_id=prog.id,
+        curriculum_name=f"{prog.name} Standard Curriculum",
+        version_code="1.0",
+        is_active=True,
+        status="active",
+        description=f"Standard active curriculum for {prog.name}",
+    )
+    db.add(initial_curr)
+
     db.commit()
     db.refresh(prog)
 
@@ -1141,23 +1152,48 @@ async def allocate_subject_to_curriculum(
     custom credits, and elective flags.
     Enforces reusability across multiple programmes!
     """
-    if not check_academic_scope(db, admin, curriculum_id=payload.curriculum_id, strict_for_user_admin=True):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: outside your assigned academic scope.")
-
-    curr = db.query(Curriculum).filter(Curriculum.id == payload.curriculum_id).first()
-    if not curr:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curriculum not found.")
-
     sem = db.query(Semester).filter(Semester.id == payload.semester_id).first()
-    if not sem or sem.programme_id != curr.programme_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Semester does not belong to this curriculum's programme.")
+    if not sem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Semester not found.")
+
+    # Resolve curriculum: validate provided ID or auto-locate / auto-provision default active curriculum
+    curr = None
+    if payload.curriculum_id:
+        curr = db.query(Curriculum).filter(Curriculum.id == payload.curriculum_id).first()
+        if not curr:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curriculum not found.")
+        if sem.programme_id != curr.programme_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Semester does not belong to this curriculum's programme.")
+    else:
+        curr = db.query(Curriculum).filter(
+            Curriculum.programme_id == sem.programme_id,
+            Curriculum.is_active == True,
+        ).first()
+        if not curr:
+            curr = db.query(Curriculum).filter(Curriculum.programme_id == sem.programme_id).first()
+        if not curr:
+            prog = db.query(Programme).filter(Programme.id == sem.programme_id).first()
+            prog_name = prog.name if prog else "Programme"
+            curr = Curriculum(
+                programme_id=sem.programme_id,
+                curriculum_name=f"{prog_name} Standard Curriculum",
+                version_code="1.0",
+                is_active=True,
+                status="active",
+                description=f"Standard active curriculum for {prog_name}",
+            )
+            db.add(curr)
+            db.flush()
+
+    if not check_academic_scope(db, admin, curriculum_id=curr.id, strict_for_user_admin=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: outside your assigned academic scope.")
 
     subj = db.query(Subject).filter(Subject.id == payload.subject_id).first()
     if not subj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found.")
 
     existing = db.query(CurriculumSubject).filter(
-        CurriculumSubject.curriculum_id == payload.curriculum_id,
+        CurriculumSubject.curriculum_id == curr.id,
         CurriculumSubject.semester_id == payload.semester_id,
         CurriculumSubject.subject_id == payload.subject_id,
     ).first()
@@ -1168,7 +1204,7 @@ async def allocate_subject_to_curriculum(
         )
 
     alloc = CurriculumSubject(
-        curriculum_id=payload.curriculum_id,
+        curriculum_id=curr.id,
         semester_id=payload.semester_id,
         subject_id=payload.subject_id,
         category_id=payload.category_id,

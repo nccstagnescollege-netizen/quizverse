@@ -254,9 +254,17 @@ export default function SuperAdminAcademicPage() {
   const handleAllocateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    if (!allocForm.semester_id) {
+      setError('Please select a semester.');
+      return;
+    }
+    if (!allocForm.subject_id) {
+      setError('Please select a master subject.');
+      return;
+    }
     try {
       await academicService.allocateSubject(token, {
-        curriculum_id: allocForm.curriculum_id,
+        curriculum_id: allocForm.curriculum_id || undefined,
         semester_id: allocForm.semester_id,
         subject_id: allocForm.subject_id,
         category_id: allocForm.category_id || undefined,
@@ -268,8 +276,9 @@ export default function SuperAdminAcademicPage() {
       setShowAllocModal(false);
       if (selectedProgrammeId) {
         const progCurricula = curricula.filter((c) => c.programme_id === selectedProgrammeId);
-        if (progCurricula.length > 0) {
-          academicService.getCurriculumAllocations(token, progCurricula[0].id).then(setAllocations);
+        const activeCurrId = allocForm.curriculum_id || progCurricula[0]?.id;
+        if (activeCurrId) {
+          academicService.getCurriculumAllocations(token, activeCurrId).then(setAllocations);
         }
       }
       loadData();
@@ -1004,6 +1013,24 @@ export default function SuperAdminAcademicPage() {
                   <button onClick={() => setShowAllocModal(false)} className="text-slate-400 hover:text-white">✕</button>
                 </div>
                 <form onSubmit={handleAllocateSubject} className="space-y-3">
+                  {curricula.filter((c) => c.programme_id === selectedProgrammeId).length > 1 && (
+                    <div>
+                      <label className="block text-xs font-mono text-slate-300 mb-1">CURRICULUM SCHEME</label>
+                      <select
+                        value={allocForm.curriculum_id}
+                        onChange={(e) => setAllocForm({ ...allocForm, curriculum_id: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                      >
+                        {curricula
+                          .filter((c) => c.programme_id === selectedProgrammeId)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.curriculum_name} (v{c.version_code})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-mono text-slate-300 mb-1">SEMESTER *</label>
                     <select
@@ -1040,6 +1067,7 @@ export default function SuperAdminAcademicPage() {
                         onChange={(e) => setAllocForm({ ...allocForm, category_id: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
                       >
+                        <option value="">None / Core</option>
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.category_name} ({c.category_code})
