@@ -41,8 +41,6 @@ import {
 } from 'recharts';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { SuperAdminSidebar } from '@/components/layout/SuperAdminSidebar';
-import { DashboardTopNavbar } from '@/components/layout/DashboardTopNavbar';
 import { StatCard } from '@/components/ui/StatCard';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { ChartContainer } from '@/components/ui/ChartContainer';
@@ -73,7 +71,6 @@ export default function SuperAdminDashboardPage() {
   const { user, token, isSuperAdmin, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -227,7 +224,7 @@ export default function SuperAdminDashboardPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-surface-base flex items-center justify-center">
+      <div className="space-y-6 max-w-7xl mx-auto w-full">
         <LoadingSkeleton className="w-64 h-8" />
       </div>
     );
@@ -238,42 +235,8 @@ export default function SuperAdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-surface-base text-slate-100 bg-grid-pattern relative">
-      <div className="fixed inset-0 pointer-events-none bg-radial-glow z-0" />
-
-      {/* Desktop Sidebar (14 Sections) */}
-      <SuperAdminSidebar />
-
-      {/* Mobile Drawer */}
-      {isMobileDrawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setIsMobileDrawerOpen(false)}
-          />
-          <div className="relative z-10">
-            <SuperAdminSidebar
-              isMobileDrawer
-              onCloseMobileDrawer={() => setIsMobileDrawerOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 z-10">
-        <DashboardTopNavbar
-          title="Super Admin Command Hub"
-          breadcrumbs={[
-            { label: 'Platform Console', href: '/super-admin/dashboard' },
-            { label: 'Overview' },
-          ]}
-          onToggleSidebar={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
-          isSidebarOpen={isMobileDrawerOpen}
-        />
-
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
-          {/* Header Banner & Quick Actions */}
+    <div className="space-y-6 max-w-7xl mx-auto w-full">
+      {/* Header Banner & Quick Actions */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-surface-elevated/80 to-surface-base border border-purple-500/20 shadow-xl backdrop-blur-xl">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -835,8 +798,6 @@ export default function SuperAdminDashboardPage() {
               )}
             </DashboardCard>
           </div>
-        </main>
-      </div>
     </div>
   );
 }

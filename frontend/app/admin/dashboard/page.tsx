@@ -326,15 +326,15 @@ export default function UserAdminDashboardPage() {
 
       {/* Quiz Filter Bar */}
       {performanceData.length > 0 && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated/40 border border-surface-border text-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-surface-elevated/40 border border-surface-border text-xs">
           <div className="flex items-center gap-2 text-slate-300">
-            <Filter className="w-4 h-4 text-cyan-400" />
+            <Filter className="w-4 h-4 text-cyan-400 shrink-0" />
             <span className="font-medium">Filter Charts by Quiz:</span>
           </div>
           <select
             value={selectedQuizId}
             onChange={(e) => setSelectedQuizId(e.target.value)}
-            className="bg-surface-base border border-surface-border text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full sm:w-auto bg-surface-base border border-surface-border text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             <option value="all">All Authorized Quizzes ({performanceData.length})</option>
             {performanceData.map((q) => (

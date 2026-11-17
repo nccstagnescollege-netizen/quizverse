@@ -46,16 +46,16 @@ export function NotificationPanel() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Open notifications"
-        className="relative p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white hover:border-brand-500/30 transition-colors"
+        className="relative p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white hover:border-brand-500/30 transition-colors touch-manipulation"
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyber-cyan animate-pulse" />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-cyber-cyan animate-pulse" />
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-card rounded-2xl border border-surface-border shadow-glass-lg p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm glass-card rounded-2xl border border-surface-border shadow-glass-lg p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
           <div className="flex items-center justify-between pb-3 border-b border-surface-border">
             <span className="text-xs font-mono uppercase text-slate-300">System Telemetry</span>
             <div className="flex items-center gap-2">

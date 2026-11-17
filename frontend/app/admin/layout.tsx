@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { UserAdminSidebar } from '@/components/layout/UserAdminSidebar';
 import { DashboardTopNavbar } from '@/components/layout/DashboardTopNavbar';
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 
 export default function AdminLayout({
   children,
@@ -65,10 +66,13 @@ export default function AdminLayout({
           isSidebarOpen={isMobileDrawerOpen}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto pb-24 lg:pb-8">
           {children}
         </main>
       </div>
+
+      {/* Mobile Quick-Access Bottom Bar */}
+      <MobileBottomNav onOpenDrawer={() => setIsMobileDrawerOpen(true)} />
     </div>
   );
 }

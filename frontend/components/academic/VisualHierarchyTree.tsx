@@ -181,7 +181,7 @@ export function VisualHierarchyTree({
 
   const renderTreeNodes = (nodes: AcademicTreeNode[], depth = 0) => {
     return (
-      <ul className={`space-y-1 ${depth > 0 ? 'ml-3 pl-3 border-l border-slate-800/80' : ''}`}>
+      <ul className={`space-y-1 ${depth > 0 ? 'ml-1.5 pl-1.5 sm:ml-3 sm:pl-3 border-l border-slate-800/80' : ''}`}>
         {nodes.map((node) => {
           const hasChildren = Boolean(node.children && node.children.length > 0);
           const isExpanded = Boolean(expandedNodes[node.id]);
@@ -190,7 +190,7 @@ export function VisualHierarchyTree({
           return (
             <li key={node.id} className="text-sm">
               <div
-                className={`group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all ${
+                className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 px-2.5 py-2 min-h-[44px] rounded-lg cursor-pointer transition-all ${
                   isSelected
                     ? 'bg-brand-500/20 border border-brand-500/40 text-brand-200'
                     : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
@@ -205,34 +205,34 @@ export function VisualHierarchyTree({
                     <button
                       type="button"
                       aria-label="Toggle node"
-                      className="p-0.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-100"
+                      className="p-1 -ml-1 rounded min-w-[32px] min-h-[32px] flex items-center justify-center hover:bg-slate-700/60 text-slate-400 hover:text-slate-100 touch-manipulation"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleNode(node.id);
                       }}
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5" />
+                        <ChevronDown className="w-4 h-4" />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="w-4 h-4" />
                       )}
                     </button>
                   ) : (
-                    <span className="w-4.5" />
+                    <span className="w-6 shrink-0" />
                   )}
 
                   {getNodeIcon(node.type, hasChildren, isExpanded)}
 
-                  <span className="font-medium truncate">{node.name}</span>
+                  <span className="font-medium truncate text-xs sm:text-sm">{node.name}</span>
 
                   {node.code && (
-                    <span className="text-[11px] font-mono text-slate-400 px-1 py-0.2 rounded bg-slate-800/80">
+                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 px-1 py-0.5 rounded bg-slate-800/80 shrink-0">
                       {node.code}
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0 pl-7 sm:pl-0">
                   {getTypeBadge(node)}
                   {hasChildren && (
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -253,7 +253,7 @@ export function VisualHierarchyTree({
   return (
     <div className={`flex flex-col h-full bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-md ${className}`}>
       {/* Header & Controls */}
-      <div className="p-3.5 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/80">
+      <div className="p-3 sm:p-3.5 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-900/80">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -269,14 +269,14 @@ export function VisualHierarchyTree({
           <button
             type="button"
             onClick={expandAll}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            className="flex-1 sm:flex-initial text-center px-2.5 py-1.5 min-h-[36px] text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
           >
             Expand All
           </button>
           <button
             type="button"
             onClick={collapseAll}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            className="flex-1 sm:flex-initial text-center px-2.5 py-1.5 min-h-[36px] text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
           >
             Collapse All
           </button>

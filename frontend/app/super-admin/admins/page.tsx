@@ -24,8 +24,6 @@ import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { FormField } from '@/components/ui/FormField';
 import { ResponsiveTable, TableColumn } from '@/components/ui/ResponsiveTable';
-import { TopNavbar } from '@/components/layout/TopNavbar';
-import { MobileNavigation } from '@/components/layout/MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface AdminUser {
@@ -88,7 +86,6 @@ const INITIAL_MOCK_ADMINS: AdminUser[] = [
 ];
 
 export default function SuperAdminAdminsPage() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [admins, setAdmins] = useState<AdminUser[]>(INITIAL_MOCK_ADMINS);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
@@ -346,27 +343,13 @@ export default function SuperAdminAdminsPage() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-base text-slate-100 bg-grid-pattern relative">
-      <div className="fixed inset-0 pointer-events-none bg-radial-glow z-0" />
-
-      <TopNavbar
-        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        isMobileMenuOpen={isMobileMenuOpen}
+    <div className="space-y-6 max-w-7xl mx-auto w-full">
+      <Breadcrumb
+        items={[
+          { label: 'Super Admin Portal', href: '/super-admin/dashboard' },
+          { label: 'User Admin Management' },
+        ]}
       />
-
-      <MobileNavigation
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 relative z-10">
-        <Breadcrumb
-          items={[
-            { label: 'Control Center', href: '/' },
-            { label: 'Super Admin Portal', href: '/super-admin/dashboard' },
-            { label: 'User Admin Management' },
-          ]}
-        />
 
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -445,12 +428,11 @@ export default function SuperAdminAdminsPage() {
             </p>
           </div>
         </div>
-      </div>
 
       {/* Provision User Admin Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-purple-400" />
@@ -534,7 +516,7 @@ export default function SuperAdminAdminsPage() {
       {/* Permissions Inspection Modal */}
       {isPermissionsModalOpen && selectedAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <SlidersHorizontal className="w-5 h-5 text-purple-400" />

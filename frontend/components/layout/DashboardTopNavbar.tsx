@@ -45,7 +45,7 @@ export function DashboardTopNavbar({
               <button
                 onClick={onToggleSidebar}
                 aria-label="Toggle navigation menu"
-                className="lg:hidden p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors"
+                className="lg:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors touch-manipulation"
               >
                 {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -75,7 +75,7 @@ export function DashboardTopNavbar({
                     ))}
                   </nav>
                 )}
-                <h1 className="text-base sm:text-lg font-display font-bold text-white tracking-tight truncate">
+                <h1 className="text-sm sm:text-lg font-display font-bold text-white tracking-tight truncate max-w-[130px] xs:max-w-[190px] sm:max-w-none">
                   {title}
                 </h1>
               </div>
@@ -105,7 +105,7 @@ export function DashboardTopNavbar({
             <div className="relative">
               <button
                 onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-surface-elevated/60 border border-surface-border hover:border-surface-border/80 transition-all"
+                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 min-h-[44px] rounded-xl bg-surface-elevated/60 border border-surface-border hover:border-surface-border/80 transition-all touch-manipulation"
                 aria-expanded={isProfileMenuOpen}
               >
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-600 to-cyber-cyan flex items-center justify-center text-white text-xs font-bold">

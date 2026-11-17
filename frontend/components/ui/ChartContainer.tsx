@@ -27,16 +27,16 @@ export function ChartContainer({
   return (
     <div
       className={cn(
-        'glass-card rounded-2xl p-5 border border-surface-border shadow-glass-sm flex flex-col',
+        'glass-card rounded-2xl p-3.5 sm:p-5 border border-surface-border shadow-glass-sm flex flex-col',
         className
       )}
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-4">
         <div>
           <h3 className="text-sm font-semibold text-white tracking-wide">{title}</h3>
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
-        {topAction && <div>{topAction}</div>}
+        {topAction && <div className="w-full sm:w-auto flex items-center justify-start sm:justify-end overflow-x-auto">{topAction}</div>}
       </div>
 
       <div className="w-full flex-1 min-h-[200px]" style={{ minHeight: height }}>

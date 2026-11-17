@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -138,7 +139,7 @@ export function UserAdminSidebar({
           )}
         </Link>
 
-        {!isMobileDrawer && (
+        {!isMobileDrawer ? (
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -146,11 +147,19 @@ export function UserAdminSidebar({
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
+        ) : (
+          <button
+            onClick={onCloseMobileDrawer}
+            aria-label="Close navigation menu"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
+          </button>
         )}
       </div>
 
       {/* Navigation List */}
-      <nav className="p-3 space-y-0.5 flex-1 overflow-y-auto">
+      <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
         {(!isCollapsed || isMobileDrawer) && (
           <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 font-mono">
             Authorized Modules ({authorizedNavItems.length})
@@ -167,7 +176,7 @@ export function UserAdminSidebar({
               onClick={onCloseMobileDrawer}
               title={isCollapsed && !isMobileDrawer ? item.label : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-colors',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-colors min-h-[44px] touch-manipulation',
                 isActive
                   ? 'bg-brand-600/30 text-cyan-200 border border-brand-500/40 shadow-glow-primary'
                   : 'text-slate-300 hover:text-white hover:bg-surface-elevated',

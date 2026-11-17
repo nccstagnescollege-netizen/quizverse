@@ -37,19 +37,19 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'glass-card rounded-2xl p-5 border border-surface-border transition-all duration-300 hover:-translate-y-0.5',
+        'glass-card rounded-2xl p-3.5 sm:p-5 border border-surface-border transition-all duration-300 hover:-translate-y-0.5',
         className
       )}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-mono uppercase tracking-wider text-slate-400">{displayLabel}</span>
-        <div className={cn('p-2.5 rounded-xl border', iconVariants[variant])}>
+        <span className="text-xs font-mono uppercase tracking-wider text-slate-400 truncate pr-2">{displayLabel}</span>
+        <div className={cn('p-2 sm:p-2.5 rounded-xl border shrink-0', iconVariants[variant])}>
           <Icon className="w-4 h-4" />
         </div>
       </div>
 
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+      <div className="mt-2.5 sm:mt-3 flex items-baseline gap-2">
+        <span className="text-xl sm:text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
           {value}
         </span>
         {trend && (
@@ -60,7 +60,7 @@ export function StatCard({
       </div>
 
       {displaySubtitle && (
-        <p className="mt-1 text-xs text-slate-400 font-sans">{displaySubtitle}</p>
+        <p className="mt-1 text-xs text-slate-400 font-sans truncate sm:whitespace-normal">{displaySubtitle}</p>
       )}
     </div>
   );

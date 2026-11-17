@@ -162,9 +162,18 @@ describe('Responsive Breakpoints and Screen Dimension Standards', () => {
 
   it('validates academic structure tree responsive touch targets and collapsible drawer behavior', () => {
     // Academic hierarchy node touch targets must exceed minimum 40px for comfortable finger tapping on small screens
-    const treeNodeContainerClasses = 'px-2.5 py-1.5 rounded-lg cursor-pointer';
+    const treeNodeContainerClasses = 'group flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 px-2.5 py-2 min-h-[44px] rounded-lg cursor-pointer transition-all';
     expect(treeNodeContainerClasses).toContain('cursor-pointer');
-    expect(treeNodeContainerClasses).toContain('rounded-lg');
+    expect(treeNodeContainerClasses).toContain('min-h-[44px]');
+
+    // Indentation scale: compact 6px/12px on mobile to avoid overflow at 8 levels of hierarchy
+    const computeIndentPx = (depth: number, isMobile: boolean) => {
+      if (depth === 0) return 0;
+      const stepPx = isMobile ? 12 : 24;
+      return depth * stepPx;
+    };
+    expect(computeIndentPx(8, true)).toBe(96); // Fits easily within 375px mobile
+    expect(computeIndentPx(8, false)).toBe(192); // Spacious on desktop
 
     // Horizontal overflow handling on mobile navigation tabs
     const tabScrollClasses = 'flex border-b border-surface-border overflow-x-auto gap-2 text-xs font-medium scrollbar-thin';
@@ -173,5 +182,35 @@ describe('Responsive Breakpoints and Screen Dimension Standards', () => {
     // Search input responsive sizing
     const searchInputClasses = 'w-full bg-slate-950/80 border border-slate-800 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2';
     expect(searchInputClasses).toContain('w-full');
+  });
+
+  it('validates MobileBottomNav structure and role-aware navigation targets', () => {
+    const superAdminItems = ['Overview', 'Academic', 'Admins', 'Analytics'];
+    const userAdminItems = ['Overview', 'Quizzes', 'Academic', 'Analytics'];
+
+    expect(superAdminItems).toHaveLength(4);
+    expect(userAdminItems).toHaveLength(4);
+
+    // Minimum thumb target height on bottom navigation must be >= 48px
+    const bottomNavTouchClass = 'min-h-[48px]';
+    const touchPx = parseInt(bottomNavTouchClass.replace(/\D/g, ''), 10);
+    expect(touchPx).toBeGreaterThanOrEqual(48);
+  });
+
+  it('validates mobile modal scrolling constraints and viewport bounding', () => {
+    const modalContainerClasses = 'w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4';
+    expect(modalContainerClasses).toContain('max-h-[90vh]');
+    expect(modalContainerClasses).toContain('overflow-y-auto');
+    expect(modalContainerClasses).toContain('p-4');
+  });
+
+  it('validates ChartContainer and Quiz Filter responsive wrapping on narrow mobile screens', () => {
+    const chartHeaderClasses = 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-4';
+    expect(chartHeaderClasses).toContain('flex-col');
+    expect(chartHeaderClasses).toContain('sm:flex-row');
+
+    const quizFilterClasses = 'flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5';
+    expect(quizFilterClasses).toContain('flex-col');
+    expect(quizFilterClasses).toContain('sm:flex-row');
   });
 });

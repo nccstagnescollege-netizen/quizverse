@@ -28,8 +28,6 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { SuperAdminSidebar } from '@/components/layout/SuperAdminSidebar';
-import { DashboardTopNavbar } from '@/components/layout/DashboardTopNavbar';
 import { StatCard } from '@/components/ui/StatCard';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { ResponsiveTable, TableColumn } from '@/components/ui/ResponsiveTable';
@@ -357,34 +355,15 @@ export default function SuperAdminAcademicPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex bg-surface-base text-slate-100">
-        <SuperAdminSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <DashboardTopNavbar
-            title="Academic Command Center"
-            breadcrumbs={[{ label: 'Super Admin', href: '/super-admin/dashboard' }, { label: 'Academic Structure' }]}
-          />
-          <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
-            <LoadingSkeleton />
-          </main>
-        </div>
+      <div className="space-y-6 max-w-7xl mx-auto w-full">
+        <LoadingSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-surface-base text-slate-100 bg-grid-pattern relative">
-      <div className="fixed inset-0 pointer-events-none bg-radial-glow z-0" />
-      <SuperAdminSidebar />
-
-      <div className="flex-1 flex flex-col min-w-0 z-10">
-        <DashboardTopNavbar
-          title="Academic Command Center"
-          breadcrumbs={[{ label: 'Super Admin', href: '/super-admin/dashboard' }, { label: 'Academic Structure' }]}
-        />
-
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
-          {/* Header */}
+    <div className="space-y-6 max-w-7xl mx-auto w-full">
+      {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-surface-border pb-5">
             <div>
               <div className="flex items-center gap-2 text-xs font-mono text-brand-400 mb-1">
@@ -755,7 +734,7 @@ export default function SuperAdminAcademicPage() {
           {/* 1. Create Institution Modal */}
           {showInstModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-semibold text-white text-base flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-cyan-400" />
@@ -828,7 +807,7 @@ export default function SuperAdminAcademicPage() {
           {/* 2. Create Programme Modal */}
           {showProgModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-semibold text-white text-base flex items-center gap-2">
                     <GraduationCap className="w-4 h-4 text-purple-400" />
@@ -936,7 +915,7 @@ export default function SuperAdminAcademicPage() {
           {/* 3. Create Master Subject Modal */}
           {showSubjModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-semibold text-white text-base flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-brand-400" />
@@ -1016,7 +995,7 @@ export default function SuperAdminAcademicPage() {
           {/* 4. Allocate Subject Modal */}
           {showAllocModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-semibold text-white text-base flex items-center gap-2">
                     <Share2 className="w-4 h-4 text-emerald-400" />
@@ -1115,7 +1094,7 @@ export default function SuperAdminAcademicPage() {
           {/* 5. Create Syllabus Unit Modal */}
           {showUnitModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-semibold text-white text-base flex items-center gap-2">
                     <Layers className="w-4 h-4 text-amber-400" />
@@ -1185,8 +1164,6 @@ export default function SuperAdminAcademicPage() {
               </div>
             </div>
           )}
-        </main>
-      </div>
     </div>
   );
 }

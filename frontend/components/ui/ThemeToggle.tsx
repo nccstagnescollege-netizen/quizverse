@@ -27,7 +27,7 @@ export function ThemeToggle() {
     <button
       onClick={toggleTheme}
       aria-label="Toggle visual theme"
-      className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white hover:border-brand-500/30 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500"
+      className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white hover:border-brand-500/30 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 touch-manipulation"
     >
       {theme === 'dark' ? <Sun className="w-4 h-4 text-cyber-gold" /> : <Moon className="w-4 h-4 text-brand-600" />}
     </button>
