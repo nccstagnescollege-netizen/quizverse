@@ -1,0 +1,117 @@
+"""
+QUIZVERSE Database Models Registry
+Registers all entity models with SQLAlchemy's declarative base metadata.
+"""
+
+from backend.app.core.database import Base
+from backend.app.models.base import JSONType, utc_now
+from backend.app.models.auth_rbac import (
+    Admin,
+    Role,
+    Permission,
+    AdminRole,
+    RolePermission,
+)
+from backend.app.models.academic import (
+    Unit,
+    Chapter,
+    Topic,
+)
+from backend.app.models.question_bank import (
+    Question,
+    QuestionOption,
+    QuestionTag,
+    QuestionTagRelation,
+    QuestionVersion,
+)
+from backend.app.models.quiz import (
+    Quiz,
+    QuizQuestion,
+    QuizGenerationRule,
+    GenerationHistory,
+)
+from backend.app.models.student import (
+    Student,
+    StudentProfile,
+)
+from backend.app.models.registration import (
+    RegistrationFormField,
+    RegistrationSubmission,
+)
+from backend.app.models.invitation import (
+    InvitationLink,
+    InvitationUsage,
+)
+from backend.app.models.examination import (
+    ExaminationAttempt,
+    AttemptAnswer,
+    AttemptEvent,
+)
+from backend.app.models.results import (
+    ExaminationResult,
+    QuestionEvaluation,
+)
+from backend.app.models.analytics import (
+    AnalyticsSnapshot,
+)
+from backend.app.models.security_audit import (
+    AuditLog,
+    SecurityEvent,
+    AccessLog,
+)
+from backend.app.models.notification import (
+    Notification,
+    NotificationPreference,
+)
+
+__all__ = [
+    "Base",
+    "JSONType",
+    "utc_now",
+    # RBAC
+    "Admin",
+    "Role",
+    "Permission",
+    "AdminRole",
+    "RolePermission",
+    # Academic
+    "Unit",
+    "Chapter",
+    "Topic",
+    # Question Bank
+    "Question",
+    "QuestionOption",
+    "QuestionTag",
+    "QuestionTagRelation",
+    "QuestionVersion",
+    # Quiz
+    "Quiz",
+    "QuizQuestion",
+    "QuizGenerationRule",
+    "GenerationHistory",
+    # Student
+    "Student",
+    "StudentProfile",
+    # Registration
+    "RegistrationFormField",
+    "RegistrationSubmission",
+    # Invitation
+    "InvitationLink",
+    "InvitationUsage",
+    # Examination
+    "ExaminationAttempt",
+    "AttemptAnswer",
+    "AttemptEvent",
+    # Results & Evaluation
+    "ExaminationResult",
+    "QuestionEvaluation",
+    # Analytics
+    "AnalyticsSnapshot",
+    # Security & Audit
+    "AuditLog",
+    "SecurityEvent",
+    "AccessLog",
+    # Notifications
+    "Notification",
+    "NotificationPreference",
+]

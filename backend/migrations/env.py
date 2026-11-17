@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from backend.app.core.config import settings
 from backend.app.core.database import Base
+import backend.app.models  # Ensure all model tables are registered in Base.metadata
 
 config = context.config
 
