@@ -19,12 +19,18 @@ if settings.DATABASE_URL:
         elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
             db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
+        # Ensure SSL requirement on cloud databases (Supabase, Neon, etc.)
+        if ("supabase.co" in db_url or "pooler.supabase.com" in db_url) and "sslmode" not in db_url:
+            sep = "&" if "?" in db_url else "?"
+            db_url = f"{db_url}{sep}sslmode=require"
+
         engine = create_engine(
             db_url,
             pool_pre_ping=True,  # Detect and discard dead connections automatically
             pool_recycle=300,    # Recycle connections after 5 minutes
             pool_size=5,         # Modest pool size for free tier
             max_overflow=10,     # Allow burst headroom
+            connect_args={"connect_timeout": 10},
             echo=False,
         )
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

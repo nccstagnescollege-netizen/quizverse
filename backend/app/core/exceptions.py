@@ -1,8 +1,28 @@
+import re
+from typing import Dict
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from backend.app.core.config import settings
 from backend.app.core.logging import logger
+
+VERCEL_REGEX = re.compile(r"^https://.*\.vercel\.app$")
+
+
+def _get_cors_headers(request: Request) -> Dict[str, str]:
+    origin = request.headers.get("origin")
+    if not origin:
+        return {}
+    allowed_list = settings.BACKEND_CORS_ORIGINS if isinstance(settings.BACKEND_CORS_ORIGINS, list) else [settings.BACKEND_CORS_ORIGINS]
+    if origin in allowed_list or VERCEL_REGEX.match(origin) or "localhost" in origin or "127.0.0.1" in origin:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Set-Cookie, x-request-id",
+        }
+    return {}
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -15,6 +35,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=exc.status_code,
+            headers=_get_cors_headers(request),
             content={
                 "success": False,
                 "error": {
@@ -45,6 +66,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            headers=_get_cors_headers(request),
             content={
                 "success": False,
                 "error": {
@@ -70,6 +92,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         # Avoid leaking internal stack trace or DB passwords to client
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            headers=_get_cors_headers(request),
             content={
                 "success": False,
                 "error": {

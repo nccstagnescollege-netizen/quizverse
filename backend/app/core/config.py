@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://quizverse.vercel.app",
+        "https://quizverse-iota.vercel.app",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
