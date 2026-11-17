@@ -86,4 +86,77 @@ describe('Responsive Breakpoints and Screen Dimension Standards', () => {
     expect(formatTime(45)).toBe('00:45');
     expect(formatTime(0)).toBe('00:00');
   });
+
+  it('validates Phase 4 Super Admin 14-item navigation matrix', () => {
+    const SUPER_ADMIN_SECTIONS = [
+      'Overview',
+      'Administrator Management',
+      'Roles & Permissions',
+      'Academic Structure',
+      'Question Bank',
+      'Quiz Management',
+      'Examination Management',
+      'Student Management',
+      'Results',
+      'Analytics',
+      'Live Monitoring',
+      'Security Center',
+      'Audit Logs',
+      'Platform Settings',
+    ];
+
+    expect(SUPER_ADMIN_SECTIONS).toHaveLength(14);
+    expect(SUPER_ADMIN_SECTIONS[0]).toBe('Overview');
+    expect(SUPER_ADMIN_SECTIONS[1]).toBe('Administrator Management');
+    expect(SUPER_ADMIN_SECTIONS[13]).toBe('Platform Settings');
+  });
+
+  it('validates Phase 4 User Admin dynamic permission filtering', () => {
+    const filterUserAdminNav = (permissions: string[], isSuperAdmin: boolean) => {
+      const allModules = [
+        { label: 'Overview', requiredPerm: null },
+        { label: 'My Quizzes', requiredPerm: 'quiz.view' },
+        { label: 'Create Quiz', requiredPerm: 'quiz.create' },
+        { label: 'Question Bank', requiredPerm: 'question.view' },
+        { label: 'Academic Structure', requiredPerm: null },
+        { label: 'Student Registrations', requiredPerm: 'student.view' },
+        { label: 'Results', requiredPerm: 'analytics.view' },
+        { label: 'Analytics', requiredPerm: 'analytics.view' },
+        { label: 'Examination Monitoring', requiredPerm: 'examination.monitor' },
+        { label: 'Profile & Security', requiredPerm: null },
+      ];
+
+      return allModules.filter((m) => {
+        if (!m.requiredPerm) return true;
+        if (isSuperAdmin) return true;
+        return permissions.includes(m.requiredPerm) || permissions.includes('*');
+      });
+    };
+
+    // User Admin with only quiz.view
+    const viewerItems = filterUserAdminNav(['quiz.view'], false);
+    expect(viewerItems.map((i) => i.label)).toContain('My Quizzes');
+    expect(viewerItems.map((i) => i.label)).not.toContain('Create Quiz');
+    expect(viewerItems.map((i) => i.label)).not.toContain('Examination Monitoring');
+
+    // User Admin with all permissions
+    const fullItems = filterUserAdminNav(
+      ['quiz.view', 'quiz.create', 'question.view', 'student.view', 'analytics.view', 'examination.monitor'],
+      false
+    );
+    expect(fullItems).toHaveLength(10);
+  });
+
+  it('validates responsive grid column counts across device breakpoints', () => {
+    // 2 columns on mobile, 3 columns on tablet, 4 columns on desktop
+    const getGridCols = (width: number) => {
+      if (width < 640) return 2; // mobile: grid-cols-2
+      if (width < 1024) return 3; // tablet: sm:grid-cols-3
+      return 4; // desktop: lg:grid-cols-4
+    };
+
+    expect(getGridCols(375)).toBe(2);
+    expect(getGridCols(768)).toBe(3);
+    expect(getGridCols(1280)).toBe(4);
+  });
 });

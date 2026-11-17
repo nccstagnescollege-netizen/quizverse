@@ -2,6 +2,7 @@ import uuid
 from typing import Set, List, Optional, Callable
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.core.logging import logger
@@ -108,6 +109,28 @@ def check_quiz_access(
     required_rank = level_hierarchy.get(required_level, 1)
 
     return assigned_rank >= required_rank
+
+
+def get_authorized_quiz_ids_subquery(admin: Admin):
+    """
+    Returns an SQLAlchemy subquery selecting all quiz IDs the admin is authorized to access.
+    Super Admins return None (meaning all quizzes without filter).
+    User Admins are restricted to:
+    - Quizzes they created (quiz.created_by == admin.id)
+    - Quizzes explicitly assigned in admin_quiz_assignments (admin_quiz_assignments.admin_id == admin.id)
+    """
+    if admin.is_super_admin:
+        return None
+
+    assigned_subquery = select(AdminQuizAssignment.quiz_id).filter(
+        AdminQuizAssignment.admin_id == admin.id
+    )
+    return select(Quiz.id).filter(
+        or_(
+            Quiz.created_by == admin.id,
+            Quiz.id.in_(assigned_subquery),
+        )
+    )
 
 
 def enforce_quiz_access(

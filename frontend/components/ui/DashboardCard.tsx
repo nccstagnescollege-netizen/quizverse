@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -6,6 +8,8 @@ interface DashboardCardProps {
   className?: string;
   glow?: 'cyan' | 'brand' | 'purple' | 'none';
   header?: React.ReactNode;
+  title?: string;
+  subtitle?: string;
 }
 
 export function DashboardCard({
@@ -13,6 +17,8 @@ export function DashboardCard({
   className,
   glow = 'none',
   header,
+  title,
+  subtitle,
 }: DashboardCardProps) {
   const glowStyles = {
     cyan: 'hover:shadow-glow-cyan hover:border-cyber-cyan/40',
@@ -20,6 +26,15 @@ export function DashboardCard({
     purple: 'hover:shadow-glow-purple hover:border-cyber-purple/40',
     none: '',
   };
+
+  const cardHeader =
+    header ||
+    (title && (
+      <div>
+        <h3 className="text-sm font-semibold text-white tracking-wide">{title}</h3>
+        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+      </div>
+    ));
 
   return (
     <div
@@ -29,7 +44,7 @@ export function DashboardCard({
         className
       )}
     >
-      {header && <div className="mb-4 pb-3 border-b border-surface-border">{header}</div>}
+      {cardHeader && <div className="mb-4 pb-3 border-b border-surface-border">{cardHeader}</div>}
       {children}
     </div>
   );

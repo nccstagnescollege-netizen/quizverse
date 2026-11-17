@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 
 interface ChartContainerProps {
@@ -9,7 +8,8 @@ interface ChartContainerProps {
   subtitle?: string;
   height?: number;
   action?: React.ReactNode;
-  children: React.ReactElement;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
@@ -18,9 +18,12 @@ export function ChartContainer({
   subtitle,
   height = 260,
   action,
+  actions,
   children,
   className,
 }: ChartContainerProps) {
+  const topAction = action || actions;
+
   return (
     <div
       className={cn(
@@ -33,13 +36,11 @@ export function ChartContainer({
           <h3 className="text-sm font-semibold text-white tracking-wide">{title}</h3>
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
-        {action && <div>{action}</div>}
+        {topAction && <div>{topAction}</div>}
       </div>
 
-      <div className="w-full flex-1 min-h-[200px]" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          {children}
-        </ResponsiveContainer>
+      <div className="w-full flex-1 min-h-[200px]" style={{ minHeight: height }}>
+        {children}
       </div>
     </div>
   );
