@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import { FileCheck, FileSpreadsheet, FileText, FolderUp, UploadCloud, RefreshCw, X } from 'lucide-react';
 import { questionImportExportService } from '../../services/questionImportExportService';
 
 interface ImportFileUploaderProps {
@@ -92,8 +93,10 @@ export default function ImportFileUploader({ token, onUploadSuccess, onError }: 
       <div className="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-purple-900/40 border border-blue-500/30 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg backdrop-blur-sm">
         <div>
           <h3 className="text-white font-semibold text-lg flex items-center gap-2">
-            <span className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg">📋</span>
-            Official Question Import Templates
+            <span className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg">
+              <FileCheck className="w-5 h-5 text-blue-400" />
+            </span>
+            <span>Official Question Import Templates</span>
           </h3>
           <p className="text-slate-400 text-sm mt-1">
             Download our verified templates with column definitions, instructions, and examples for Single Choice, Multiple Choice, True/False, and Short Answer.
@@ -106,11 +109,11 @@ export default function ImportFileUploader({ token, onUploadSuccess, onError }: 
             className="px-4 py-2 bg-emerald-600/80 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition flex items-center gap-2 border border-emerald-400/30 shadow-md shadow-emerald-950/40 disabled:opacity-50"
           >
             {downloadingTemplate === 'xlsx' ? (
-              <span className="animate-spin text-sm">⏳</span>
+              <RefreshCw className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <span>📊</span>
+              <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
             )}
-            Download Excel (.xlsx)
+            <span>Download Excel (.xlsx)</span>
           </button>
           <button
             onClick={() => handleDownloadTemplate('csv')}
@@ -118,11 +121,11 @@ export default function ImportFileUploader({ token, onUploadSuccess, onError }: 
             className="px-4 py-2 bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition flex items-center gap-2 border border-blue-400/30 shadow-md shadow-blue-950/40 disabled:opacity-50"
           >
             {downloadingTemplate === 'csv' ? (
-              <span className="animate-spin text-sm">⏳</span>
+              <RefreshCw className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <span>📄</span>
+              <FileText className="w-4 h-4 text-cyan-200" />
             )}
-            Download CSV (.csv)
+            <span>Download CSV (.csv)</span>
           </button>
         </div>
       </div>
@@ -149,8 +152,8 @@ export default function ImportFileUploader({ token, onUploadSuccess, onError }: 
         />
 
         <div className="max-w-md mx-auto space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-3xl shadow-inner">
-            📁
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center shadow-inner">
+            <FolderUp className="w-8 h-8 text-indigo-400" />
           </div>
           <div>
             <h4 className="text-white font-medium text-lg">
@@ -174,9 +177,10 @@ export default function ImportFileUploader({ token, onUploadSuccess, onError }: 
                   e.stopPropagation();
                   setSelectedFile(null);
                 }}
-                className="text-red-400 hover:text-red-300 ml-2"
+                className="text-red-400 hover:text-red-300 ml-2 inline-flex items-center gap-1"
               >
-                ✕ Remove
+                <X className="w-3.5 h-3.5" />
+                <span>Remove</span>
               </button>
             </div>
           )}
@@ -202,13 +206,13 @@ export default function ImportFileUploader({ token, onUploadSuccess, onError }: 
           >
             {uploading ? (
               <>
-                <span className="animate-spin">⏳</span>
-                Validating Questions...
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                <span>Validating Questions...</span>
               </>
             ) : (
               <>
-                <span>🚀</span>
-                Upload & Validate Preview
+                <UploadCloud className="w-4 h-4 text-white" />
+                <span>Upload & Validate Preview</span>
               </>
             )}
           </button>

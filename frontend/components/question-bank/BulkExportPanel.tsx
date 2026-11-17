@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Download, Lock, FileSpreadsheet, FileText, ShieldCheck, RefreshCw } from 'lucide-react';
 import { questionImportExportService, ExportFilters } from '../../services/questionImportExportService';
 import { academicService, Subject } from '../../services/academicService';
 
@@ -79,7 +80,9 @@ export default function BulkExportPanel({
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
       <div className="border-b border-slate-800 pb-4">
         <h3 className="text-white text-xl font-bold flex items-center gap-2.5">
-          <span className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">📤</span>
+          <span className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
+            <Download className="w-5 h-5 text-indigo-400" />
+          </span>
           Bulk Question Export Studio
         </h3>
         <p className="text-slate-400 text-sm mt-1">
@@ -90,7 +93,8 @@ export default function BulkExportPanel({
       {/* Security Mode Selector */}
       <div className="space-y-3">
         <label className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-2">
-          <span>🔒</span> Export Security & Answer-Key Mode
+          <Lock className="w-3.5 h-3.5 text-amber-400" />
+          <span>Export Security & Answer-Key Mode</span>
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className={`p-4 rounded-xl border cursor-pointer transition flex items-start gap-3.5 ${
@@ -219,30 +223,32 @@ export default function BulkExportPanel({
             <button
               type="button"
               onClick={() => setExportFormat('xlsx')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
                 exportFormat === 'xlsx'
                   ? 'bg-emerald-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              📊 Excel (.xlsx)
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Excel (.xlsx)</span>
             </button>
             <button
               type="button"
               onClick={() => setExportFormat('csv')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
                 exportFormat === 'csv'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              📄 CSV (.csv)
+              <FileText className="w-3.5 h-3.5 text-cyan-300" />
+              <span>CSV (.csv)</span>
             </button>
           </div>
         </div>
 
         <div className="text-xs text-slate-400 flex items-center gap-1.5">
-          <span>🛡️</span>
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>Formula Injection Protection active (prefixing triggers with &apos;)</span>
         </div>
       </div>
@@ -257,13 +263,13 @@ export default function BulkExportPanel({
         >
           {exporting ? (
             <>
-              <span className="animate-spin">⏳</span>
-              Preparing Export File...
+              <RefreshCw className="w-4 h-4 animate-spin text-white" />
+              <span>Preparing Export File...</span>
             </>
           ) : (
             <>
-              <span>📥</span>
-              Export {exportFormat.toUpperCase()} File Now
+              <Download className="w-4 h-4 text-white" />
+              <span>Export {exportFormat.toUpperCase()} File Now</span>
             </>
           )}
         </button>

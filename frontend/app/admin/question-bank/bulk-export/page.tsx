@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { Download, Upload, AlertTriangle, CheckCircle2, RefreshCw, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import BulkExportPanel from '@/components/question-bank/BulkExportPanel';
 
@@ -13,7 +14,7 @@ export default function UserAdminBulkExportPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        <span className="animate-spin mr-2">⏳</span> Loading...
+        <RefreshCw className="w-5 h-5 animate-spin mr-2 text-brand-400" /> Loading...
       </div>
     );
   }
@@ -34,7 +35,8 @@ export default function UserAdminBulkExportPage() {
             <span className="text-slate-400">Bulk Export</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <span>📤</span> Scoped Question Export
+            <Download className="w-7 h-7 text-indigo-400" />
+            <span>Scoped Question Export</span>
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-1">
             Export questions within your assigned academic scope. Answer keys are strictly protected based on your granted permissions.
@@ -44,9 +46,10 @@ export default function UserAdminBulkExportPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/admin/question-bank/bulk-import"
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition"
           >
-            📥 Go to Bulk Import
+            <Upload className="w-3.5 h-3.5 text-brand-400" />
+            <span>Go to Bulk Import</span>
           </Link>
           <Link
             href="/admin/question-bank"
@@ -59,15 +62,25 @@ export default function UserAdminBulkExportPage() {
 
       {errorMsg && (
         <div className="p-4 bg-rose-950/60 border border-rose-500/40 rounded-xl text-rose-200 text-sm flex items-center justify-between">
-          <span>⚠️ {errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white">✕</button>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
       {successMsg && (
         <div className="p-4 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-200 text-sm flex items-center justify-between">
-          <span>✅ {successMsg}</span>
-          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-white">✕</button>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

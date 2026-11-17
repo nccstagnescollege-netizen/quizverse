@@ -27,6 +27,8 @@ import {
   HelpCircle,
   ChevronRight,
   ChevronDown,
+  Info,
+  X,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -1156,7 +1158,7 @@ export default function SuperAdminAcademicPage() {
                     <Building2 className="w-4 h-4 text-cyan-400" />
                     New Academic Institution
                   </h3>
-                  <button onClick={() => setShowInstModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowInstModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <form onSubmit={handleCreateInstitution} className="space-y-3">
                   <div>
@@ -1231,7 +1233,7 @@ export default function SuperAdminAcademicPage() {
                     <GraduationCap className="w-4 h-4 text-purple-400" />
                     New Degree Programme
                   </h3>
-                  <button onClick={() => setShowProgModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowProgModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <form onSubmit={handleCreateProgramme} className="space-y-3">
                   <div>
@@ -1307,8 +1309,9 @@ export default function SuperAdminAcademicPage() {
                       />
                     </div>
                   </div>
-                  <div className="p-2.5 rounded-lg bg-brand-950/40 border border-brand-900/60 text-[11px] text-brand-300">
-                    ℹ️ Quietly auto-provisions {progForm.duration_years} Programme Years and {progForm.total_semesters} Semesters.
+                  <div className="p-2.5 rounded-lg bg-brand-950/40 border border-brand-900/60 text-[11px] text-brand-300 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+                    <span>Auto-provisions {progForm.duration_years} Programme Years and {progForm.total_semesters} Semesters.</span>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -1341,7 +1344,7 @@ export default function SuperAdminAcademicPage() {
                     <BookOpen className="w-4 h-4 text-brand-400" />
                     New Master Subject
                   </h3>
-                  <button onClick={() => setShowSubjModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowSubjModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <form onSubmit={handleCreateSubject} className="space-y-3">
                   <div>
@@ -1423,7 +1426,7 @@ export default function SuperAdminAcademicPage() {
                     <Share2 className="w-4 h-4 text-emerald-400" />
                     Allocate Subject to Semester
                   </h3>
-                  <button onClick={() => setShowAllocModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowAllocModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <form onSubmit={handleAllocateSubject} className="space-y-3">
                   {curricula.filter((c) => c.programme_id === selectedProgrammeId).length > 1 && (
@@ -1543,7 +1546,7 @@ export default function SuperAdminAcademicPage() {
                     <Layers className="w-4 h-4 text-amber-400" />
                     Add Syllabus Unit
                   </h3>
-                  <button onClick={() => setShowUnitModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowUnitModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <form onSubmit={handleCreateUnit} className="space-y-3">
                   <div>
@@ -1619,7 +1622,7 @@ export default function SuperAdminAcademicPage() {
                     <BookOpen className="w-4 h-4 text-cyan-400" />
                     Add Chapter to Unit {activeUnitForChapter.unit_number}
                   </h3>
-                  <button onClick={() => setShowChapterModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowChapterModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="text-xs text-slate-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
                   Target Unit: <span className="text-amber-400 font-medium">{activeUnitForChapter.unit_name}</span> ({activeUnitForChapter.unit_code})
@@ -1702,7 +1705,7 @@ export default function SuperAdminAcademicPage() {
                     <Tag className="w-4 h-4 text-emerald-400" />
                     Add Topic to Chapter {activeChapterForTopic.chapter_number}
                   </h3>
-                  <button onClick={() => setShowTopicModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                  <button onClick={() => setShowTopicModal(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="text-xs text-slate-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
                   Target Chapter: <span className="text-cyan-400 font-medium">{activeChapterForTopic.chapter_name}</span> ({activeChapterForTopic.chapter_code})

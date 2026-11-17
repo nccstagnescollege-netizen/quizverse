@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Upload, History, AlertTriangle, CheckCircle2, RefreshCw, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ImportFileUploader from '@/components/question-bank/ImportFileUploader';
 import ImportPreviewPanel from '@/components/question-bank/ImportPreviewPanel';
@@ -18,7 +19,7 @@ export default function SuperAdminBulkImportPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        <span className="animate-spin mr-2">⏳</span> Loading...
+        <RefreshCw className="w-5 h-5 animate-spin mr-2 text-brand-400" /> Loading...
       </div>
     );
   }
@@ -36,7 +37,8 @@ export default function SuperAdminBulkImportPage() {
             <span className="text-slate-400">Bulk Import</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <span>📥</span> Bulk Question Import Studio
+            <Upload className="w-7 h-7 text-brand-400" />
+            <span>Bulk Question Import Studio</span>
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-1">
             Upload questions via Excel (.xlsx) or CSV (.csv) with academic hierarchy validation, duplicate detection, and import previews.
@@ -46,9 +48,10 @@ export default function SuperAdminBulkImportPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/super-admin/question-bank/import-history"
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition"
           >
-            📜 View Import History
+            <History className="w-3.5 h-3.5 text-purple-400" />
+            <span>View Import History</span>
           </Link>
           <Link
             href="/super-admin/question-bank"
@@ -63,20 +66,24 @@ export default function SuperAdminBulkImportPage() {
       {errorMsg && (
         <div className="p-4 bg-rose-950/60 border border-rose-500/40 rounded-xl text-rose-200 text-sm flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white">✕</button>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
       {successMsg && (
         <div className="p-4 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-200 text-sm flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span>✅</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-white">✕</button>
+          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

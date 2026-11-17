@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { History, RefreshCw, Download } from 'lucide-react';
 import { questionImportExportService, ImportJobSummary } from '../../services/questionImportExportService';
 
 interface ImportHistoryPanelProps {
@@ -71,8 +72,10 @@ export default function ImportHistoryPanel({ token, onError }: ImportHistoryPane
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
           <h3 className="text-white text-xl font-bold flex items-center gap-2.5">
-            <span className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">📜</span>
-            Question Import Job History
+            <span className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+              <History className="w-5 h-5 text-emerald-400" />
+            </span>
+            <span>Question Import Job History</span>
           </h3>
           <p className="text-slate-400 text-sm mt-1">
             Audit log of bulk question uploads, row-level validation outcomes, and error reports.
@@ -83,13 +86,15 @@ export default function ImportHistoryPanel({ token, onError }: ImportHistoryPane
           disabled={loading}
           className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium border border-slate-700 flex items-center gap-2"
         >
-          <span>🔄</span> Refresh
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh</span>
         </button>
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-slate-400">
-          <span className="animate-spin inline-block text-2xl mr-2">⏳</span> Loading history...
+        <div className="text-center py-16 text-slate-400 space-y-2">
+          <RefreshCw className="w-6 h-6 animate-spin text-brand-400 mx-auto" />
+          <p className="text-xs">Loading import history...</p>
         </div>
       ) : jobs.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
@@ -135,9 +140,19 @@ export default function ImportHistoryPanel({ token, onError }: ImportHistoryPane
                         <button
                           onClick={() => handleDownloadErrors(job)}
                           disabled={downloadingId === job.id}
-                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-rose-300 rounded-lg text-xs font-medium border border-rose-500/20"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-rose-300 rounded-lg text-xs font-medium border border-rose-500/20"
                         >
-                          {downloadingId === job.id ? 'Exporting...' : '📥 Errors'}
+                          {downloadingId === job.id ? (
+                            <>
+                              <RefreshCw className="w-3 h-3 animate-spin text-rose-400" />
+                              <span>Exporting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3 h-3 text-rose-400" />
+                              <span>Errors</span>
+                            </>
+                          )}
                         </button>
                       )}
                     </td>
@@ -182,9 +197,19 @@ export default function ImportHistoryPanel({ token, onError }: ImportHistoryPane
                   <button
                     onClick={() => handleDownloadErrors(job)}
                     disabled={downloadingId === job.id}
-                    className="w-full py-2 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded-lg text-xs font-medium text-center"
+                    className="w-full py-2 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded-lg text-xs font-medium text-center inline-flex items-center justify-center gap-1.5"
                   >
-                    {downloadingId === job.id ? 'Downloading Errors...' : '📥 Download Row Errors (.csv)'}
+                    {downloadingId === job.id ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Downloading Errors...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Download Row Errors (.csv)</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>

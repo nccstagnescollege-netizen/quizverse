@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Download, SlidersHorizontal, RefreshCw, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { questionImportExportService, ImportJobSummary, ImportRow } from '../../services/questionImportExportService';
 
 interface ImportPreviewPanelProps {
@@ -177,7 +178,17 @@ export default function ImportPreviewPanel({
             disabled={downloadingErrors}
             className="px-3.5 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium rounded-lg transition border border-rose-400/30 flex items-center gap-1.5 disabled:opacity-50"
           >
-            {downloadingErrors ? '⏳ Exporting...' : '📥 Download Row Errors (.csv)'}
+            {downloadingErrors ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5 mr-1" />
+                <span>Download Row Errors (.csv)</span>
+              </>
+            )}
           </button>
         )}
       </div>
@@ -284,7 +295,7 @@ export default function ImportPreviewPanel({
       {/* Import Policy & Confirmation Actions */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-5">
         <h4 className="text-white font-semibold text-base flex items-center gap-2">
-          <span>⚙️</span> Import Policy & Execution
+          <SlidersHorizontal className="w-4 h-4 text-brand-400" /> Import Policy & Execution
         </h4>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -399,12 +410,12 @@ export default function ImportPreviewPanel({
           >
             {confirming ? (
               <>
-                <span className="animate-spin">⏳</span>
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
                 Committing to Database...
               </>
             ) : (
               <>
-                <span>✅</span>
+                <CheckCircle2 className="w-4 h-4 text-white" />
                 Confirm & Import {policy === 'import_valid' ? `${job.valid_rows} Valid Questions` : 'All Questions'}
               </>
             )}
@@ -418,13 +429,14 @@ export default function ImportPreviewPanel({
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-white font-semibold text-lg flex items-center gap-2">
-                <span>⚠️</span> Validation Issues — Row #{selectedErrorRow.row_number}
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" /> Validation Issues — Row #{selectedErrorRow.row_number}
               </h3>
               <button
                 onClick={() => setSelectedErrorRow(null)}
-                className="text-slate-400 hover:text-white text-lg"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                aria-label="Close"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 

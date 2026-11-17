@@ -19,6 +19,9 @@ import {
   Tag,
   Sparkles,
   SlidersHorizontal,
+  Upload,
+  Download,
+  History,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -281,22 +284,22 @@ export default function SuperAdminQuestionBankPage() {
             href="/super-admin/question-bank/bulk-import"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition"
           >
-            <span>📥</span>
+            <Upload className="w-3.5 h-3.5 text-brand-400" />
             <span>Import</span>
           </Link>
           <Link
             href="/super-admin/question-bank/bulk-export"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition"
           >
-            <span>📤</span>
+            <Download className="w-3.5 h-3.5 text-indigo-400" />
             <span>Export</span>
           </Link>
           <Link
             href="/super-admin/question-bank/import-history"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition"
             title="Import History"
           >
-            <span>📜</span>
+            <History className="w-3.5 h-3.5 text-purple-400" />
           </Link>
           <button
             onClick={fetchData}
