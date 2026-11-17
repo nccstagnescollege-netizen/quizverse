@@ -5,6 +5,7 @@ from backend.app.api.v1.endpoints import (
     admin_management,
     academic,
     quizzes,
+    question_bank,
     dashboard_super_admin,
     dashboard_user_admin,
 )
@@ -31,7 +32,14 @@ api_router.include_router(
     tags=["Academic Structure Management"],
 )
 
-# 4. Scoped Quiz Management
+# 5. Question Bank Management System (Phase 6)
+api_router.include_router(
+    question_bank.router,
+    prefix="/questions",
+    tags=["Question Bank Management"],
+)
+
+# 6. Scoped Quiz Management
 api_router.include_router(quizzes.router, prefix="/quizzes", tags=["Quiz Management & Scoped Access"])
 
 # 5. Super Admin Platform-Wide Dashboard & Analytics

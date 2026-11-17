@@ -33,7 +33,7 @@ class Admin(Base):
     # Relationships
     admin_roles = relationship("AdminRole", back_populates="admin", cascade="all, delete-orphan")
     roles = relationship("Role", secondary="admin_roles", back_populates="admins", viewonly=True)
-    created_questions = relationship("Question", back_populates="creator")
+    created_questions = relationship("Question", back_populates="creator", foreign_keys="Question.created_by")
     created_quizzes = relationship("Quiz", back_populates="creator")
     audit_logs = relationship("AuditLog", back_populates="admin")
     sessions = relationship("AdminSession", back_populates="admin", cascade="all, delete-orphan")

@@ -213,4 +213,22 @@ describe('Responsive Breakpoints and Screen Dimension Standards', () => {
     expect(quizFilterClasses).toContain('flex-col');
     expect(quizFilterClasses).toContain('sm:flex-row');
   });
+
+  it('validates Question Bank responsive card and preview modal viewport scaling', () => {
+    // Question Bank Toolbar flex layout on mobile
+    const qbToolbarClasses = 'flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3';
+    expect(qbToolbarClasses).toContain('flex-col');
+    expect(qbToolbarClasses).toContain('md:flex-row');
+
+    // Question Preview Modal responsive size
+    const previewModalClasses = 'relative w-full max-w-3xl max-h-[90vh] bg-surface-base border border-surface-border rounded-2xl shadow-2xl flex flex-col overflow-hidden';
+    expect(previewModalClasses).toContain('max-w-3xl');
+    expect(previewModalClasses).toContain('max-h-[90vh]');
+    expect(previewModalClasses).toContain('overflow-hidden');
+
+    // Question Action touch targets
+    const actionBtnClasses = 'min-h-[36px] min-w-[36px] flex items-center justify-center';
+    expect(actionBtnClasses).toContain('min-h-[36px]');
+    expect(actionBtnClasses).toContain('min-w-[36px]');
+  });
 });

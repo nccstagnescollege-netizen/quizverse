@@ -36,6 +36,9 @@ from backend.app.models.question_bank import (
     QuestionTag,
     QuestionTagRelation,
     QuestionVersion,
+    QuestionAttachment,
+    QuestionReview,
+    PlatformSetting,
 )
 from backend.app.models.quiz import (
     Quiz,
@@ -110,6 +113,9 @@ __all__ = [
     "QuestionTag",
     "QuestionTagRelation",
     "QuestionVersion",
+    "QuestionAttachment",
+    "QuestionReview",
+    "PlatformSetting",
     # Quiz
     "Quiz",
     "QuizQuestion",

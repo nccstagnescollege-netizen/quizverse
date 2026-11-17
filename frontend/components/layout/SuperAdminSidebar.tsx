@@ -31,7 +31,7 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { label: 'Administrator Management', href: '/super-admin/admins', icon: Users, badge: 'Core' },
   { label: 'Roles & Permissions', href: '/super-admin/admins?tab=roles', icon: ShieldCheck },
   { label: 'Academic Structure', href: '/super-admin/academic', icon: Layers },
-  { label: 'Question Bank', href: '/admin/question-bank', icon: HelpCircle },
+  { label: 'Question Bank', href: '/super-admin/question-bank', icon: HelpCircle },
   { label: 'Quiz Management', href: '/admin/quiz', icon: BookOpen },
   { label: 'Examination Management', href: '/super-admin/dashboard#exams', icon: ClipboardList },
   { label: 'Student Management', href: '/super-admin/dashboard#students', icon: GraduationCap },
