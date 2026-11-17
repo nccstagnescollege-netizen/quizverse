@@ -1,0 +1,35 @@
+{
+  "name": "quizverse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QUIZVERSE - Advanced 3D Interactive Online Quiz & Examination Platform",
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/*\" --parallel dev",
+    "dev:web": "pnpm --filter @quizverse/web dev",
+    "dev:api": "pnpm --filter @quizverse/api dev",
+    "build": "pnpm --filter @quizverse/shared build && pnpm --filter @quizverse/web build && pnpm --filter @quizverse/api build",
+    "build:web": "pnpm --filter @quizverse/web build",
+    "build:api": "pnpm --filter @quizverse/api build",
+    "build:shared": "pnpm --filter @quizverse/shared build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
+    "eslint": "^10.15.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^2.1.5"
+  },
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

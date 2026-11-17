@@ -1,0 +1,9 @@
+name = "quizverse-api"
+main = "src/worker.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+# Supabase secrets should be set using `wrangler secret put SUPABASE_URL` etc.
