@@ -59,7 +59,14 @@ export default function SuperAdminAcademicPage() {
   const [activeTab, setActiveTab] = useState<'tree' | 'institutions' | 'programmes' | 'subjects' | 'curricula' | 'syllabus'>('tree');
 
   // Loading & Error States
-  const [loading, setLoading] = useState<boolean>(true);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [treeLoading, setTreeLoading] = useState<boolean>(false);
+  const [allocationsLoading, setAllocationsLoading] = useState<boolean>(false);
+  const [unitsLoading, setUnitsLoading] = useState<boolean>(false);
+  const [loadingChapterUnitId, setLoadingChapterUnitId] = useState<string | null>(null);
+  const [loadingTopicChapterId, setLoadingTopicChapterId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -138,14 +145,17 @@ export default function SuperAdminAcademicPage() {
     }
   }, [authLoading, isAuthenticated, isSuperAdmin, router]);
 
-  // Load all academic data
-  const loadData = useCallback(async () => {
+  // Load core academic records asynchronously (non-blocking)
+  const loadData = useCallback(async (isInitial = false) => {
     if (!token) return;
-    setLoading(true);
+    if (isInitial) {
+      setInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
     try {
-      const [treeRes, instRes, progRes, catRes, subjRes, currRes] = await Promise.all([
-        academicService.getAcademicTree(token).catch(() => []),
+      const [instRes, progRes, catRes, subjRes, currRes] = await Promise.all([
         academicService.getInstitutions(token).catch(() => []),
         academicService.getProgrammes(token).catch(() => []),
         academicService.getCategories(token).catch(() => []),
@@ -153,79 +163,113 @@ export default function SuperAdminAcademicPage() {
         academicService.getCurricula(token).catch(() => []),
       ]);
 
-      setTreeData(treeRes);
       setInstitutions(instRes);
       setProgrammes(progRes);
       setCategories(catRes);
       setSubjects(subjRes);
       setCurricula(currRes);
 
-      if (progRes.length > 0 && !selectedProgrammeId) {
-        setSelectedProgrammeId(progRes[0].id);
-      }
-      if (subjRes.length > 0 && !selectedSubjectId) {
-        setSelectedSubjectId(subjRes[0].id);
-      }
+      setSelectedProgrammeId((prev) => prev || (progRes.length > 0 ? progRes[0].id : ''));
+      setSelectedSubjectId((prev) => prev || (subjRes.length > 0 ? subjRes[0].id : ''));
     } catch (err: any) {
       setError(err.message || 'Failed to load academic records');
     } finally {
-      setLoading(false);
+      if (isInitial) setInitialLoading(false);
+      setIsRefreshing(false);
     }
-  }, [token, selectedProgrammeId, selectedSubjectId]);
+  }, [token]);
 
+  // Load Tree Data asynchronously on-demand
+  const loadTreeData = useCallback(async () => {
+    if (!token) return;
+    setTreeLoading(true);
+    try {
+      const treeRes = await academicService.getAcademicTree(token).catch(() => []);
+      setTreeData(treeRes);
+    } catch (err) {
+      console.error('Failed to load academic tree', err);
+    } finally {
+      setTreeLoading(false);
+    }
+  }, [token]);
+
+  // Initial load
   useEffect(() => {
     if (isAuthenticated && isSuperAdmin && token) {
-      loadData();
+      loadData(true);
     }
   }, [isAuthenticated, isSuperAdmin, token, loadData]);
 
-  // Load curriculum allocations when programme changes
+  // Load Tree Data asynchronously when Tree tab is active and not yet loaded
+  useEffect(() => {
+    if (isAuthenticated && isSuperAdmin && token && activeTab === 'tree' && treeData.length === 0 && !treeLoading) {
+      loadTreeData();
+    }
+  }, [isAuthenticated, isSuperAdmin, token, activeTab, treeData.length, treeLoading, loadTreeData]);
+
+  // Load curriculum allocations asynchronously when selected programme changes
   useEffect(() => {
     if (!token || !selectedProgrammeId) return;
+    setAllocationsLoading(true);
     const progCurricula = curricula.filter((c) => c.programme_id === selectedProgrammeId);
-    if (progCurricula.length > 0) {
-      academicService
-        .getCurriculumAllocations(token, progCurricula[0].id)
-        .then(setAllocations)
-        .catch(() => setAllocations([]));
-    } else {
-      setAllocations([]);
-    }
-    academicService
-      .getSemesters(token, selectedProgrammeId)
-      .then(setProgrammeSemesters)
-      .catch(() => setProgrammeSemesters([]));
+    const activeCurrId = progCurricula[0]?.id;
+
+    Promise.all([
+      activeCurrId
+        ? academicService.getCurriculumAllocations(token, activeCurrId).catch(() => [])
+        : Promise.resolve([]),
+      academicService.getSemesters(token, selectedProgrammeId).catch(() => []),
+    ])
+      .then(([allocRes, semRes]) => {
+        setAllocations(allocRes);
+        setProgrammeSemesters(semRes);
+      })
+      .catch((err) => {
+        console.error('Failed to load allocations/semesters', err);
+      })
+      .finally(() => {
+        setAllocationsLoading(false);
+      });
   }, [token, selectedProgrammeId, curricula]);
 
-  // Load units when selected subject changes
+  // Load units asynchronously when selected subject changes
   useEffect(() => {
     if (!token || !selectedSubjectId) return;
+    setUnitsLoading(true);
     academicService
       .getUnits(token, selectedSubjectId)
       .then(setUnits)
-      .catch(() => setUnits([]));
+      .catch(() => setUnits([]))
+      .finally(() => {
+        setUnitsLoading(false);
+      });
   }, [token, selectedSubjectId]);
 
-  // Handlers for Creations
+  // Handlers for Creations (Asynchronous & Non-Blocking)
   const handleCreateInstitution = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await academicService.createInstitution(token, instForm);
+      const newInst = await academicService.createInstitution(token, instForm);
       setSuccessMessage(`Institution '${instForm.name}' created successfully.`);
       setShowInstModal(false);
       setInstForm({ name: '', code: '', description: '', website_url: '' });
-      loadData();
+      setInstitutions((prev) => [newInst, ...prev]);
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateProgramme = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await academicService.createProgramme(token, progForm);
+      const newProg = await academicService.createProgramme(token, progForm);
       setSuccessMessage(`Programme '${progForm.name}' and its semester sequence created.`);
       setShowProgModal(false);
       setProgForm({
@@ -237,17 +281,22 @@ export default function SuperAdminAcademicPage() {
         total_semesters: 6,
         description: '',
       });
-      loadData();
+      setProgrammes((prev) => [newProg, ...prev]);
+      setSelectedProgrammeId(newProg.id);
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await academicService.createSubject(token, {
+      const newSubj = await academicService.createSubject(token, {
         ...subjForm,
         institution_id: subjForm.institution_id || undefined,
       });
@@ -261,15 +310,19 @@ export default function SuperAdminAcademicPage() {
         subject_type: 'theory',
         description: '',
       });
-      loadData();
+      setSubjects((prev) => [newSubj, ...prev]);
+      setSelectedSubjectId(newSubj.id);
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAllocateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || isSubmitting) return;
     if (!allocForm.semester_id) {
       setError('Please select a semester.');
       return;
@@ -278,8 +331,9 @@ export default function SuperAdminAcademicPage() {
       setError('Please select a master subject.');
       return;
     }
+    setIsSubmitting(true);
     try {
-      await academicService.allocateSubject(token, {
+      const newAlloc = await academicService.allocateSubject(token, {
         curriculum_id: allocForm.curriculum_id || undefined,
         semester_id: allocForm.semester_id,
         subject_id: allocForm.subject_id,
@@ -290,24 +344,26 @@ export default function SuperAdminAcademicPage() {
       });
       setSuccessMessage('Subject allocated to curriculum semester.');
       setShowAllocModal(false);
-      if (selectedProgrammeId) {
-        const progCurricula = curricula.filter((c) => c.programme_id === selectedProgrammeId);
-        const activeCurrId = allocForm.curriculum_id || progCurricula[0]?.id;
-        if (activeCurrId) {
-          academicService.getCurriculumAllocations(token, activeCurrId).then(setAllocations);
-        }
+      setAllocations((prev) => [...prev, newAlloc]);
+      const progCurricula = curricula.filter((c) => c.programme_id === selectedProgrammeId);
+      const activeCurrId = allocForm.curriculum_id || progCurricula[0]?.id;
+      if (activeCurrId) {
+        academicService.getCurriculumAllocations(token, activeCurrId).then(setAllocations);
       }
-      loadData();
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateUnit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedSubjectId) return;
+    if (!token || !selectedSubjectId || isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await academicService.createUnit(token, {
+      const newUnit = await academicService.createUnit(token, {
         subject_id: selectedSubjectId,
         unit_name: unitForm.unit_name,
         unit_code: unitForm.unit_code,
@@ -316,22 +372,28 @@ export default function SuperAdminAcademicPage() {
       });
       setSuccessMessage(`Unit '${unitForm.unit_code}' added to subject syllabus.`);
       setShowUnitModal(false);
-      setUnitForm({ unit_name: '', unit_code: '', unit_number: 1, description: '' });
+      setUnitForm({ unit_name: '', unit_code: '', unit_number: (units.length + 2), description: '' });
+      setUnits((prev) => [...prev, newUnit]);
       academicService.getUnits(token, selectedSubjectId).then(setUnits);
-      loadData();
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const toggleUnitExpand = async (unitId: string) => {
     const isCurrentlyExpanded = expandedUnits[unitId];
     if (!isCurrentlyExpanded && !unitChapters[unitId] && token) {
+      setLoadingChapterUnitId(unitId);
       try {
         const chapters = await academicService.getChapters(token, unitId);
         setUnitChapters((prev) => ({ ...prev, [unitId]: chapters }));
       } catch (err) {
         console.error('Failed to load chapters for unit', err);
+      } finally {
+        setLoadingChapterUnitId(null);
       }
     }
     setExpandedUnits((prev) => ({ ...prev, [unitId]: !isCurrentlyExpanded }));
@@ -340,11 +402,14 @@ export default function SuperAdminAcademicPage() {
   const toggleChapterExpand = async (chapterId: string) => {
     const isCurrentlyExpanded = expandedChapters[chapterId];
     if (!isCurrentlyExpanded && !chapterTopics[chapterId] && token) {
+      setLoadingTopicChapterId(chapterId);
       try {
         const topics = await academicService.getTopics(token, chapterId);
         setChapterTopics((prev) => ({ ...prev, [chapterId]: topics }));
       } catch (err) {
         console.error('Failed to load topics for chapter', err);
+      } finally {
+        setLoadingTopicChapterId(null);
       }
     }
     setExpandedChapters((prev) => ({ ...prev, [chapterId]: !isCurrentlyExpanded }));
@@ -352,10 +417,12 @@ export default function SuperAdminAcademicPage() {
 
   const handleCreateChapter = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !activeUnitForChapter) return;
+    if (!token || !activeUnitForChapter || isSubmitting) return;
+    setIsSubmitting(true);
+    const unitId = activeUnitForChapter.id;
     try {
-      await academicService.createChapter(token, {
-        unit_id: activeUnitForChapter.id,
+      const newChapter = await academicService.createChapter(token, {
+        unit_id: unitId,
         chapter_name: chapterForm.chapter_name,
         chapter_code: chapterForm.chapter_code,
         chapter_number: Number(chapterForm.chapter_number),
@@ -363,38 +430,52 @@ export default function SuperAdminAcademicPage() {
       });
       setSuccessMessage(`Chapter '${chapterForm.chapter_code}' added to Unit ${activeUnitForChapter.unit_number}.`);
       setShowChapterModal(false);
-      const unitId = activeUnitForChapter.id;
       setChapterForm({ chapter_name: '', chapter_code: '', chapter_number: 1, description: '' });
-      const updatedChapters = await academicService.getChapters(token, unitId);
-      setUnitChapters((prev) => ({ ...prev, [unitId]: updatedChapters }));
+      setUnitChapters((prev) => ({
+        ...prev,
+        [unitId]: [...(prev[unitId] || []), newChapter],
+      }));
       setExpandedUnits((prev) => ({ ...prev, [unitId]: true }));
+      academicService.getChapters(token, unitId).then((chList) => {
+        setUnitChapters((prev) => ({ ...prev, [unitId]: chList }));
+      });
       academicService.getUnits(token, selectedSubjectId).then(setUnits);
-      loadData();
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !activeChapterForTopic) return;
+    if (!token || !activeChapterForTopic || isSubmitting) return;
+    setIsSubmitting(true);
+    const chapterId = activeChapterForTopic.id;
     try {
-      await academicService.createTopic(token, {
-        chapter_id: activeChapterForTopic.id,
+      const newTopic = await academicService.createTopic(token, {
+        chapter_id: chapterId,
         topic_name: topicForm.topic_name,
         topic_code: topicForm.topic_code || undefined,
         description: topicForm.description || undefined,
       });
       setSuccessMessage(`Topic '${topicForm.topic_name}' created.`);
       setShowTopicModal(false);
-      const chapterId = activeChapterForTopic.id;
       setTopicForm({ topic_name: '', topic_code: '', description: '' });
-      const updatedTopics = await academicService.getTopics(token, chapterId);
-      setChapterTopics((prev) => ({ ...prev, [chapterId]: updatedTopics }));
+      setChapterTopics((prev) => ({
+        ...prev,
+        [chapterId]: [...(prev[chapterId] || []), newTopic],
+      }));
       setExpandedChapters((prev) => ({ ...prev, [chapterId]: true }));
-      loadData();
+      academicService.getTopics(token, chapterId).then((tpList) => {
+        setChapterTopics((prev) => ({ ...prev, [chapterId]: tpList }));
+      });
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -403,7 +484,8 @@ export default function SuperAdminAcademicPage() {
     try {
       await academicService.archiveSubject(token, id);
       setSuccessMessage(`Subject '${name}' archived.`);
-      loadData();
+      setSubjects((prev) => prev.filter((s) => s.id !== id));
+      loadData(false);
     } catch (err: any) {
       setError(err.message);
     }
@@ -452,7 +534,7 @@ export default function SuperAdminAcademicPage() {
     )},
   ];
 
-  if (authLoading || loading) {
+  if (authLoading || (initialLoading && institutions.length === 0 && programmes.length === 0 && subjects.length === 0)) {
     return (
       <div className="space-y-6 max-w-7xl mx-auto w-full">
         <LoadingSkeleton />
@@ -463,130 +545,150 @@ export default function SuperAdminAcademicPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full">
       {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-surface-border pb-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-surface-border pb-5">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-mono text-brand-400 mb-1">
+            <FolderTree className="w-3.5 h-3.5" />
+            ACADEMIC HIERARCHY & REUSABLE CURRICULA
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            Academic Command Center
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Manage institutions, programmes, semesters, reusable master subjects, and syllabus hierarchy.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              loadData(false);
+              if (activeTab === 'tree') loadTreeData();
+            }}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-brand-400' : ''}`} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </button>
+          <button
+            onClick={() => {
+              setInstForm({ name: '', code: '', description: '', website_url: '' });
+              setShowInstModal(true);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white shadow-lg shadow-brand-500/20 transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            New Institution
+          </button>
+        </div>
+      </div>
+
+      {/* Feedback Banners */}
+      {error && <ErrorState message={error} onRetry={() => setError(null)} />}
+      {successMessage && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-xs flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            {successMessage}
+          </span>
+          <button onClick={() => setSuccessMessage(null)} className="text-emerald-400 hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Top High-Level Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <StatCard
+          title="Institutions"
+          value={institutions.length}
+          icon={Building2}
+          description="Accredited entities"
+          variant="cyan"
+        />
+        <StatCard
+          title="Programmes"
+          value={programmes.length}
+          icon={GraduationCap}
+          description="Undergrad & Postgrad"
+          variant="purple"
+        />
+        <StatCard
+          title="Master Subjects"
+          value={subjects.length}
+          icon={BookOpen}
+          description="Reusable subject bank"
+          variant="brand"
+        />
+        <StatCard
+          title="Curricula Schemes"
+          value={curricula.length}
+          icon={SlidersHorizontal}
+          description="Active syllabus schemes"
+          variant="emerald"
+        />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex border-b border-surface-border overflow-x-auto gap-2 text-xs font-medium scrollbar-thin">
+        {[
+          { id: 'tree', label: 'Interactive Tree Explorer', icon: FolderTree },
+          { id: 'institutions', label: 'Institutions', icon: Building2 },
+          { id: 'programmes', label: 'Programmes & Semesters', icon: GraduationCap },
+          { id: 'subjects', label: 'Reusable Master Subjects', icon: BookOpen },
+          { id: 'curricula', label: 'Curricula & Allocations', icon: SlidersHorizontal },
+          { id: 'syllabus', label: 'Syllabus Breakdown (Units/Topics)', icon: Layers },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-2.5 border-b-2 font-medium transition-all whitespace-nowrap ${
+                isActive
+                  ? 'border-brand-500 text-brand-300 bg-brand-500/10'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: VISUAL TREE EXPLORER */}
+      {activeTab === 'tree' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 text-xs font-mono text-brand-400 mb-1">
-                <FolderTree className="w-3.5 h-3.5" />
-                ACADEMIC HIERARCHY & REUSABLE CURRICULA
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-                Academic Command Center
-              </h1>
-              <p className="text-sm text-slate-400 mt-1">
-                Manage institutions, programmes, semesters, reusable master subjects, and syllabus hierarchy.
+              <h2 className="text-base font-semibold text-white">Interactive Visual Academic Tree</h2>
+              <p className="text-xs text-slate-400">
+                Live hierarchical graph from Institution down to Topics with Question Bank integration counts.
               </p>
             </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={loadData}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Refresh
-              </button>
-              <button
-                onClick={() => {
-                  setInstForm({ name: '', code: '', description: '', website_url: '' });
-                  setShowInstModal(true);
-                }}
-                className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white shadow-lg shadow-brand-500/20 transition-all"
-              >
-                <PlusCircle className="w-4 h-4" />
-                New Institution
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={loadTreeData}
+              disabled={treeLoading}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`w-3 h-3 ${treeLoading ? 'animate-spin text-brand-400' : ''}`} />
+              <span>{treeLoading ? 'Updating Tree...' : 'Refresh Tree'}</span>
+            </button>
           </div>
-
-          {/* Feedback Banners */}
-          {error && <ErrorState message={error} onRetry={() => setError(null)} />}
-          {successMessage && (
-            <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-xs flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                {successMessage}
-              </span>
-              <button onClick={() => setSuccessMessage(null)} className="text-emerald-400 hover:underline">
-                Dismiss
-              </button>
+          {treeLoading && treeData.length === 0 ? (
+            <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-xl space-y-3">
+              <RefreshCw className="w-6 h-6 animate-spin text-brand-400 mx-auto" />
+              <p className="text-xs text-slate-400">Loading academic hierarchy tree asynchronously...</p>
             </div>
+          ) : (
+            <VisualHierarchyTree tree={treeData} />
           )}
-
-          {/* Top High-Level Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatCard
-              title="Institutions"
-              value={institutions.length}
-              icon={Building2}
-              description="Accredited entities"
-              variant="cyan"
-            />
-            <StatCard
-              title="Programmes"
-              value={programmes.length}
-              icon={GraduationCap}
-              description="Undergrad & Postgrad"
-              variant="purple"
-            />
-            <StatCard
-              title="Master Subjects"
-              value={subjects.length}
-              icon={BookOpen}
-              description="Reusable subject bank"
-              variant="brand"
-            />
-            <StatCard
-              title="Curricula Schemes"
-              value={curricula.length}
-              icon={SlidersHorizontal}
-              description="Active syllabus schemes"
-              variant="emerald"
-            />
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="flex border-b border-surface-border overflow-x-auto gap-2 text-xs font-medium scrollbar-thin">
-            {[
-              { id: 'tree', label: 'Interactive Tree Explorer', icon: FolderTree },
-              { id: 'institutions', label: 'Institutions', icon: Building2 },
-              { id: 'programmes', label: 'Programmes & Semesters', icon: GraduationCap },
-              { id: 'subjects', label: 'Reusable Master Subjects', icon: BookOpen },
-              { id: 'curricula', label: 'Curricula & Allocations', icon: SlidersHorizontal },
-              { id: 'syllabus', label: 'Syllabus Breakdown (Units/Topics)', icon: Layers },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2.5 border-b-2 font-medium transition-all whitespace-nowrap ${
-                    isActive
-                      ? 'border-brand-500 text-brand-300 bg-brand-500/10'
-                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* TAB 1: VISUAL TREE EXPLORER */}
-          {activeTab === 'tree' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-white">Interactive Visual Academic Tree</h2>
-                  <p className="text-xs text-slate-400">
-                    Live hierarchical graph from Institution down to Topics with Question Bank integration counts.
-                  </p>
-                </div>
-              </div>
-              <VisualHierarchyTree tree={treeData} />
-            </div>
-          )}
+        </div>
+      )}
 
           {/* TAB 2: INSTITUTIONS */}
           {activeTab === 'institutions' && (
@@ -713,7 +815,12 @@ export default function SuperAdminAcademicPage() {
               {/* Allocations Table */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Allocated Subjects for Selected Programme</h3>
-                {allocations.length === 0 ? (
+                {allocationsLoading ? (
+                  <div className="text-center py-12 text-slate-400 text-xs flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-brand-400" />
+                    <span>Loading programme curriculum allocations...</span>
+                  </div>
+                ) : allocations.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 text-xs">
                     No subjects allocated to this programme curriculum yet. Click Allocate Subject above.
                   </div>
@@ -801,7 +908,12 @@ export default function SuperAdminAcademicPage() {
 
               {/* Units List */}
               <div className="space-y-3">
-                {units.length === 0 ? (
+                {unitsLoading ? (
+                  <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-xl text-slate-400 text-xs flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-brand-400" />
+                    <span>Loading syllabus units for selected subject...</span>
+                  </div>
+                ) : units.length === 0 ? (
                   <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-xl text-slate-400 text-xs">
                     No syllabus units registered for this subject yet. Click &quot;Add Syllabus Unit&quot; above to create one.
                   </div>
@@ -820,7 +932,9 @@ export default function SuperAdminAcademicPage() {
                             className="flex items-center gap-2.5 text-left flex-1 group"
                           >
                             <span className="p-1 rounded bg-slate-800 text-slate-400 group-hover:text-white transition-colors">
-                              {isUnitExpanded ? (
+                              {loadingChapterUnitId === u.id ? (
+                                <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
+                              ) : isUnitExpanded ? (
                                 <ChevronDown className="w-4 h-4 text-amber-400" />
                               ) : (
                                 <ChevronRight className="w-4 h-4" />
@@ -904,7 +1018,9 @@ export default function SuperAdminAcademicPage() {
                                         className="flex items-center gap-2 text-left flex-1 group"
                                       >
                                         <span className="p-0.5 rounded bg-slate-800 text-slate-400 group-hover:text-white transition-colors">
-                                          {isChapterExpanded ? (
+                                          {loadingTopicChapterId === ch.id ? (
+                                            <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                          ) : isChapterExpanded ? (
                                             <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
                                           ) : (
                                             <ChevronRight className="w-3.5 h-3.5" />
@@ -1094,9 +1210,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Save Institution
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Saving...' : 'Save Institution'}</span>
                     </button>
                   </div>
                 </form>
@@ -1202,9 +1320,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Create Programme
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Creating...' : 'Create Programme'}</span>
                     </button>
                   </div>
                 </form>
@@ -1282,9 +1402,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Save Subject
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Saving...' : 'Save Subject'}</span>
                     </button>
                   </div>
                 </form>
@@ -1400,9 +1522,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Allocate
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Allocating...' : 'Allocate'}</span>
                     </button>
                   </div>
                 </form>
@@ -1474,9 +1598,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Add Unit
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Adding...' : 'Add Unit'}</span>
                     </button>
                   </div>
                 </form>
@@ -1555,9 +1681,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Save Chapter
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Saving...' : 'Save Chapter'}</span>
                     </button>
                   </div>
                 </form>
@@ -1624,9 +1752,11 @@ export default function SuperAdminAcademicPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-medium"
+                      disabled={isSubmitting}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-medium disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      Save Topic
+                      {isSubmitting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                      <span>{isSubmitting ? 'Saving...' : 'Save Topic'}</span>
                     </button>
                   </div>
                 </form>

@@ -32,7 +32,9 @@ export default function UserAdminAcademicPage() {
   const { user, token, isAuthenticated, hasPermission, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [treeLoading, setTreeLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [treeData, setTreeData] = useState<AcademicTreeNode[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
@@ -45,34 +47,51 @@ export default function UserAdminAcademicPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isInitial = false) => {
     if (!token) return;
-    setLoading(true);
+    if (isInitial) {
+      setInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
     try {
-      const [treeRes, progRes, subjRes] = await Promise.all([
-        academicService.getAcademicTree(token).catch(() => []),
+      const [progRes, subjRes] = await Promise.all([
         academicService.getProgrammes(token).catch(() => []),
         academicService.getSubjects(token).catch(() => []),
       ]);
 
-      setTreeData(treeRes);
       setProgrammes(progRes);
       setSubjects(subjRes);
     } catch (err: any) {
       setError(err.message || 'Failed to load assigned academic structure.');
     } finally {
-      setLoading(false);
+      if (isInitial) setInitialLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [token]);
+
+  const loadTreeData = useCallback(async () => {
+    if (!token) return;
+    setTreeLoading(true);
+    try {
+      const treeRes = await academicService.getAcademicTree(token).catch(() => []);
+      setTreeData(treeRes);
+    } catch (err) {
+      console.error('Failed to load academic tree', err);
+    } finally {
+      setTreeLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
     if (isAuthenticated && token) {
-      loadData();
+      loadData(true);
+      loadTreeData();
     }
-  }, [isAuthenticated, token, loadData]);
+  }, [isAuthenticated, token, loadData, loadTreeData]);
 
-  if (authLoading || loading) {
+  if (authLoading || (initialLoading && programmes.length === 0 && subjects.length === 0)) {
     return (
       <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
         <LoadingSkeleton />
@@ -114,11 +133,15 @@ export default function UserAdminAcademicPage() {
         </div>
 
         <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+          onClick={() => {
+            loadData(false);
+            loadTreeData();
+          }}
+          disabled={isRefreshing}
+          className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors disabled:opacity-60"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-brand-400' : ''}`} />
+          <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
         </button>
       </div>
 
@@ -160,7 +183,12 @@ export default function UserAdminAcademicPage() {
           </div>
         </div>
 
-        {treeData.length === 0 ? (
+        {treeLoading && treeData.length === 0 ? (
+          <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-2xl space-y-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-brand-400 mx-auto" />
+            <p className="text-xs text-slate-400">Loading assigned academic hierarchy tree asynchronously...</p>
+          </div>
+        ) : treeData.length === 0 ? (
           <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-2xl space-y-2">
             <Sparkles className="w-8 h-8 text-slate-600 mx-auto mb-2" />
             <h3 className="text-sm font-semibold text-slate-200">No Academic Scope Assigned</h3>
