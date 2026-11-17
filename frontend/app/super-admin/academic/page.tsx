@@ -25,6 +25,8 @@ import {
   Share2,
   Shield,
   HelpCircle,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -112,6 +114,20 @@ export default function SuperAdminAcademicPage() {
 
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [unitForm, setUnitForm] = useState({ unit_name: '', unit_code: '', unit_number: 1, description: '' });
+
+  // Chapter & Topic Hierarchy State
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
+  const [unitChapters, setUnitChapters] = useState<Record<string, Chapter[]>>({});
+  const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
+  const [chapterTopics, setChapterTopics] = useState<Record<string, Topic[]>>({});
+
+  const [showChapterModal, setShowChapterModal] = useState(false);
+  const [activeUnitForChapter, setActiveUnitForChapter] = useState<Unit | null>(null);
+  const [chapterForm, setChapterForm] = useState({ chapter_name: '', chapter_code: '', chapter_number: 1, description: '' });
+
+  const [showTopicModal, setShowTopicModal] = useState(false);
+  const [activeChapterForTopic, setActiveChapterForTopic] = useState<Chapter | null>(null);
+  const [topicForm, setTopicForm] = useState({ topic_name: '', topic_code: '', description: '' });
 
   // Guard against non-super-admins
   useEffect(() => {
@@ -302,6 +318,80 @@ export default function SuperAdminAcademicPage() {
       setShowUnitModal(false);
       setUnitForm({ unit_name: '', unit_code: '', unit_number: 1, description: '' });
       academicService.getUnits(token, selectedSubjectId).then(setUnits);
+      loadData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const toggleUnitExpand = async (unitId: string) => {
+    const isCurrentlyExpanded = expandedUnits[unitId];
+    if (!isCurrentlyExpanded && !unitChapters[unitId] && token) {
+      try {
+        const chapters = await academicService.getChapters(token, unitId);
+        setUnitChapters((prev) => ({ ...prev, [unitId]: chapters }));
+      } catch (err) {
+        console.error('Failed to load chapters for unit', err);
+      }
+    }
+    setExpandedUnits((prev) => ({ ...prev, [unitId]: !isCurrentlyExpanded }));
+  };
+
+  const toggleChapterExpand = async (chapterId: string) => {
+    const isCurrentlyExpanded = expandedChapters[chapterId];
+    if (!isCurrentlyExpanded && !chapterTopics[chapterId] && token) {
+      try {
+        const topics = await academicService.getTopics(token, chapterId);
+        setChapterTopics((prev) => ({ ...prev, [chapterId]: topics }));
+      } catch (err) {
+        console.error('Failed to load topics for chapter', err);
+      }
+    }
+    setExpandedChapters((prev) => ({ ...prev, [chapterId]: !isCurrentlyExpanded }));
+  };
+
+  const handleCreateChapter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !activeUnitForChapter) return;
+    try {
+      await academicService.createChapter(token, {
+        unit_id: activeUnitForChapter.id,
+        chapter_name: chapterForm.chapter_name,
+        chapter_code: chapterForm.chapter_code,
+        chapter_number: Number(chapterForm.chapter_number),
+        description: chapterForm.description || undefined,
+      });
+      setSuccessMessage(`Chapter '${chapterForm.chapter_code}' added to Unit ${activeUnitForChapter.unit_number}.`);
+      setShowChapterModal(false);
+      const unitId = activeUnitForChapter.id;
+      setChapterForm({ chapter_name: '', chapter_code: '', chapter_number: 1, description: '' });
+      const updatedChapters = await academicService.getChapters(token, unitId);
+      setUnitChapters((prev) => ({ ...prev, [unitId]: updatedChapters }));
+      setExpandedUnits((prev) => ({ ...prev, [unitId]: true }));
+      academicService.getUnits(token, selectedSubjectId).then(setUnits);
+      loadData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleCreateTopic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !activeChapterForTopic) return;
+    try {
+      await academicService.createTopic(token, {
+        chapter_id: activeChapterForTopic.id,
+        topic_name: topicForm.topic_name,
+        topic_code: topicForm.topic_code || undefined,
+        description: topicForm.description || undefined,
+      });
+      setSuccessMessage(`Topic '${topicForm.topic_name}' created.`);
+      setShowTopicModal(false);
+      const chapterId = activeChapterForTopic.id;
+      setTopicForm({ topic_name: '', topic_code: '', description: '' });
+      const updatedTopics = await academicService.getTopics(token, chapterId);
+      setChapterTopics((prev) => ({ ...prev, [chapterId]: updatedTopics }));
+      setExpandedChapters((prev) => ({ ...prev, [chapterId]: true }));
       loadData();
     } catch (err: any) {
       setError(err.message);
@@ -713,24 +803,225 @@ export default function SuperAdminAcademicPage() {
               <div className="space-y-3">
                 {units.length === 0 ? (
                   <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-xl text-slate-400 text-xs">
-                    No syllabus units registered for this subject yet.
+                    No syllabus units registered for this subject yet. Click &quot;Add Syllabus Unit&quot; above to create one.
                   </div>
                 ) : (
-                  units.map((u) => (
-                    <div key={u.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Layers className="w-4 h-4 text-amber-400" />
-                          <span className="font-semibold text-white text-sm">{u.unit_name}</span>
-                          <span className="font-mono text-xs text-amber-300 px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-800">
-                            Unit {u.unit_number} ({u.unit_code})
-                          </span>
+                  units.map((u) => {
+                    const isUnitExpanded = !!expandedUnits[u.id];
+                    const chapters = unitChapters[u.id] || [];
+
+                    return (
+                      <div key={u.id} className="rounded-xl bg-slate-900/60 border border-slate-800 overflow-hidden">
+                        {/* Unit Header Bar */}
+                        <div className="p-4 flex items-center justify-between gap-3 hover:bg-slate-850/40 transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => toggleUnitExpand(u.id)}
+                            className="flex items-center gap-2.5 text-left flex-1 group"
+                          >
+                            <span className="p-1 rounded bg-slate-800 text-slate-400 group-hover:text-white transition-colors">
+                              {isUnitExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-amber-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </span>
+                            <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-white text-sm">{u.unit_name}</span>
+                                <span className="font-mono text-xs text-amber-300 px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-800">
+                                  Unit {u.unit_number} ({u.unit_code})
+                                </span>
+                              </div>
+                              {u.description && <p className="text-xs text-slate-400 mt-0.5">{u.description}</p>}
+                            </div>
+                          </button>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+                              {u.chapters_count || chapters.length} Chapters
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveUnitForChapter(u);
+                                const nextNum = (chapters.length || u.chapters_count || 0) + 1;
+                                setChapterForm({
+                                  chapter_name: '',
+                                  chapter_code: `${u.unit_code}-CH${nextNum}`,
+                                  chapter_number: nextNum,
+                                  description: '',
+                                });
+                                setShowChapterModal(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800 flex items-center gap-1.5 transition-colors"
+                            >
+                              <PlusCircle className="w-3.5 h-3.5" />
+                              <span>Add Chapter</span>
+                            </button>
+                          </div>
                         </div>
-                        <span className="text-xs text-slate-400 font-mono">{u.chapters_count} Chapters</span>
+
+                        {/* Expanded Unit Chapters */}
+                        {isUnitExpanded && (
+                          <div className="border-t border-slate-800/80 bg-slate-950/40 p-3 sm:p-4 space-y-3">
+                            {chapters.length === 0 ? (
+                              <div className="p-4 text-center rounded-lg bg-slate-900/40 border border-dashed border-slate-800 text-slate-400 text-xs">
+                                <span>No chapters added to this unit yet. </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveUnitForChapter(u);
+                                    setChapterForm({
+                                      chapter_name: '',
+                                      chapter_code: `${u.unit_code}-CH1`,
+                                      chapter_number: 1,
+                                      description: '',
+                                    });
+                                    setShowChapterModal(true);
+                                  }}
+                                  className="text-cyan-400 hover:underline font-medium ml-1"
+                                >
+                                  + Add the first Chapter
+                                </button>
+                              </div>
+                            ) : (
+                              chapters.map((ch) => {
+                                const isChapterExpanded = !!expandedChapters[ch.id];
+                                const topics = chapterTopics[ch.id] || [];
+
+                                return (
+                                  <div
+                                    key={ch.id}
+                                    className="rounded-lg bg-slate-900/70 border border-slate-800 overflow-hidden"
+                                  >
+                                    {/* Chapter Header */}
+                                    <div className="p-3 flex items-center justify-between gap-3 hover:bg-slate-850/50 transition-colors">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleChapterExpand(ch.id)}
+                                        className="flex items-center gap-2 text-left flex-1 group"
+                                      >
+                                        <span className="p-0.5 rounded bg-slate-800 text-slate-400 group-hover:text-white transition-colors">
+                                          {isChapterExpanded ? (
+                                            <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                                          ) : (
+                                            <ChevronRight className="w-3.5 h-3.5" />
+                                          )}
+                                        </span>
+                                        <BookOpen className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                        <div>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-medium text-slate-200 text-xs sm:text-sm">
+                                              Ch {ch.chapter_number}: {ch.chapter_name}
+                                            </span>
+                                            <span className="font-mono text-[10px] text-cyan-300 px-1.5 py-0.5 rounded bg-cyan-950/70 border border-cyan-800">
+                                              {ch.chapter_code}
+                                            </span>
+                                          </div>
+                                          {ch.description && (
+                                            <p className="text-[11px] text-slate-400 mt-0.5">{ch.description}</p>
+                                          )}
+                                        </div>
+                                      </button>
+
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+                                          {ch.topics_count || topics.length} Topics
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveChapterForTopic(ch);
+                                            const nextNum = (topics.length || ch.topics_count || 0) + 1;
+                                            setTopicForm({
+                                              topic_name: '',
+                                              topic_code: `${ch.chapter_code}-T${nextNum}`,
+                                              description: '',
+                                            });
+                                            setShowTopicModal(true);
+                                          }}
+                                          className="px-2 py-0.5 text-xs font-medium rounded-lg bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800 flex items-center gap-1.5 transition-colors"
+                                        >
+                                          <PlusCircle className="w-3 h-3" />
+                                          <span>Add Topic</span>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Expanded Topics List */}
+                                    {isChapterExpanded && (
+                                      <div className="border-t border-slate-800/60 bg-slate-950/60 p-2.5 sm:p-3 space-y-2">
+                                        {topics.length === 0 ? (
+                                          <div className="p-3 text-center rounded bg-slate-900/30 border border-dashed border-slate-800/80 text-slate-400 text-xs">
+                                            <span>No topics in this chapter yet. </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setActiveChapterForTopic(ch);
+                                                setTopicForm({
+                                                  topic_name: '',
+                                                  topic_code: `${ch.chapter_code}-T1`,
+                                                  description: '',
+                                                });
+                                                setShowTopicModal(true);
+                                              }}
+                                              className="text-emerald-400 hover:underline font-medium ml-1"
+                                            >
+                                              + Add the first Topic
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="grid grid-cols-1 gap-1.5">
+                                            {topics.map((tp) => (
+                                              <div
+                                                key={tp.id}
+                                                className="p-2 sm:px-3 rounded bg-slate-900/80 border border-slate-800/80 flex items-center justify-between gap-2 text-xs"
+                                              >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                  <Tag className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                  <span className="font-medium text-slate-200 truncate">
+                                                    {tp.topic_name}
+                                                  </span>
+                                                  {tp.description && (
+                                                    <span className="text-slate-400 text-[11px] hidden md:inline truncate max-w-xs">
+                                                      - {tp.description}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                  {tp.topic_code && (
+                                                    <span
+                                                      className="font-mono text-[10px] text-emerald-300 px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800"
+                                                      title="Use this topic_code in Question Bank & Bulk Import"
+                                                    >
+                                                      {tp.topic_code}
+                                                    </span>
+                                                  )}
+                                                  <Link
+                                                    href={`/super-admin/question-bank?topic_id=${tp.id}`}
+                                                    className="text-brand-400 hover:text-brand-300 text-[11px] flex items-center gap-1 font-mono"
+                                                    title="View Questions"
+                                                  >
+                                                    Questions &rarr;
+                                                  </Link>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {u.description && <p className="text-xs text-slate-400">{u.description}</p>}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -1186,6 +1477,156 @@ export default function SuperAdminAcademicPage() {
                       className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs text-white font-medium"
                     >
                       Add Unit
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 6. Create Chapter Modal */}
+          {showChapterModal && activeUnitForChapter && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-cyan-400" />
+                    Add Chapter to Unit {activeUnitForChapter.unit_number}
+                  </h3>
+                  <button onClick={() => setShowChapterModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <div className="text-xs text-slate-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                  Target Unit: <span className="text-amber-400 font-medium">{activeUnitForChapter.unit_name}</span> ({activeUnitForChapter.unit_code})
+                </div>
+                <form onSubmit={handleCreateChapter} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-mono text-slate-300 mb-1">CHAPTER NUMBER *</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        required
+                        value={chapterForm.chapter_number}
+                        onChange={(e) => setChapterForm({ ...chapterForm, chapter_number: Number(e.target.value) })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-300 mb-1">CHAPTER CODE *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. CS101-U1-CH1"
+                        value={chapterForm.chapter_code}
+                        onChange={(e) => setChapterForm({ ...chapterForm, chapter_code: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white uppercase font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1">CHAPTER NAME / TITLE *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Asynchronous I/O Fundamentals"
+                      value={chapterForm.chapter_name}
+                      onChange={(e) => setChapterForm({ ...chapterForm, chapter_name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1">DESCRIPTION</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Optional chapter syllabus scope..."
+                      value={chapterForm.description}
+                      onChange={(e) => setChapterForm({ ...chapterForm, description: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowChapterModal(false)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs text-white font-medium"
+                    >
+                      Save Chapter
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 7. Create Topic Modal */}
+          {showTopicModal && activeChapterForTopic && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-emerald-400" />
+                    Add Topic to Chapter {activeChapterForTopic.chapter_number}
+                  </h3>
+                  <button onClick={() => setShowTopicModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <div className="text-xs text-slate-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                  Target Chapter: <span className="text-cyan-400 font-medium">{activeChapterForTopic.chapter_name}</span> ({activeChapterForTopic.chapter_code})
+                </div>
+                <form onSubmit={handleCreateTopic} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1">TOPIC NAME / TITLE *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Event Loop vs Thread Pool Execution"
+                      value={topicForm.topic_name}
+                      onChange={(e) => setTopicForm({ ...topicForm, topic_name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1">TOPIC CODE</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CS101-U1-CH1-T1"
+                      value={topicForm.topic_code}
+                      onChange={(e) => setTopicForm({ ...topicForm, topic_code: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white uppercase font-mono"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Tip: Questions can be automatically mapped to this topic in Excel/CSV Bulk Import using this code.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1">DESCRIPTION</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Optional topic learning objectives..."
+                      value={topicForm.description}
+                      onChange={(e) => setTopicForm({ ...topicForm, description: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowTopicModal(false)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-medium"
+                    >
+                      Save Topic
                     </button>
                   </div>
                 </form>
