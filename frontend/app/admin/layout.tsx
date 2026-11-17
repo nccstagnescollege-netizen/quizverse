@@ -35,7 +35,7 @@ export default function AdminLayout({
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open administration menu"
-              className="md:hidden p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300"
+              className="md:hidden p-2.5 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
             >
               <div className="w-4 h-4 flex flex-col justify-around">
                 <span className="h-0.5 w-full bg-current" />

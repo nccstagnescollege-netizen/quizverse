@@ -1,16 +1,21 @@
 'use client';
 
-import { Suspense, useRef } from 'react';
+import { Suspense, useRef, useEffect, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, Sphere, MeshDistortMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
-function RotatingCore({ isReducedMotion }: { isReducedMotion: boolean }) {
+interface RotatingCoreProps {
+  isReducedMotion: boolean;
+  isMobile: boolean;
+}
+
+function RotatingCore({ isReducedMotion, isMobile }: RotatingCoreProps) {
   const outerRef = useRef<THREE.Mesh>(null);
   const ringRef = useRef<THREE.Mesh>(null);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (isReducedMotion) return;
     if (outerRef.current) {
       outerRef.current.rotation.x += delta * 0.15;
@@ -21,8 +26,12 @@ function RotatingCore({ isReducedMotion }: { isReducedMotion: boolean }) {
     }
   });
 
+  // Scale down complexity for mobile phones to save GPU battery & avoid frame drops
+  const sphereSegments = isMobile ? 24 : 48;
+  const torusTubular = isMobile ? 40 : 80;
+
   return (
-    <group>
+    <group scale={isMobile ? 0.85 : 1.0}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[8, 8, 4]} intensity={1.5} color="#4668fa" />
       <pointLight position={[-8, -8, -4]} intensity={1.2} color="#00f5d4" />
@@ -41,11 +50,11 @@ function RotatingCore({ isReducedMotion }: { isReducedMotion: boolean }) {
       </mesh>
 
       {/* Inner Glowing Core */}
-      <Sphere args={[1.1, 48, 48]}>
+      <Sphere args={[1.1, sphereSegments, sphereSegments]}>
         <MeshDistortMaterial
           color="#9d4edd"
           attach="material"
-          distort={isReducedMotion ? 0 : 0.3}
+          distort={isReducedMotion ? 0 : isMobile ? 0.2 : 0.3}
           speed={isReducedMotion ? 0 : 1.5}
           roughness={0.3}
           metalness={0.8}
@@ -54,7 +63,7 @@ function RotatingCore({ isReducedMotion }: { isReducedMotion: boolean }) {
 
       {/* Orbital Ring */}
       <mesh ref={ringRef} rotation={[Math.PI / 3, 0, 0]}>
-        <torusGeometry args={[2.8, 0.03, 16, 80]} />
+        <torusGeometry args={[2.8, 0.03, 16, torusTubular]} />
         <meshBasicMaterial color="#00f5d4" transparent opacity={0.65} />
       </mesh>
     </group>
@@ -63,19 +72,38 @@ function RotatingCore({ isReducedMotion }: { isReducedMotion: boolean }) {
 
 export default function HeroScene() {
   const isReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    function checkSize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    checkSize();
+    window.addEventListener('resize', checkSize);
+    return () => window.removeEventListener('resize', checkSize);
+  }, []);
 
   return (
-    <div className="w-full h-full min-h-[300px] flex items-center justify-center">
+    <div className="w-full h-full min-h-[260px] sm:min-h-[340px] flex items-center justify-center relative touch-none">
       <Canvas
-        camera={{ position: [0, 0, 5.5], fov: 45 }}
-        gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
+        camera={{ position: [0, 0, 5.5], fov: isMobile ? 50 : 45 }}
+        gl={{
+          antialias: !isMobile,
+          alpha: true,
+          powerPreference: isMobile ? 'low-power' : 'default',
+        }}
+        dpr={isMobile ? [1, 1.25] : [1, 2]}
       >
         <Suspense fallback={null}>
           {isReducedMotion ? (
-            <RotatingCore isReducedMotion={true} />
+            <RotatingCore isReducedMotion={true} isMobile={isMobile} />
           ) : (
-            <Float speed={1.5} rotationIntensity={0.3} floatIntensity={0.8}>
-              <RotatingCore isReducedMotion={false} />
+            <Float
+              speed={isMobile ? 1.0 : 1.5}
+              rotationIntensity={isMobile ? 0.15 : 0.3}
+              floatIntensity={isMobile ? 0.4 : 0.8}
+            >
+              <RotatingCore isReducedMotion={false} isMobile={isMobile} />
             </Float>
           )}
         </Suspense>

@@ -48,36 +48,36 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
               <p className="text-[10px] font-mono uppercase text-slate-400 tracking-wider mb-2">
                 Public Portal
               </p>
-              <nav className="space-y-1">
+              <nav className="space-y-1.5">
                 <Link
                   href="/"
                   onClick={onClose}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium ${
-                    pathname === '/' ? 'bg-cyber-cyan/15 text-cyber-cyan' : 'text-slate-300'
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium min-h-[44px] transition-colors ${
+                    pathname === '/' ? 'bg-cyber-cyan/15 text-cyber-cyan font-semibold' : 'text-slate-300 hover:text-white hover:bg-surface-elevated'
                   }`}
                 >
-                  <Home className="w-4 h-4" />
-                  Overview
+                  <Home className="w-4 h-4 shrink-0" />
+                  <span>Overview</span>
                 </Link>
                 <Link
                   href="/about"
                   onClick={onClose}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium ${
-                    pathname === '/about' ? 'bg-cyber-cyan/15 text-cyber-cyan' : 'text-slate-300'
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium min-h-[44px] transition-colors ${
+                    pathname === '/about' ? 'bg-cyber-cyan/15 text-cyber-cyan font-semibold' : 'text-slate-300 hover:text-white hover:bg-surface-elevated'
                   }`}
                 >
-                  <Info className="w-4 h-4" />
-                  About Platform
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>About Platform</span>
                 </Link>
                 <Link
                   href="/exam/demo-test"
                   onClick={onClose}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium ${
-                    pathname?.startsWith('/exam') ? 'bg-cyber-cyan/15 text-cyber-cyan' : 'text-slate-300'
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium min-h-[44px] transition-colors ${
+                    pathname?.startsWith('/exam') ? 'bg-cyber-cyan/15 text-cyber-cyan font-semibold' : 'text-slate-300 hover:text-white hover:bg-surface-elevated'
                   }`}
                 >
-                  <KeyRound className="w-4 h-4" />
-                  Candidate Examination
+                  <KeyRound className="w-4 h-4 shrink-0" />
+                  <span>Candidate Examination</span>
                 </Link>
               </nav>
             </div>
@@ -86,7 +86,7 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
               <p className="text-[10px] font-mono uppercase text-slate-400 tracking-wider mb-2">
                 Admin Console
               </p>
-              <nav className="space-y-1">
+              <nav className="space-y-1.5">
                 {ADMIN_NAV_ITEMS.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -95,16 +95,16 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
                       key={item.href}
                       href={item.href}
                       onClick={onClose}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium ${
-                        isActive ? 'bg-brand-600 text-white shadow-glow-primary' : 'text-slate-300'
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium min-h-[44px] transition-colors ${
+                        isActive ? 'bg-brand-600 text-white shadow-glow-primary font-semibold' : 'text-slate-300 hover:text-white hover:bg-surface-elevated'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className="w-4 h-4" />
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-4 h-4 shrink-0" />
                         <span>{item.label}</span>
                       </div>
                       {item.badge && (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 font-mono">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 font-mono">
                           {item.badge}
                         </span>
                       )}
@@ -119,7 +119,7 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
         {/* Bottom Auth Action */}
         <div className="pt-4 border-t border-surface-border">
           <Link href="/login" onClick={onClose} className="block w-full">
-            <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple text-white text-xs font-semibold shadow-glow-purple">
+            <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple text-white text-xs font-semibold shadow-glow-purple min-h-[44px]">
               <Sparkles className="w-4 h-4" />
               Sign In to Account
             </button>

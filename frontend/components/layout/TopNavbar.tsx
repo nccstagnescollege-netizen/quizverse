@@ -27,7 +27,7 @@ export function TopNavbar({ onToggleMobileMenu, isMobileMenuOpen }: TopNavbarPro
               <button
                 onClick={onToggleMobileMenu}
                 aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-                className="md:hidden p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white"
+                className="md:hidden p-2.5 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors active:scale-95"
               >
                 <div className="w-4 h-4 flex flex-col justify-around">
                   <span
