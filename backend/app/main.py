@@ -20,7 +20,7 @@ if "backend" not in sys.modules:
         sys.modules["backend"] = _backend_pkg
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
 from backend.app.core.exceptions import register_exception_handlers
@@ -87,6 +87,12 @@ def create_application() -> FastAPI:
             "docs": "/docs",
             "health": f"{settings.API_V1_STR}/health",
         }
+
+    @app.get("/health", tags=["Health"], include_in_schema=False)
+    @app.get("/api/v1/api/v1/health", tags=["Health"], include_in_schema=False)
+    async def health_alias(request: Request):
+        from backend.app.api.v1.endpoints.health import get_health
+        return await get_health(request)
 
     return app
 
