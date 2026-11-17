@@ -1,7 +1,13 @@
 import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
+
+try:
+    import email_validator  # noqa: F401
+    from pydantic import EmailStr
+except (ImportError, Exception):
+    EmailStr = str  # type: ignore[misc,assignment]
 
 
 class CreateAdminRequest(BaseModel):
