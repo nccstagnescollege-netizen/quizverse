@@ -54,6 +54,12 @@ export function UserAdminSidebar({
         authorized: hasPermission('quiz.view'),
       },
       {
+        label: 'Manage & Publish',
+        href: '/admin/quiz/manage',
+        icon: BookOpen,
+        authorized: hasPermission('quiz.view'),
+      },
+      {
         label: 'Create Quiz',
         href: '/admin/quiz#create',
         icon: PlusCircle,

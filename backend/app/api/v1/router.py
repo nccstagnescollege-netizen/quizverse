@@ -11,6 +11,7 @@ from backend.app.api.v1.endpoints import (
     dashboard_user_admin,
     quiz_generator,
     manual_quiz,
+    quiz_publishing,
 )
 
 api_router = APIRouter()
@@ -49,10 +50,13 @@ api_router.include_router(
     tags=["Question Bank Management"],
 )
 
-# 6. Manual Quiz Creator System (Phase 9) - registered before parameterized /{quiz_id}
+# 6. Quiz Configuration, Scoring & Publishing System (Phase 10)
+api_router.include_router(quiz_publishing.router, prefix="/quizzes", tags=["Quiz Configuration & Publishing"])
+
+# 6.1. Manual Quiz Creator System (Phase 9) - registered before parameterized /{quiz_id}
 api_router.include_router(manual_quiz.router, prefix="/quizzes", tags=["Manual Quiz Creator"])
 
-# 6.1. Scoped Quiz Management
+# 6.2. Scoped Quiz Management
 api_router.include_router(quizzes.router, prefix="/quizzes", tags=["Quiz Management & Scoped Access"])
 
 # 5. Super Admin Platform-Wide Dashboard & Analytics
