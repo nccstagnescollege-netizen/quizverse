@@ -201,9 +201,11 @@ export default function AdminQuizPage() {
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
           </Link>
-          <button className="p-1.5 rounded-lg bg-surface-elevated text-slate-300 hover:text-white" title="Edit Quiz Configuration">
-            <Edit className="w-3.5 h-3.5" />
-          </button>
+          <Link href={`/admin/quiz/${row.id}/edit/manual`}>
+            <button className="p-1.5 rounded-lg bg-surface-elevated text-slate-300 hover:text-white" title="Edit in Manual Quiz Creator">
+              <Edit className="w-3.5 h-3.5" />
+            </button>
+          </Link>
           <button className="p-1.5 rounded-lg bg-surface-elevated text-slate-400 hover:text-rose-400" title="Delete">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -229,10 +231,13 @@ export default function AdminQuizPage() {
             >
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-brand-400' : ''}`} />
             </button>
-            <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple hover:from-brand-500 hover:to-purple-500 text-white text-xs font-semibold shadow-glow-purple min-h-[36px]">
+            <Link
+              href="/admin/quiz/create/manual"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple hover:from-brand-500 hover:to-purple-500 text-white text-xs font-semibold shadow-glow-purple min-h-[36px]"
+            >
               <Plus className="w-3.5 h-3.5" />
-              Create Examination
-            </button>
+              <span>Create Manual Quiz</span>
+            </Link>
           </div>
         }
       />

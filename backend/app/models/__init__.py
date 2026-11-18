@@ -47,7 +47,10 @@ from backend.app.models.question_import_export import (
 )
 from backend.app.models.quiz import (
     Quiz,
+    QuizSection,
     QuizQuestion,
+    QuizDraftVersion,
+    QuizAttachment,
     QuizGenerationRule,
     GenerationHistory,
 )
@@ -127,7 +130,10 @@ __all__ = [
     "QuestionExportJob",
     # Quiz
     "Quiz",
+    "QuizSection",
     "QuizQuestion",
+    "QuizDraftVersion",
+    "QuizAttachment",
     "QuizGenerationRule",
     "GenerationHistory",
     # Student
