@@ -54,7 +54,7 @@ export function QuestionCard({
 
   return (
     <div
-      className={`relative p-5 rounded-2xl border transition-all hover:shadow-lg flex flex-col justify-between gap-3.5 overflow-hidden ${
+      className={`relative p-5 rounded-2xl border transition-all hover:shadow-lg flex flex-col justify-between gap-3.5 overflow-hidden w-full max-w-full box-border ${
         isArchived
           ? 'bg-slate-950/40 border-slate-800/80 opacity-75'
           : 'bg-surface-elevated border-surface-border hover:border-slate-600'

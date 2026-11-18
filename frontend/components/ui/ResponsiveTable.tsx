@@ -69,14 +69,16 @@ export function ResponsiveTable<T>({
 
       {/* 1. Mobile Cards View (Active on mobile unless forced to table) */}
       <div className={cn('space-y-3', viewMode === 'table' ? 'hidden' : viewMode === 'cards' ? 'block' : 'block md:hidden')}>
-        {safeData.map((row) => (
-          <div
-            key={keyExtractor(row)}
-            className="glass-card rounded-2xl border border-surface-border p-4 space-y-3 transition-colors hover:border-slate-500/40"
-          >
-            {mobileCardRender ? (
-              mobileCardRender(row)
-            ) : (
+        {safeData.map((row) =>
+          mobileCardRender ? (
+            <div key={keyExtractor(row)} className="w-full">
+              {mobileCardRender(row)}
+            </div>
+          ) : (
+            <div
+              key={keyExtractor(row)}
+              className="glass-card rounded-2xl border border-surface-border p-4 space-y-3 transition-colors hover:border-slate-500/40"
+            >
               <div className="space-y-2">
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-center justify-between text-xs py-1 border-b border-surface-border/40 last:border-b-0">
@@ -87,9 +89,9 @@ export function ResponsiveTable<T>({
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          )
+        )}
       </div>
 
       {/* 2. Desktop Full Table View (Active on md+ screens or when forced to table) */}
