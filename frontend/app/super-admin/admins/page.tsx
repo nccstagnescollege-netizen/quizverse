@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Users,
@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   FileText,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import { DashboardCard } from '@/components/ui/DashboardCard';
@@ -87,6 +88,8 @@ const INITIAL_MOCK_ADMINS: AdminUser[] = [
 
 export default function SuperAdminAdminsPage() {
   const [admins, setAdmins] = useState<AdminUser[]>(INITIAL_MOCK_ADMINS);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -97,36 +100,65 @@ export default function SuperAdminAdminsPage() {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
   const { token } = useAuth();
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-  // Fetch live admins from backend if available
+  // Auto-dismiss toast
   useEffect(() => {
-    if (token) {
-      fetch(`${API_BASE}/admin-management/admins`, {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // Fetch live admins from backend asynchronously
+  const fetchAdmins = useCallback(async () => {
+    if (!token) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin-management/admins`, {
         headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data && data.admins && data.admins.length > 0) {
-            setAdmins(data.admins);
-          }
-        })
-        .catch(() => {});
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.admins && data.admins.length > 0) {
+          setAdmins(data.admins);
+        }
+      }
+    } catch {
+      // Non-blocking fallback to local state
+    } finally {
+      setIsSyncing(false);
     }
   }, [token, API_BASE]);
 
+  useEffect(() => {
+    if (token) {
+      fetchAdmins();
+    }
+  }, [token, fetchAdmins]);
+
   const handleToggleStatus = async (admin: AdminUser) => {
     if (admin.is_super_admin) {
-      alert('Super Administrator accounts cannot be disabled.');
+      setToastMessage({ type: 'error', text: 'Super Administrator accounts cannot be disabled.' });
       return;
     }
 
     const newStatus = admin.status === 'active' ? 'disabled' : 'active';
     const actionEndpoint = newStatus === 'disabled' ? 'disable' : 'reactivate';
+
+    // Optimistic status update
+    setAdmins((prev) =>
+      prev.map((a) => (a.id === admin.id ? { ...a, status: newStatus } : a))
+    );
+    setToastMessage({
+      type: 'success',
+      text: `Administrator ${admin.email} marked as ${newStatus}.`,
+    });
 
     if (token) {
       try {
@@ -134,12 +166,14 @@ export default function SuperAdminAdminsPage() {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
-      } catch {}
+      } catch (err: any) {
+        // Rollback
+        setAdmins((prev) =>
+          prev.map((a) => (a.id === admin.id ? { ...a, status: admin.status } : a))
+        );
+        setToastMessage({ type: 'error', text: `Failed to update status: ${err.message}` });
+      }
     }
-
-    setAdmins((prev) =>
-      prev.map((a) => (a.id === admin.id ? { ...a, status: newStatus } : a))
-    );
   };
 
   const handleRevokeSessions = async (admin: AdminUser) => {
@@ -149,15 +183,21 @@ export default function SuperAdminAdminsPage() {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
-      } catch {}
+        setToastMessage({
+          type: 'success',
+          text: `All active sessions for ${admin.email} have been revoked immediately.`,
+        });
+      } catch (err: any) {
+        setToastMessage({ type: 'error', text: `Failed to revoke sessions: ${err.message}` });
+      }
     }
-    alert(`All active sessions for ${admin.email} have been revoked immediately.`);
   };
 
   const handleCreateUserAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
+    setIsSubmitting(true);
 
     if (token) {
       try {
@@ -191,6 +231,8 @@ export default function SuperAdminAdminsPage() {
         return;
       } catch (err: any) {
         setFormError(err.message || 'Server error.');
+      } finally {
+        setIsSubmitting(false);
       }
     }
 
@@ -344,6 +386,30 @@ export default function SuperAdminAdminsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full">
+      {/* Notifications Toast */}
+      {toastMessage && (
+        <div
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl border text-xs font-medium shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-bottom-2 ${
+            toastMessage.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
+              : 'bg-rose-950/90 border-rose-500/40 text-rose-200'
+          }`}
+        >
+          {toastMessage.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          )}
+          <span>{toastMessage.text}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="p-1 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       <Breadcrumb
         items={[
           { label: 'Super Admin Portal', href: '/super-admin/dashboard' },
@@ -356,7 +422,13 @@ export default function SuperAdminAdminsPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-white flex items-center gap-2">
               <Users className="w-6 h-6 text-purple-400" />
-              User Admin Management &amp; Role-Based Access
+              <span>User Admin Management &amp; Role-Based Access</span>
+              {isSyncing && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20 animate-pulse font-normal">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <span>Syncing</span>
+                </span>
+              )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400">
               Provision operational administrators, configure granular scopes, and enforce instant session terminations.
@@ -364,6 +436,14 @@ export default function SuperAdminAdminsPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={fetchAdmins}
+              disabled={isSyncing}
+              className="p-2.5 rounded-xl bg-surface-elevated border border-surface-border text-slate-400 hover:text-white transition-colors disabled:opacity-60"
+              title="Refresh Administrators Asynchronously"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-purple-400' : ''}`} />
+            </button>
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-glow-purple transition-all cursor-pointer"
@@ -503,9 +583,11 @@ export default function SuperAdminAdminsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-glow-purple"
+                  disabled={isSubmitting}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-glow-purple disabled:opacity-60"
                 >
-                  Create User Admin
+                  {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? 'Provisioning...' : 'Create User Admin'}</span>
                 </button>
               </div>
             </form>

@@ -75,6 +75,7 @@ export default function UserAdminDashboardPage() {
 
   const [stats, setStats] = useState<UserAdminOverviewStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
   // Filters
@@ -104,9 +105,13 @@ export default function UserAdminDashboardPage() {
     };
   }, [token]);
 
-  // Fetch Scoped Overview Statistics
-  const fetchOverviewStats = useCallback(async () => {
-    setLoadingStats(true);
+  // Fetch Scoped Overview Statistics (Asynchronous & Non-Blocking)
+  const fetchOverviewStats = useCallback(async (isInitial = false) => {
+    if (isInitial) {
+      setLoadingStats(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setStatsError(null);
     try {
       const res = await fetch(`${API_BASE}/admin/dashboard/overview`, {
@@ -118,38 +123,40 @@ export default function UserAdminDashboardPage() {
     } catch (err: any) {
       setStatsError(err.message || 'Unable to load operational statistics');
     } finally {
-      setLoadingStats(false);
+      if (isInitial) setLoadingStats(false);
+      setIsRefreshing(false);
     }
   }, [authHeaders]);
 
-  // Fetch Visualizations
+  // Fetch Visualizations in Parallel Asynchronously via Promise.allSettled
   const fetchChartData = useCallback(async () => {
     try {
       const headers = authHeaders();
       const quizParam = selectedQuizId !== 'all' ? `&quiz_id=${selectedQuizId}` : '';
       const quizParamOnly = selectedQuizId !== 'all' ? `?quiz_id=${selectedQuizId}` : '';
 
-      // 1. My Quiz Trends
-      const resQuiz = await fetch(
-        `${API_BASE}/admin/dashboard/quiz-trends?period=${quizPeriod}`,
-        { headers }
-      );
-      if (resQuiz.ok) setQuizTrends(await resQuiz.json());
+      const [
+        quizRes,
+        studentRes,
+        compRes,
+        scoresRes,
+        perfRes,
+        diffRes,
+        recentRes,
+      ] = await Promise.allSettled([
+        fetch(`${API_BASE}/admin/dashboard/quiz-trends?period=${quizPeriod}`, { headers }),
+        fetch(`${API_BASE}/admin/dashboard/student-trends?period=${studentPeriod}${quizParam}`, { headers }),
+        fetch(`${API_BASE}/admin/dashboard/examination-statistics${quizParamOnly}`, { headers }),
+        fetch(`${API_BASE}/admin/dashboard/score-distribution${quizParamOnly}`, { headers }),
+        fetch(`${API_BASE}/admin/dashboard/quiz-performance`, { headers }),
+        fetch(`${API_BASE}/admin/dashboard/question-difficulty${quizParamOnly}`, { headers }),
+        fetch(`${API_BASE}/admin/dashboard/recent-activity`, { headers }),
+      ]);
 
-      // 2. My Student Trends
-      const resStudent = await fetch(
-        `${API_BASE}/admin/dashboard/student-trends?period=${studentPeriod}${quizParam}`,
-        { headers }
-      );
-      if (resStudent.ok) setStudentTrends(await resStudent.json());
-
-      // 3. Completion Rates
-      const resComp = await fetch(
-        `${API_BASE}/admin/dashboard/examination-statistics${quizParamOnly}`,
-        { headers }
-      );
-      if (resComp.ok) {
-        const d = await resComp.json();
+      if (quizRes.status === 'fulfilled' && quizRes.value.ok) setQuizTrends(await quizRes.value.json());
+      if (studentRes.status === 'fulfilled' && studentRes.value.ok) setStudentTrends(await studentRes.value.json());
+      if (compRes.status === 'fulfilled' && compRes.value.ok) {
+        const d = await compRes.value.json();
         setCompletionData([
           { name: 'Submitted', value: d.submitted, color: '#10b981' },
           { name: 'Timed Out', value: d.timed_out, color: '#f59e0b' },
@@ -158,34 +165,10 @@ export default function UserAdminDashboardPage() {
           { name: 'Disqualified', value: d.disqualified, color: '#6b7280' },
         ].filter((x) => x.value > 0));
       }
-
-      // 4. Score Distribution
-      const resScores = await fetch(
-        `${API_BASE}/admin/dashboard/score-distribution${quizParamOnly}`,
-        { headers }
-      );
-      if (resScores.ok) setScoreData(await resScores.json());
-
-      // 5. Quiz Performance Comparison
-      const resPerf = await fetch(
-        `${API_BASE}/admin/dashboard/quiz-performance`,
-        { headers }
-      );
-      if (resPerf.ok) setPerformanceData(await resPerf.json());
-
-      // 6. Question Difficulty Distribution
-      const resDiff = await fetch(
-        `${API_BASE}/admin/dashboard/question-difficulty${quizParamOnly}`,
-        { headers }
-      );
-      if (resDiff.ok) setDifficultyData(await resDiff.json());
-
-      // Recent Activity
-      const resRecent = await fetch(
-        `${API_BASE}/admin/dashboard/recent-activity`,
-        { headers }
-      );
-      if (resRecent.ok) setRecentActivity(await resRecent.json());
+      if (scoresRes.status === 'fulfilled' && scoresRes.value.ok) setScoreData(await scoresRes.value.json());
+      if (perfRes.status === 'fulfilled' && perfRes.value.ok) setPerformanceData(await perfRes.value.json());
+      if (diffRes.status === 'fulfilled' && diffRes.value.ok) setDifficultyData(await diffRes.value.json());
+      if (recentRes.status === 'fulfilled' && recentRes.value.ok) setRecentActivity(await recentRes.value.json());
     } catch {
       // Handled gracefully in empty chart UI states
     }
@@ -193,7 +176,7 @@ export default function UserAdminDashboardPage() {
 
   useEffect(() => {
     if (user) {
-      fetchOverviewStats();
+      fetchOverviewStats(true);
       fetchChartData();
     }
   }, [user, fetchOverviewStats, fetchChartData]);
@@ -313,13 +296,14 @@ export default function UserAdminDashboardPage() {
 
           <button
             onClick={() => {
-              fetchOverviewStats();
+              fetchOverviewStats(false);
               fetchChartData();
             }}
-            className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-400 hover:text-white transition-all"
-            title="Refresh Metrics"
+            disabled={isRefreshing}
+            className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-400 hover:text-white transition-all disabled:opacity-60"
+            title="Refresh Metrics Asynchronously"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingStats ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-brand-400' : ''}`} />
           </button>
         </div>
       </div>

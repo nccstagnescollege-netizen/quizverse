@@ -22,6 +22,8 @@ import {
   Upload,
   Download,
   History,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,15 +51,34 @@ export default function SuperAdminQuestionBankPage() {
   // Data States
   const [questions, setQuestions] = useState<QuestionListItem[]>([]);
   const [stats, setStats] = useState<QuestionStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Filters State
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  // Debounce search input for fluid typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   // Modals State
   const [previewQuestionId, setPreviewQuestionId] = useState<string | null>(null);
@@ -66,31 +87,39 @@ export default function SuperAdminQuestionBankPage() {
   const [questionToDelete, setQuestionToDelete] = useState<QuestionListItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Load Questions and Stats
-  const fetchData = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const filterParams: QuestionFilterParams = {};
-      if (search.trim()) filterParams.search = search.trim();
-      if (selectedStatus !== 'all') filterParams.status = selectedStatus;
-      if (selectedDifficulty !== 'all') filterParams.difficulty = selectedDifficulty;
-      if (selectedType !== 'all') filterParams.question_type = selectedType;
+  // Asynchronous Question & Stats Fetcher (non-blocking)
+  const fetchData = useCallback(
+    async (isInitial = false) => {
+      if (!token) return;
+      if (isInitial) {
+        setInitialLoading(true);
+      } else {
+        setIsSyncing(true);
+      }
+      setError(null);
+      try {
+        const filterParams: QuestionFilterParams = {};
+        if (debouncedSearch.trim()) filterParams.search = debouncedSearch.trim();
+        if (selectedStatus !== 'all') filterParams.status = selectedStatus;
+        if (selectedDifficulty !== 'all') filterParams.difficulty = selectedDifficulty;
+        if (selectedType !== 'all') filterParams.question_type = selectedType;
 
-      const [qList, sData] = await Promise.all([
-        questionBankService.getQuestions(filterParams, token),
-        questionBankService.getStats(token),
-      ]);
+        const [qList, sData] = await Promise.all([
+          questionBankService.getQuestions(filterParams, token),
+          questionBankService.getStats(token),
+        ]);
 
-      setQuestions(Array.isArray(qList) ? qList : []);
-      setStats(sData);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load question bank data.');
-    } finally {
-      setLoading(false);
-    }
-  }, [token, search, selectedStatus, selectedDifficulty, selectedType]);
+        setQuestions(Array.isArray(qList) ? qList : []);
+        setStats(sData);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load question bank data.');
+      } finally {
+        if (isInitial) setInitialLoading(false);
+        setIsSyncing(false);
+      }
+    },
+    [token, debouncedSearch, selectedStatus, selectedDifficulty, selectedType]
+  );
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -98,50 +127,74 @@ export default function SuperAdminQuestionBankPage() {
       return;
     }
     if (token) {
-      fetchData();
+      fetchData(questions.length === 0);
     }
   }, [authLoading, isAuthenticated, token, fetchData, router]);
 
-  // Handlers
+  // Optimistic & Non-blocking Handlers
   async function handleDuplicate(q: QuestionListItem) {
     if (!token) return;
+    setIsSyncing(true);
     try {
       await questionBankService.duplicateQuestion(q.id, token);
-      fetchData();
+      setToastMessage({ type: 'success', text: `Question "${q.title || 'Untitled'}" duplicated successfully.` });
+      await fetchData(false);
     } catch (err: any) {
-      alert(`Failed to duplicate: ${err.message}`);
+      setToastMessage({ type: 'error', text: `Failed to duplicate: ${err.message}` });
+      setIsSyncing(false);
     }
   }
 
   async function handleArchive(q: QuestionListItem) {
     if (!token) return;
+    const prev = [...questions];
+    // Optimistic status update
+    setQuestions((current) =>
+      current.map((item) => (item.id === q.id ? { ...item, status: 'archived' } : item))
+    );
     try {
       await questionBankService.archiveQuestion(q.id, token);
-      fetchData();
+      setToastMessage({ type: 'success', text: 'Question moved to archive.' });
+      questionBankService.getStats(token).then(setStats).catch(() => {});
     } catch (err: any) {
-      alert(`Failed to archive: ${err.message}`);
+      setQuestions(prev); // Revert on failure
+      setToastMessage({ type: 'error', text: `Failed to archive: ${err.message}` });
     }
   }
 
   async function handleRestore(q: QuestionListItem) {
     if (!token) return;
+    const prev = [...questions];
+    // Optimistic status update
+    setQuestions((current) =>
+      current.map((item) => (item.id === q.id ? { ...item, status: 'draft' } : item))
+    );
     try {
       await questionBankService.restoreQuestion(q.id, token);
-      fetchData();
+      setToastMessage({ type: 'success', text: 'Question restored to drafts.' });
+      questionBankService.getStats(token).then(setStats).catch(() => {});
     } catch (err: any) {
-      alert(`Failed to restore: ${err.message}`);
+      setQuestions(prev); // Revert on failure
+      setToastMessage({ type: 'error', text: `Failed to restore: ${err.message}` });
     }
   }
 
   async function handleConfirmDelete() {
     if (!token || !questionToDelete) return;
     setDeleteLoading(true);
+    const targetId = questionToDelete.id;
+    const prev = [...questions];
+    // Optimistic removal
+    setQuestions((current) => current.filter((item) => item.id !== targetId));
+    setQuestionToDelete(null);
+
     try {
-      await questionBankService.deleteQuestion(questionToDelete.id, token);
-      setQuestionToDelete(null);
-      fetchData();
+      await questionBankService.deleteQuestion(targetId, token);
+      setToastMessage({ type: 'success', text: 'Question permanently deleted.' });
+      questionBankService.getStats(token).then(setStats).catch(() => {});
     } catch (err: any) {
-      alert(`Delete rejected: ${err.message}`);
+      setQuestions(prev); // Revert on failure
+      setToastMessage({ type: 'error', text: `Delete rejected: ${err.message}` });
     } finally {
       setDeleteLoading(false);
     }
@@ -262,6 +315,30 @@ export default function SuperAdminQuestionBankPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full pb-16">
+      {/* Notifications Toast */}
+      {toastMessage && (
+        <div
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl border text-xs font-medium shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-bottom-2 ${
+            toastMessage.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
+              : 'bg-rose-950/90 border-rose-500/40 text-rose-200'
+          }`}
+        >
+          {toastMessage.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          )}
+          <span>{toastMessage.text}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="p-1 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -271,8 +348,14 @@ export default function SuperAdminQuestionBankPage() {
             </span>
             <span className="text-xs text-slate-400">Platform-Wide Repository</span>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight mt-1">
-            Question Bank Command Center
+          <h1 className="text-2xl font-black text-white tracking-tight mt-1 flex items-center gap-2.5">
+            <span>Question Bank Command Center</span>
+            {isSyncing && (
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono bg-brand-500/10 text-brand-400 border border-brand-500/20 animate-pulse font-normal">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Syncing</span>
+              </span>
+            )}
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
             Create, audit, review, and manage questions anchored in the academic syllabus hierarchy.
@@ -302,12 +385,12 @@ export default function SuperAdminQuestionBankPage() {
             <History className="w-3.5 h-3.5 text-purple-400" />
           </Link>
           <button
-            onClick={fetchData}
-            disabled={loading}
-            className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors"
-            title="Refresh Question Bank"
+            onClick={() => fetchData(false)}
+            disabled={isSyncing}
+            className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors disabled:opacity-60"
+            title="Refresh Question Bank Asynchronously"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-brand-400' : ''}`} />
           </button>
           <Link
             href="/super-admin/question-bank/create"
@@ -361,9 +444,9 @@ export default function SuperAdminQuestionBankPage() {
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title, prompt text, or tag..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by title, prompt text, or tag (async live search)..."
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-surface-border text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary-500"
             />
           </div>
@@ -435,11 +518,11 @@ export default function SuperAdminQuestionBankPage() {
         </div>
       </div>
 
-      {/* Main Question List */}
-      {loading ? (
+      {/* Main Question List - Asynchronous with Non-Blocking Revalidation */}
+      {initialLoading && questions.length === 0 ? (
         <LoadingSkeleton />
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchData} />
+      ) : error && questions.length === 0 ? (
+        <ErrorState message={error} onRetry={() => fetchData(true)} />
       ) : !Array.isArray(questions) || questions.length === 0 ? (
         <div className="text-center py-16 p-8 rounded-2xl bg-surface-elevated border border-surface-border space-y-3">
           <HelpCircle className="w-12 h-12 text-slate-600 mx-auto" />
@@ -510,7 +593,7 @@ export default function SuperAdminQuestionBankPage() {
           question={reviewQuestion}
           isOpen={!!reviewQuestion}
           onClose={() => setReviewQuestion(null)}
-          onSuccess={fetchData}
+          onSuccess={() => fetchData(false)}
           token={token || ''}
           isSuperAdmin={true}
         />

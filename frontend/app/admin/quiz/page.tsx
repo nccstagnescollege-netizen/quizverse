@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   BookOpen,
@@ -14,7 +14,9 @@ import {
   Edit,
   Trash2,
   Calendar,
+  RefreshCw,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import { DashboardCard } from '@/components/ui/DashboardCard';
@@ -80,12 +82,57 @@ const SAMPLE_QUIZZES: QuizItem[] = [
 ];
 
 export default function AdminQuizPage() {
+  const { token } = useAuth();
+  const [quizzes, setQuizzes] = useState<QuizItem[]>(SAMPLE_QUIZZES);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const filteredQuizzes = SAMPLE_QUIZZES.filter(
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const fetchQuizzes = useCallback(async () => {
+    if (!token) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/admin/dashboard/quiz-performance`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: QuizItem[] = data.map((d: any, idx: number) => ({
+            id: d.quiz_id || `qz-${idx}`,
+            title: d.title || 'Untitled Exam',
+            slug: d.slug || d.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `exam-${idx}`,
+            durationMinutes: d.duration_minutes || 60,
+            totalMarks: d.total_marks || 100,
+            passingPercentage: d.passing_percentage || 50,
+            maxAttempts: d.max_attempts || 1,
+            status: d.status || 'published',
+            totalAttempts: d.attempts_count || 0,
+          }));
+          setQuizzes(mapped);
+        }
+      }
+    } catch {
+      // Clean fallback to initial mock items
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token) fetchQuizzes();
+  }, [token, fetchQuizzes]);
+
+  const filteredQuizzes = quizzes.filter(
     (q) =>
-      q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.slug.toLowerCase().includes(searchTerm.toLowerCase())
+      q.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      q.slug.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   const columns: TableColumn<QuizItem>[] = [
@@ -173,10 +220,20 @@ export default function AdminQuizPage() {
         title="Quiz &amp; Examination Engine"
         description="Configure timed examination sessions, question shuffling policies, pass marks, and student invitation links."
         actions={
-          <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple hover:from-brand-500 hover:to-purple-500 text-white text-xs font-semibold shadow-glow-purple min-h-[36px]">
-            <Plus className="w-3.5 h-3.5" />
-            Create Examination
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchQuizzes}
+              disabled={isSyncing}
+              className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors disabled:opacity-60"
+              title="Refresh Quizzes Asynchronously"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-brand-400' : ''}`} />
+            </button>
+            <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple hover:from-brand-500 hover:to-purple-500 text-white text-xs font-semibold shadow-glow-purple min-h-[36px]">
+              <Plus className="w-3.5 h-3.5" />
+              Create Examination
+            </button>
+          </div>
         }
       />
 

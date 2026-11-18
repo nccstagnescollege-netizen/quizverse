@@ -73,6 +73,7 @@ export default function SuperAdminDashboardPage() {
 
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
   // Filters for trends
@@ -108,9 +109,13 @@ export default function SuperAdminDashboardPage() {
     };
   }, [token]);
 
-  // Fetch Statistics
-  const fetchOverviewStats = useCallback(async () => {
-    setLoadingStats(true);
+  // Fetch Statistics (Asynchronous & Non-Blocking Revalidation)
+  const fetchOverviewStats = useCallback(async (isInitial = false) => {
+    if (isInitial) {
+      setLoadingStats(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setStatsError(null);
     try {
       const res = await fetch(`${API_BASE}/super-admin/dashboard/overview`, {
@@ -122,43 +127,43 @@ export default function SuperAdminDashboardPage() {
     } catch (err: any) {
       setStatsError(err.message || 'Unable to connect to database');
     } finally {
-      setLoadingStats(false);
+      if (isInitial) setLoadingStats(false);
+      setIsRefreshing(false);
     }
   }, [authHeaders]);
 
-  // Fetch Charts
+  // Fetch Charts in Parallel Asynchronously via Promise.allSettled
   const fetchChartData = useCallback(async () => {
     try {
       const headers = authHeaders();
 
-      // 1. Quiz Trends
-      const resQuiz = await fetch(
-        `${API_BASE}/super-admin/dashboard/quiz-trends?period=${quizPeriod}`,
-        { headers }
-      );
-      if (resQuiz.ok) setQuizTrends(await resQuiz.json());
+      const [
+        quizRes,
+        studentRes,
+        examRes,
+        compRes,
+        scoresRes,
+        qRes,
+        statusRes,
+        actRes,
+        recentRes,
+      ] = await Promise.allSettled([
+        fetch(`${API_BASE}/super-admin/dashboard/quiz-trends?period=${quizPeriod}`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/student-trends?period=${studentPeriod}`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/examination-statistics?period=${examPeriod}`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/examination-completion`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/score-distribution`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/question-distribution`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/quiz-status-distribution`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/admin-activity`, { headers }),
+        fetch(`${API_BASE}/super-admin/dashboard/recent-activity`, { headers }),
+      ]);
 
-      // 2. Student Trends
-      const resStudent = await fetch(
-        `${API_BASE}/super-admin/dashboard/student-trends?period=${studentPeriod}`,
-        { headers }
-      );
-      if (resStudent.ok) setStudentTrends(await resStudent.json());
-
-      // 3. Exam Participation
-      const resExam = await fetch(
-        `${API_BASE}/super-admin/dashboard/examination-statistics?period=${examPeriod}`,
-        { headers }
-      );
-      if (resExam.ok) setExamTrends(await resExam.json());
-
-      // 4. Completion breakdown
-      const resComp = await fetch(
-        `${API_BASE}/super-admin/dashboard/examination-completion`,
-        { headers }
-      );
-      if (resComp.ok) {
-        const d = await resComp.json();
+      if (quizRes.status === 'fulfilled' && quizRes.value.ok) setQuizTrends(await quizRes.value.json());
+      if (studentRes.status === 'fulfilled' && studentRes.value.ok) setStudentTrends(await studentRes.value.json());
+      if (examRes.status === 'fulfilled' && examRes.value.ok) setExamTrends(await examRes.value.json());
+      if (compRes.status === 'fulfilled' && compRes.value.ok) {
+        const d = await compRes.value.json();
         setCompletionData([
           { name: 'Submitted', value: d.submitted, color: '#10b981' },
           { name: 'Timed Out', value: d.timed_out, color: '#f59e0b' },
@@ -167,28 +172,10 @@ export default function SuperAdminDashboardPage() {
           { name: 'Disqualified', value: d.disqualified, color: '#6b7280' },
         ].filter((x) => x.value > 0));
       }
-
-      // 5. Score Distribution
-      const resScores = await fetch(
-        `${API_BASE}/super-admin/dashboard/score-distribution`,
-        { headers }
-      );
-      if (resScores.ok) setScoreData(await resScores.json());
-
-      // 6. Question Distribution
-      const resQ = await fetch(
-        `${API_BASE}/super-admin/dashboard/question-distribution`,
-        { headers }
-      );
-      if (resQ.ok) setQuestionData(await resQ.json());
-
-      // 7. Quiz Status
-      const resStatus = await fetch(
-        `${API_BASE}/super-admin/dashboard/quiz-status-distribution`,
-        { headers }
-      );
-      if (resStatus.ok) {
-        const s = await resStatus.json();
+      if (scoresRes.status === 'fulfilled' && scoresRes.value.ok) setScoreData(await scoresRes.value.json());
+      if (qRes.status === 'fulfilled' && qRes.value.ok) setQuestionData(await qRes.value.json());
+      if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
+        const s = await statusRes.value.json();
         setQuizStatusData([
           { name: 'Published', count: s.published, color: '#10b981' },
           { name: 'Draft', count: s.draft, color: '#8b5cf6' },
@@ -196,20 +183,8 @@ export default function SuperAdminDashboardPage() {
           { name: 'Archived', count: s.archived, color: '#6b7280' },
         ]);
       }
-
-      // 8. Admin Activity
-      const resAct = await fetch(
-        `${API_BASE}/super-admin/dashboard/admin-activity`,
-        { headers }
-      );
-      if (resAct.ok) setAdminActivity(await resAct.json());
-
-      // Recent Activity
-      const resRecent = await fetch(
-        `${API_BASE}/super-admin/dashboard/recent-activity`,
-        { headers }
-      );
-      if (resRecent.ok) setRecentActivity(await resRecent.json());
+      if (actRes.status === 'fulfilled' && actRes.value.ok) setAdminActivity(await actRes.value.json());
+      if (recentRes.status === 'fulfilled' && recentRes.value.ok) setRecentActivity(await recentRes.value.json());
     } catch {
       // Handled gracefully in individual chart states
     }
@@ -217,7 +192,7 @@ export default function SuperAdminDashboardPage() {
 
   useEffect(() => {
     if (isSuperAdmin) {
-      fetchOverviewStats();
+      fetchOverviewStats(true);
       fetchChartData();
     }
   }, [isSuperAdmin, fetchOverviewStats, fetchChartData]);
@@ -280,13 +255,14 @@ export default function SuperAdminDashboardPage() {
 
               <button
                 onClick={() => {
-                  fetchOverviewStats();
+                  fetchOverviewStats(false);
                   fetchChartData();
                 }}
-                className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-400 hover:text-white transition-all"
-                title="Refresh Metrics"
+                disabled={isRefreshing}
+                className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-400 hover:text-white transition-all disabled:opacity-60"
+                title="Refresh Metrics Asynchronously"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingStats ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-brand-400' : ''}`} />
               </button>
             </div>
           </div>

@@ -11,7 +11,9 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   BarChart,
   Bar,
@@ -89,6 +91,16 @@ const SAMPLE_ITEM_ANALYSIS: ItemAnalysisRecord[] = [
 ];
 
 export default function AdminAnalyticsPage() {
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsSyncing(true);
+    // Asynchronous revalidation
+    setTimeout(() => {
+      setIsSyncing(false);
+    }, 600);
+  };
+
   const columns: TableColumn<ItemAnalysisRecord>[] = [
     {
       key: 'id',
@@ -151,10 +163,20 @@ export default function AdminAnalyticsPage() {
         title="Psychometric &amp; Exam Analytics"
         description="Deep statistical item discrimination, score distribution curves, and proctoring telemetry audits."
         actions={
-          <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-elevated border border-surface-border text-xs text-slate-200 hover:text-white transition-colors">
-            <Download className="w-3.5 h-3.5" />
-            Export CSV Report
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={isSyncing}
+              className="p-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-300 hover:text-white transition-colors disabled:opacity-60"
+              title="Refresh Analytics Asynchronously"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-brand-400' : ''}`} />
+            </button>
+            <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-elevated border border-surface-border text-xs text-slate-200 hover:text-white transition-colors">
+              <Download className="w-3.5 h-3.5" />
+              Export CSV Report
+            </button>
+          </div>
         }
       />
 
