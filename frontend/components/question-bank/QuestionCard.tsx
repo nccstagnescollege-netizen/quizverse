@@ -187,85 +187,91 @@ export function QuestionCard({
         </div>
 
         {/* Tier 2: Action Buttons Bar */}
-        <div className="flex items-center justify-end gap-1 flex-wrap pt-1 border-t border-surface-border/30">
-          {/* Preview */}
-          <button
-            onClick={() => onPreview(q)}
-            title="Preview Question"
-            className="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-
-          {/* Review Workflow */}
-          {canReview && (
+        <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-surface-border/30 w-full min-w-0">
+          {/* Read / Workflow Group */}
+          <div className="flex items-center gap-1 min-w-0">
+            {/* Preview */}
             <button
-              onClick={() => onReview(q)}
-              title="Review / Approval Workflow"
-              className="w-8 h-8 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors flex items-center justify-center shrink-0"
+              onClick={() => onPreview(q)}
+              title="Preview Question"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
             >
-              <MessageSquare className="w-4 h-4" />
+              <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-          )}
 
-          {/* Version History */}
-          <button
-            onClick={() => onHistory(q)}
-            title="Version History & Snapshots"
-            className="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
-          >
-            <History className="w-4 h-4" />
-          </button>
+            {/* Review Workflow */}
+            {canReview && (
+              <button
+                onClick={() => onReview(q)}
+                title="Review / Approval Workflow"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors flex items-center justify-center shrink-0"
+              >
+                <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+            )}
 
-          {/* Duplicate */}
-          <button
-            onClick={() => onDuplicate(q)}
-            title="Duplicate Question"
-            className="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
-          >
-            <Copy className="w-4 h-4" />
-          </button>
-
-          {/* Edit */}
-          {canEdit && !isArchived && (
-            <Link
-              href={`${basePath}/${q.id}/edit`}
-              title="Edit Question"
-              className="w-8 h-8 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors flex items-center justify-center shrink-0"
-            >
-              <Edit className="w-4 h-4" />
-            </Link>
-          )}
-
-          {/* Archive / Restore */}
-          {isArchived ? (
+            {/* Version History */}
             <button
-              onClick={() => onRestore(q)}
-              title="Restore from Archive"
-              className="w-8 h-8 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors flex items-center justify-center shrink-0"
+              onClick={() => onHistory(q)}
+              title="Version History & Snapshots"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
             >
-              <RotateCcw className="w-4 h-4" />
+              <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-          ) : (
-            <button
-              onClick={() => onArchive(q)}
-              title="Archive Question"
-              className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
-            >
-              <Archive className="w-4 h-4" />
-            </button>
-          )}
 
-          {/* Delete */}
-          {canDelete && (
+            {/* Duplicate */}
             <button
-              onClick={() => onDelete(q)}
-              title="Permanently Delete Question"
-              className="w-8 h-8 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center justify-center shrink-0"
+              onClick={() => onDuplicate(q)}
+              title="Duplicate Question"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-slate-300 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
             >
-              <Trash2 className="w-4 h-4" />
+              <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-          )}
+          </div>
+
+          {/* Mutation Group */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Edit */}
+            {canEdit && !isArchived && (
+              <Link
+                href={`${basePath}/${q.id}/edit`}
+                title="Edit Question"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors flex items-center justify-center shrink-0"
+              >
+                <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </Link>
+            )}
+
+            {/* Archive / Restore */}
+            {isArchived ? (
+              <button
+                onClick={() => onRestore(q)}
+                title="Restore from Archive"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors flex items-center justify-center shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => onArchive(q)}
+                title="Archive Question"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-slate-400 hover:text-white hover:bg-surface-border transition-colors flex items-center justify-center shrink-0"
+              >
+                <Archive className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+            )}
+
+            {/* Delete */}
+            {canDelete && (
+              <button
+                onClick={() => onDelete(q)}
+                title="Permanently Delete Question"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center justify-center shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

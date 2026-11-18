@@ -9,6 +9,7 @@ from backend.app.api.v1.endpoints import (
     question_import_export,
     dashboard_super_admin,
     dashboard_user_admin,
+    quiz_generator,
 )
 
 api_router = APIRouter()
@@ -62,4 +63,11 @@ api_router.include_router(
     dashboard_user_admin.router,
     prefix="/admin/dashboard",
     tags=["User Admin Scoped Dashboard & Visualizations"],
+)
+
+# 7. Automatic Quiz & Question Paper Generator (Phase 8)
+api_router.include_router(
+    quiz_generator.router,
+    prefix="/quiz-generator",
+    tags=["Automatic Quiz & Question Paper Generator"],
 )

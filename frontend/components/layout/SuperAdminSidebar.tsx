@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   Lock,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,7 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { label: 'Roles & Permissions', href: '/super-admin/admins?tab=roles', icon: ShieldCheck },
   { label: 'Academic Structure', href: '/super-admin/academic', icon: Layers },
   { label: 'Question Bank', href: '/super-admin/question-bank', icon: HelpCircle },
+  { label: 'Quiz Generator', href: '/super-admin/quiz-generator', icon: Sparkles, badge: 'Auto' },
   { label: 'Quiz Management', href: '/admin/quiz', icon: BookOpen },
   { label: 'Examination Management', href: '/super-admin/dashboard#exams', icon: ClipboardList },
   { label: 'Student Management', href: '/super-admin/dashboard#students', icon: GraduationCap },

@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ShieldAlert,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +64,12 @@ export function UserAdminSidebar({
         href: '/admin/question-bank',
         icon: HelpCircle,
         authorized: hasPermission('question.view'),
+      },
+      {
+        label: 'Quiz Generator',
+        href: '/admin/quiz-generator',
+        icon: Sparkles,
+        authorized: hasPermission('quiz.generate') || hasPermission('quiz.create'),
       },
       {
         label: 'Academic Structure',

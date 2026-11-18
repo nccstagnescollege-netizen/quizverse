@@ -63,6 +63,7 @@ export default function SuperAdminLayout({
     if (pathname === '/super-admin/dashboard') return 'Global Platform Command';
     if (pathname.startsWith('/super-admin/academic')) return 'Academic Command Center';
     if (pathname.startsWith('/super-admin/admins')) return 'Administrator Management';
+    if (pathname.startsWith('/super-admin/quiz-generator')) return 'Quiz & Question Paper Generator';
     return 'Super Admin Portal';
   };
 

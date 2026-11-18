@@ -115,15 +115,28 @@ class GenerationHistory(Base):
 
     id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     rule_id = Column(Uuid, ForeignKey("quiz_generation_rules.id", ondelete="SET NULL"), nullable=True)
-    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
-    generated_by = Column(Uuid, ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=True, index=True)
+    subject_id = Column(Uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True, index=True)
+    generated_by = Column(Uuid, ForeignKey("admins.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    session_title = Column(String(255), nullable=True)
     questions_selected_count = Column(Integer, nullable=False, default=0)
-    generation_rule_snapshot = Column(JSONType, nullable=False)
-    status = Column(String(32), nullable=False, default="success", server_default=text("'success'"))  # success, failed, partial
+    generation_rule_snapshot = Column(JSONType, nullable=True)
+
+    academic_scope = Column(JSONType, nullable=True)
+    configuration = Column(JSONType, nullable=True)
+    exam_settings = Column(JSONType, nullable=True)
+    selected_questions = Column(JSONType, nullable=True)
+    validation_report = Column(JSONType, nullable=True)
+    seed = Column(String(64), nullable=True)
+
+    status = Column(String(32), nullable=False, default="generated", server_default=text("'generated'"))  # generated, saved_as_draft, abandoned
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
 
     # Relationships
     rule = relationship("QuizGenerationRule", back_populates="history_entries")
     quiz = relationship("Quiz", back_populates="generation_histories")
+    subject = relationship("Subject")
     generator = relationship("Admin")
