@@ -6,8 +6,13 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 import uuid
 
-import qrcode
-import qrcode.image.svg
+try:
+    import qrcode
+    import qrcode.image.svg
+    QRCODE_AVAILABLE = True
+except ImportError:
+    qrcode = None
+    QRCODE_AVAILABLE = False
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, desc, select
 from fastapi import HTTPException, status
@@ -51,6 +56,11 @@ def generate_secure_token() -> Tuple[str, str]:
 
 def generate_qr_svg(url: str) -> str:
     """Generate local SVG vector QR code without external APIs."""
+    if not QRCODE_AVAILABLE or qrcode is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="QR code generator is not available on server (missing 'qrcode' dependency).",
+        )
     factory = qrcode.image.svg.SvgPathImage
     img = qrcode.make(url, image_factory=factory, box_size=10, border=2)
     stream = io.BytesIO()
@@ -60,6 +70,11 @@ def generate_qr_svg(url: str) -> str:
 
 def generate_qr_png_base64(url: str) -> str:
     """Generate local PNG raster QR code formatted as data URI without external APIs."""
+    if not QRCODE_AVAILABLE or qrcode is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="QR code generator is not available on server (missing 'qrcode' dependency).",
+        )
     img = qrcode.make(url, box_size=10, border=2)
     stream = io.BytesIO()
     img.save(stream, format="PNG")

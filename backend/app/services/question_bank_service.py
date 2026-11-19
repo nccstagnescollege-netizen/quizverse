@@ -50,7 +50,7 @@ from backend.app.services.audit_service import log_audit_event
 
 
 def sanitize_rich_text(content: str) -> str:
-    """
+    r"""
     Sanitizes question rich text content to protect against XSS,
     while preserving safe markdown, LaTeX math notation ($...$, $$...$$, \(...\), \[...\]),
     and code block formats.
