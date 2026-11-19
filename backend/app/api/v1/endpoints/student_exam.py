@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, Header, Request, Path, Query, status, HTTPException
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,16 @@ from backend.app.schemas.student_exam import (
     StudentAttemptDetailResponse,
     StudentSaveAnswerRequest,
     StudentSaveAnswerResponse,
+    AnswerItemResponse,
+    SingleAnswerUpdateRequest,
+    BatchAnswerSaveRequest,
+    BatchAnswerSaveResponse,
+    StudentProgressResponse,
+    ReviewFlagUpdateRequest,
+    ReviewFlagUpdateResponse,
+    StudentHeartbeatRequest,
+    StudentHeartbeatResponse,
+    StudentSubmitRequest,
     StudentEventLogRequest,
     StudentReviewSummaryResponse,
     StudentSubmitResponse,
@@ -124,6 +134,23 @@ def get_attempt_questions(
     )
 
 
+@router.get("/attempts/{attempt_id}/answers", response_model=List[AnswerItemResponse])
+def get_attempt_answers(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves all authoritative server-persisted answers for the active attempt.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.get_attempt_answers(
+        db=db,
+        attempt_id=attempt_id,
+        session_student_id=student_id,
+    )
+
+
 @router.post("/attempts/{attempt_id}/answers", response_model=StudentSaveAnswerResponse)
 def save_attempt_answer(
     attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
@@ -133,10 +160,126 @@ def save_attempt_answer(
 ):
     """
     Persists or updates candidate's response for a specific question.
-    Enforces active timer deadline and answer change restrictions.
+    Enforces active timer deadline, option validation, and optimistic concurrency version checking.
     """
     student_id = uuid.UUID(session["sub"])
     return StudentExamService.save_attempt_answer(
+        db=db,
+        attempt_id=attempt_id,
+        session_student_id=student_id,
+        req=req,
+    )
+
+
+@router.patch("/attempts/{attempt_id}/answers/{answer_id}", response_model=AnswerItemResponse)
+def update_answer_by_id(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    answer_id: uuid.UUID = Path(..., description="Answer Record ID"),
+    req: SingleAnswerUpdateRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Selectively updates an existing answer record by its unique answer_id.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.update_answer_by_id(
+        db=db,
+        attempt_id=attempt_id,
+        answer_id=answer_id,
+        session_student_id=student_id,
+        req=req,
+    )
+
+
+@router.delete("/attempts/{attempt_id}/answers/{answer_id}")
+def delete_answer_by_id(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    answer_id: uuid.UUID = Path(..., description="Answer Record ID"),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Clears an answer's selected options or text response without clearing the review marker.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.delete_answer_by_id(
+        db=db,
+        attempt_id=attempt_id,
+        answer_id=answer_id,
+        session_student_id=student_id,
+    )
+
+
+@router.post("/attempts/{attempt_id}/answers/batch", response_model=BatchAnswerSaveResponse)
+def batch_save_attempt_answers(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: BatchAnswerSaveRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Synchronizes a batch of pending answer modifications in a single atomic transaction.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.batch_save_attempt_answers(
+        db=db,
+        attempt_id=attempt_id,
+        session_student_id=student_id,
+        req=req,
+    )
+
+
+@router.patch("/attempts/{attempt_id}/questions/{question_id}/review", response_model=ReviewFlagUpdateResponse)
+def toggle_review_flag(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    question_id: uuid.UUID = Path(..., description="Quiz Question ID"),
+    req: ReviewFlagUpdateRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Toggles or sets the persistent 'mark for review' flag for a question.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.toggle_review_flag(
+        db=db,
+        attempt_id=attempt_id,
+        question_id=question_id,
+        session_student_id=student_id,
+        req=req,
+    )
+
+
+@router.get("/attempts/{attempt_id}/progress", response_model=StudentProgressResponse)
+def get_attempt_progress(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Calculates server-authoritative progress, answered/unanswered counts, and section satisfaction.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.get_attempt_progress(
+        db=db,
+        attempt_id=attempt_id,
+        session_student_id=student_id,
+    )
+
+
+@router.post("/attempts/{attempt_id}/heartbeat", response_model=StudentHeartbeatResponse)
+def session_heartbeat(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: StudentHeartbeatRequest = StudentHeartbeatRequest(),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Heartbeat ping to sync server timer, verify active session token, and report time remaining.
+    """
+    student_id = uuid.UUID(session["sub"])
+    return StudentExamService.heartbeat(
         db=db,
         attempt_id=attempt_id,
         session_student_id=student_id,
@@ -184,18 +327,31 @@ def get_attempt_review_summary(
 @router.post("/attempts/{attempt_id}/submit", response_model=StudentSubmitResponse)
 def submit_attempt(
     attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: Optional[StudentSubmitRequest] = None,
     session: Dict[str, Any] = Depends(get_current_student_session),
     db: Session = Depends(get_db),
 ):
     """
-    Finalizes candidate examination submission.
+    Finalizes candidate examination submission transactionally (idempotent).
     """
     student_id = uuid.UUID(session["sub"])
     return StudentExamService.submit_attempt(
         db=db,
         attempt_id=attempt_id,
         session_student_id=student_id,
+        req=req,
     )
+
+
+@router.post("/quizzes/process-expired", status_code=status.HTTP_200_OK)
+def trigger_process_expired_attempts(
+    db: Session = Depends(get_db),
+):
+    """
+    Administrative / Worker hook: Proactively finds and finalizes all attempts whose deadline has expired.
+    """
+    count = StudentExamService.process_expired_attempts(db)
+    return {"processed_count": count, "message": f"Successfully finalized {count} expired examination attempts."}
 
 
 @router.get("/attempts/{attempt_id}/result", response_model=StudentResultResponse)

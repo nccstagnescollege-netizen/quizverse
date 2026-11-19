@@ -127,8 +127,11 @@ class StudentSaveAnswerRequest(BaseModel):
     quiz_question_id: uuid.UUID
     selected_option_ids: Optional[List[str]] = None
     text_response: Optional[str] = None
-    is_flagged_for_review: bool = False
+    is_flagged_for_review: Optional[bool] = None
     time_spent_seconds: int = 0
+    version: Optional[int] = None
+    idempotency_key: Optional[str] = None
+    client_timestamp: Optional[datetime] = None
 
 
 class StudentSaveAnswerResponse(BaseModel):
@@ -137,6 +140,84 @@ class StudentSaveAnswerResponse(BaseModel):
     saved_at: datetime
     is_answered: bool
     is_flagged_for_review: bool
+    answer_id: Optional[uuid.UUID] = None
+    version: int = 1
+    answer_status: str = "ANSWERED"
+
+
+class AnswerItemResponse(BaseModel):
+    id: uuid.UUID
+    attempt_id: uuid.UUID
+    quiz_question_id: uuid.UUID
+    selected_option_ids: Optional[List[str]] = None
+    text_response: Optional[str] = None
+    is_flagged_for_review: bool = False
+    version: int = 1
+    answer_status: str = "NOT_ANSWERED"
+    time_spent_seconds: int = 0
+    answered_at: datetime
+
+
+class SingleAnswerUpdateRequest(BaseModel):
+    selected_option_ids: Optional[List[str]] = None
+    text_response: Optional[str] = None
+    is_flagged_for_review: Optional[bool] = None
+    time_spent_seconds: int = 0
+    version: Optional[int] = None
+    idempotency_key: Optional[str] = None
+
+
+class BatchAnswerSaveRequest(BaseModel):
+    operations: List[StudentSaveAnswerRequest]
+
+
+class BatchAnswerSaveResponse(BaseModel):
+    success: bool
+    total_processed: int
+    saved_answers: List[StudentSaveAnswerResponse]
+    server_time: datetime
+
+
+class StudentProgressResponse(BaseModel):
+    attempt_id: uuid.UUID
+    total_questions: int
+    answered_count: int
+    unanswered_count: int
+    marked_for_review_count: int
+    remaining_seconds: int
+    deadline_at: datetime
+    status: str
+    is_expired: bool
+    sections_progress: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ReviewFlagUpdateRequest(BaseModel):
+    is_flagged_for_review: bool
+
+
+class ReviewFlagUpdateResponse(BaseModel):
+    success: bool
+    quiz_question_id: uuid.UUID
+    is_flagged_for_review: bool
+    updated_at: datetime
+
+
+class StudentHeartbeatRequest(BaseModel):
+    client_time: Optional[datetime] = None
+
+
+class StudentHeartbeatResponse(BaseModel):
+    server_time: datetime
+    remaining_seconds: int
+    deadline_at: datetime
+    status: str
+    is_active_session: bool = True
+
+
+class StudentSubmitRequest(BaseModel):
+    confirm: bool = True
+    submission_reason: Optional[str] = "STUDENT_SUBMITTED"
+    idempotency_key: Optional[str] = None
 
 
 class StudentEventLogRequest(BaseModel):

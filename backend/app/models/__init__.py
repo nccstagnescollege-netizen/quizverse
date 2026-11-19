@@ -75,6 +75,7 @@ from backend.app.models.examination import (
     ExaminationAttempt,
     AttemptAnswer,
     AttemptEvent,
+    AttemptSession,
 )
 from backend.app.models.results import (
     ExaminationResult,
@@ -159,6 +160,7 @@ __all__ = [
     "ExaminationAttempt",
     "AttemptAnswer",
     "AttemptEvent",
+    "AttemptSession",
     # Results & Evaluation
     "ExaminationResult",
     "QuestionEvaluation",

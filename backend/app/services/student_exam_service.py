@@ -17,10 +17,16 @@ from backend.app.models.quiz import (
     QuizConfiguration,
     QuizSection,
     QuizQuestion,
+    QuizPublishedVersion,
 )
 from backend.app.models.student import Student, StudentProfile
 from backend.app.models.registration import QuizParticipant
-from backend.app.models.examination import ExaminationAttempt, AttemptAnswer, AttemptEvent
+from backend.app.models.examination import (
+    ExaminationAttempt,
+    AttemptAnswer,
+    AttemptEvent,
+    AttemptSession,
+)
 from backend.app.models.results import ExaminationResult, QuestionEvaluation
 from backend.app.schemas.student_exam import (
     StudentExamLandingResponse,
@@ -33,6 +39,16 @@ from backend.app.schemas.student_exam import (
     StudentSectionItemResponse,
     StudentSaveAnswerRequest,
     StudentSaveAnswerResponse,
+    AnswerItemResponse,
+    SingleAnswerUpdateRequest,
+    BatchAnswerSaveRequest,
+    BatchAnswerSaveResponse,
+    StudentProgressResponse,
+    ReviewFlagUpdateRequest,
+    ReviewFlagUpdateResponse,
+    StudentHeartbeatRequest,
+    StudentHeartbeatResponse,
+    StudentSubmitRequest,
     StudentReviewSummaryResponse,
     StudentSubmitResponse,
     StudentResultResponse,
@@ -50,17 +66,152 @@ def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
 class StudentExamService:
 
     @staticmethod
-    def _create_session_token(student_id: uuid.UUID, attempt_id: uuid.UUID, quiz_id: uuid.UUID, expires_at: datetime) -> str:
+    def _create_session_token(
+        student_id: uuid.UUID,
+        attempt_id: uuid.UUID,
+        quiz_id: uuid.UUID,
+        expires_at: datetime,
+        session_id: Optional[uuid.UUID] = None,
+    ) -> str:
         """Create a cryptographically signed JWT for the active candidate examination attempt."""
         payload = {
             "sub": str(student_id),
             "attempt_id": str(attempt_id),
             "quiz_id": str(quiz_id),
+            "session_id": str(session_id) if session_id else str(uuid.uuid4()),
             "iat": datetime.now(timezone.utc),
             "exp": expires_at + timedelta(hours=2),  # Valid through examination window + buffer
             "type": "student_exam_session",
         }
         return jwt.encode(payload, settings.effective_jwt_secret, algorithm=settings.JWT_ALGORITHM)
+
+    @staticmethod
+    def _evaluate_objective_scoring(db: Session, attempt: ExaminationAttempt, calculated_at: datetime):
+        """Internal helper: Computes objective question scores and records ExaminationResult."""
+        quiz = attempt.quiz
+        cfg = quiz.configuration
+        total_quiz_marks = float(quiz.total_marks or 100.0)
+        passing_pct = float(cfg.passing_percentage if cfg else 40.0)
+
+        answers_by_qq = {a.quiz_question_id: a for a in attempt.answers}
+        total_correct = 0
+        total_incorrect = 0
+        total_unanswered = 0
+        earned_marks = 0.0
+
+        for qq in quiz.quiz_questions:
+            snap = qq.question_snapshot or {}
+            ans = answers_by_qq.get(qq.id)
+
+            if not ans or (not ans.selected_option_ids and not (ans.text_response and ans.text_response.strip())):
+                total_unanswered += 1
+                continue
+
+            qtype = snap.get("question_type")
+            q_marks = float(qq.marks or snap.get("marks") or 1.0)
+            q_neg_marks = float(qq.negative_marks or snap.get("negative_marks") or 0.0)
+
+            # Evaluate objective questions (single_choice, multiple_choice, true_false)
+            if qtype in ["single_choice", "true_false", "multiple_choice"]:
+                correct_opts = []
+                for opt in snap.get("options") or []:
+                    if opt.get("is_correct"):
+                        correct_opts.append(str(opt.get("id") or opt.get("option_id")))
+                if not correct_opts and snap.get("correct_answers"):
+                    correct_opts = [str(x) for x in snap.get("correct_answers")]
+
+                user_selected = [str(x) for x in (ans.selected_option_ids or [])]
+
+                if sorted(user_selected) == sorted(correct_opts) and len(correct_opts) > 0:
+                    total_correct += 1
+                    earned_marks += q_marks
+                else:
+                    total_incorrect += 1
+                    earned_marks -= q_neg_marks
+
+        if total_quiz_marks > 0:
+            pct = round((earned_marks / total_quiz_marks) * 100.0, 2)
+        else:
+            pct = 0.0
+
+        is_passed = (pct >= passing_pct)
+
+        existing_res = db.query(ExaminationResult).filter(ExaminationResult.attempt_id == attempt.id).first()
+        if existing_res:
+            existing_res.score = earned_marks
+            existing_res.percentage = pct
+            existing_res.is_passed = is_passed
+            existing_res.total_correct = total_correct
+            existing_res.total_incorrect = total_incorrect
+            existing_res.total_unanswered = total_unanswered
+            existing_res.calculated_at = calculated_at
+        else:
+            exam_res = ExaminationResult(
+                attempt_id=attempt.id,
+                quiz_id=quiz.id,
+                student_id=attempt.student_id,
+                score=earned_marks,
+                percentage=pct,
+                is_passed=is_passed,
+                total_correct=total_correct,
+                total_incorrect=total_incorrect,
+                total_unanswered=total_unanswered,
+                calculated_at=calculated_at,
+            )
+            db.add(exam_res)
+
+    @staticmethod
+    def _auto_expire_and_submit_attempt(
+        db: Session,
+        attempt: ExaminationAttempt,
+        commit: bool = True,
+    ) -> ExaminationAttempt:
+        """
+        Server-side authoritative expiry finalization:
+        - Freezes the attempt (is_immutable = True)
+        - Finalizes status to 'submitted'
+        - Sets submission_reason to 'TIME_EXPIRED'
+        - Sets submission_source to 'server_deadline'
+        - Computes preliminary objective evaluation
+        - Increments participant attempt count
+        - Logs audit event DEADLINE_EXPIRED
+        """
+        if attempt.status == "submitted":
+            return attempt
+
+        now = datetime.now(timezone.utc)
+        effective_sub_time = _ensure_utc(attempt.deadline_at or attempt.expires_at) or now
+        attempt.status = "submitted"
+        attempt.submitted_at = effective_sub_time
+        attempt.submission_reason = "TIME_EXPIRED"
+        attempt.submission_source = "server_deadline"
+        attempt.is_immutable = True
+
+        # Increment participant count
+        participant = db.query(QuizParticipant).filter(
+            QuizParticipant.quiz_id == attempt.quiz_id,
+            QuizParticipant.student_id == attempt.student_id,
+        ).first()
+        if participant:
+            participant.attempt_count += 1
+
+        # Evaluate objective scoring
+        StudentExamService._evaluate_objective_scoring(db, attempt, now)
+
+        # Audit event
+        event = AttemptEvent(
+            attempt_id=attempt.id,
+            event_type="DEADLINE_EXPIRED",
+            event_metadata={"reason": "TIME_EXPIRED", "expired_at": effective_sub_time.isoformat()},
+            actor_type="system",
+            occurred_at=now,
+        )
+        db.add(event)
+
+        if commit:
+            db.commit()
+            db.refresh(attempt)
+        return attempt
 
     @staticmethod
     def verify_session_token(token: str) -> Dict[str, Any]:
@@ -413,14 +564,41 @@ class StudentExamService:
         ).first()
 
         if active_attempt:
-            if _ensure_utc(active_attempt.expires_at) > now:
-                remaining = max(0, int((_ensure_utc(active_attempt.expires_at) - now).total_seconds()))
+            act_deadline = _ensure_utc(active_attempt.deadline_at or active_attempt.expires_at)
+            if act_deadline > now:
+                remaining = max(0, int((act_deadline - now).total_seconds()))
+                session_id = uuid.uuid4()
                 session_token = StudentExamService._create_session_token(
                     student_id=student.id,
                     attempt_id=active_attempt.id,
                     quiz_id=quiz.id,
-                    expires_at=_ensure_utc(active_attempt.expires_at),
+                    expires_at=act_deadline,
+                    session_id=session_id,
                 )
+                active_attempt.active_session_token = str(session_id)
+                active_attempt.last_heartbeat_at = now
+
+                # Register active session
+                sess_record = AttemptSession(
+                    attempt_id=active_attempt.id,
+                    session_token_hash=hashlib.sha256(str(session_id).encode("utf-8")).hexdigest(),
+                    device_info=user_agent,
+                    ip_address=client_ip,
+                    is_active=True,
+                )
+                db.add(sess_record)
+
+                # Record resumption event
+                res_event = AttemptEvent(
+                    attempt_id=active_attempt.id,
+                    event_type="ATTEMPT_RESUMED",
+                    event_metadata={"client_ip": client_ip, "user_agent": user_agent},
+                    actor_type="student",
+                    occurred_at=now,
+                )
+                db.add(res_event)
+                db.commit()
+
                 return StudentExamStartResponse(
                     attempt_id=active_attempt.id,
                     session_token=session_token,
@@ -429,15 +607,13 @@ class StudentExamService:
                     student_identifier=student.profile.student_identifier if student.profile else None,
                     attempt_number=active_attempt.attempt_number,
                     started_at=_ensure_utc(active_attempt.started_at),
-                    expires_at=_ensure_utc(active_attempt.expires_at),
+                    expires_at=act_deadline,
                     remaining_seconds=remaining,
                     is_resumed=True,
                     status=active_attempt.status,
                 )
             else:
-                active_attempt.status = "timed_out"
-                active_attempt.submitted_at = active_attempt.expires_at
-                db.commit()
+                StudentExamService._auto_expire_and_submit_attempt(db, active_attempt, commit=True)
 
         # Check maximum attempts
         max_attempts = cfg.max_attempts if cfg else 1
@@ -454,11 +630,19 @@ class StudentExamService:
 
         # Calculate expiration deadline
         duration_mins = quiz.duration_minutes or 60
-        expires_at = now + timedelta(minutes=duration_mins)
+        duration_seconds = duration_mins * 60
+        expires_at = now + timedelta(seconds=duration_seconds)
         if cfg and cfg.end_time:
             end_limit = _ensure_utc(cfg.end_time) + timedelta(minutes=cfg.grace_period_minutes)
             if expires_at > end_limit:
                 expires_at = end_limit
+
+        # Resolve published quiz version for immutable question binding
+        pub_version = db.query(QuizPublishedVersion).filter(
+            QuizPublishedVersion.quiz_id == quiz.id
+        ).order_by(QuizPublishedVersion.version_number.desc()).first()
+
+        session_id = uuid.uuid4()
 
         new_attempt = ExaminationAttempt(
             quiz_id=quiz.id,
@@ -467,11 +651,46 @@ class StudentExamService:
             status="in_progress",
             started_at=now,
             expires_at=expires_at,
+            deadline_at=expires_at,
+            duration_seconds=duration_seconds,
+            extra_time_seconds=0,
+            published_quiz_version_id=pub_version.id if pub_version else None,
+            active_session_token=str(session_id),
+            last_heartbeat_at=now,
+            is_immutable=False,
             time_spent_seconds=0,
             ip_address=client_ip,
             user_agent=user_agent,
         )
         db.add(new_attempt)
+        db.flush()
+
+        # Record initial session
+        sess_record = AttemptSession(
+            attempt_id=new_attempt.id,
+            session_token_hash=hashlib.sha256(str(session_id).encode("utf-8")).hexdigest(),
+            device_info=user_agent,
+            ip_address=client_ip,
+            is_active=True,
+        )
+        db.add(sess_record)
+
+        # Record attempt lifecycle audit events
+        ev_created = AttemptEvent(
+            attempt_id=new_attempt.id,
+            event_type="ATTEMPT_CREATED",
+            event_metadata={"attempt_number": new_attempt.attempt_number, "published_version_id": str(pub_version.id) if pub_version else None},
+            actor_type="student",
+            occurred_at=now,
+        )
+        ev_started = AttemptEvent(
+            attempt_id=new_attempt.id,
+            event_type="ATTEMPT_STARTED",
+            event_metadata={"deadline": expires_at.isoformat(), "duration_seconds": duration_seconds},
+            actor_type="student",
+            occurred_at=now,
+        )
+        db.add_all([ev_created, ev_started])
         db.commit()
         db.refresh(new_attempt)
 
@@ -480,6 +699,7 @@ class StudentExamService:
             attempt_id=new_attempt.id,
             quiz_id=quiz.id,
             expires_at=_ensure_utc(new_attempt.expires_at),
+            session_id=session_id,
         )
 
         remaining = max(0, int((_ensure_utc(new_attempt.expires_at) - now).total_seconds()))
@@ -627,10 +847,11 @@ class StudentExamService:
     ) -> StudentSaveAnswerResponse:
         """
         Saves or updates a candidate's response for a specific question.
-        Enforces active status, deadline, and navigation change rules.
+        Enforces active status, server deadline, option validation, and optimistic concurrency.
         """
         attempt = db.query(ExaminationAttempt).options(
-            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.configuration)
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.configuration),
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.quiz_questions),
         ).filter(ExaminationAttempt.id == attempt_id).first()
 
         if not attempt:
@@ -638,57 +859,528 @@ class StudentExamService:
         if attempt.student_id != session_student_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
+        if attempt.is_immutable or attempt.status == "submitted":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Examination attempt is finalized and immutable. Answers cannot be modified."
+            )
+
         now = datetime.now(timezone.utc)
-        if attempt.status != "in_progress" or now > _ensure_utc(attempt.expires_at):
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        if attempt.status != "in_progress" or now > deadline:
+            StudentExamService._auto_expire_and_submit_attempt(db, attempt, commit=True)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Examination attempt is no longer active or time has expired"
             )
 
-        cfg = attempt.quiz.configuration
+        quiz = attempt.quiz
+        cfg = quiz.configuration
 
-        # Find existing answer
+        # Validate that the question belongs to this quiz
+        qq = next((q for q in quiz.quiz_questions if q.id == req.quiz_question_id), None)
+        if not qq:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Question does not belong to this examination."
+            )
+
+        snap = qq.question_snapshot or {}
+        valid_opts = {str(opt.get("id") or opt.get("option_id")) for opt in (snap.get("options") or [])}
+        if req.selected_option_ids:
+            for opt_id in req.selected_option_ids:
+                if valid_opts and str(opt_id) not in valid_opts:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid option selection '{opt_id}' for question."
+                    )
+
+        if req.text_response and len(req.text_response) > 5000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Text response exceeds maximum character limit."
+            )
+
         existing = db.query(AttemptAnswer).filter(
             AttemptAnswer.attempt_id == attempt.id,
             AttemptAnswer.quiz_question_id == req.quiz_question_id,
         ).first()
 
-        if existing and cfg and not cfg.allow_answer_change:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Answer modification is restricted for this examination."
+        # Idempotent retry detection
+        if existing and req.idempotency_key and existing.idempotency_key == req.idempotency_key:
+            has_ans = bool(existing.selected_option_ids or (existing.text_response and existing.text_response.strip()))
+            return StudentSaveAnswerResponse(
+                success=True,
+                quiz_question_id=req.quiz_question_id,
+                saved_at=existing.answered_at,
+                is_answered=has_ans,
+                is_flagged_for_review=existing.is_flagged_for_review,
+                answer_id=existing.id,
+                version=existing.version,
+                answer_status=existing.answer_status,
             )
 
-        is_answered = bool(req.selected_option_ids or (req.text_response and req.text_response.strip()))
+        # Optimistic concurrency control check
+        if existing and req.version is not None and req.version < existing.version:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Conflict: Client answer version ({req.version}) is older than server version ({existing.version})."
+            )
 
+        if existing and cfg and not cfg.allow_answer_change:
+            has_prev = bool(existing.selected_option_ids or (existing.text_response and existing.text_response.strip()))
+            if has_prev:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Answer modification is restricted for this examination."
+                )
+
+        target_record = existing
         if existing:
-            existing.selected_option_ids = req.selected_option_ids
-            existing.text_response = req.text_response
-            existing.is_flagged_for_review = req.is_flagged_for_review
+            if req.selected_option_ids is not None or req.text_response is not None:
+                existing.selected_option_ids = req.selected_option_ids
+                existing.text_response = req.text_response
+            if req.is_flagged_for_review is not None:
+                existing.is_flagged_for_review = req.is_flagged_for_review
+            existing.version += 1
+            existing.idempotency_key = req.idempotency_key
+            existing.client_timestamp = req.client_timestamp
             existing.time_spent_seconds = existing.time_spent_seconds + req.time_spent_seconds
             existing.answered_at = now
+
+            has_content = bool(existing.selected_option_ids or (existing.text_response and existing.text_response.strip()))
+            if has_content and existing.is_flagged_for_review:
+                existing.answer_status = "ANSWERED_AND_MARKED"
+            elif has_content:
+                existing.answer_status = "ANSWERED"
+            elif existing.is_flagged_for_review:
+                existing.answer_status = "MARKED_FOR_REVIEW"
+            else:
+                existing.answer_status = "NOT_ANSWERED"
+
+            # Event logging
+            db.add(AttemptEvent(
+                attempt_id=attempt.id,
+                event_type="ANSWER_UPDATED",
+                event_metadata={"quiz_question_id": str(req.quiz_question_id), "version": existing.version},
+                actor_type="student",
+                occurred_at=now,
+            ))
         else:
+            has_content = bool(req.selected_option_ids or (req.text_response and req.text_response.strip()))
+            flag = req.is_flagged_for_review if req.is_flagged_for_review is not None else False
+            if has_content and flag:
+                status_str = "ANSWERED_AND_MARKED"
+            elif has_content:
+                status_str = "ANSWERED"
+            elif flag:
+                status_str = "MARKED_FOR_REVIEW"
+            else:
+                status_str = "NOT_ANSWERED"
+
             new_ans = AttemptAnswer(
                 attempt_id=attempt.id,
                 quiz_question_id=req.quiz_question_id,
                 selected_option_ids=req.selected_option_ids,
                 text_response=req.text_response,
-                is_flagged_for_review=req.is_flagged_for_review,
+                is_flagged_for_review=flag,
+                version=1,
+                idempotency_key=req.idempotency_key,
+                answer_status=status_str,
+                client_timestamp=req.client_timestamp,
+                source_question_id=qq.question_id,
                 time_spent_seconds=req.time_spent_seconds,
                 answered_at=now,
             )
             db.add(new_ans)
+            target_record = new_ans
 
-        # Accumulate total time spent on attempt
+            db.add(AttemptEvent(
+                attempt_id=attempt.id,
+                event_type="ANSWER_SAVED",
+                event_metadata={"quiz_question_id": str(req.quiz_question_id), "version": 1},
+                actor_type="student",
+                occurred_at=now,
+            ))
+
         attempt.time_spent_seconds = attempt.time_spent_seconds + req.time_spent_seconds
+        attempt.last_heartbeat_at = now
         db.commit()
+        db.refresh(target_record)
 
+        is_ans = bool(target_record.selected_option_ids or (target_record.text_response and target_record.text_response.strip()))
         return StudentSaveAnswerResponse(
             success=True,
             quiz_question_id=req.quiz_question_id,
-            saved_at=now,
-            is_answered=is_answered,
+            saved_at=target_record.answered_at,
+            is_answered=is_ans,
+            is_flagged_for_review=target_record.is_flagged_for_review,
+            answer_id=target_record.id,
+            version=target_record.version,
+            answer_status=target_record.answer_status,
+        )
+
+    @staticmethod
+    def update_answer_by_id(
+        db: Session,
+        attempt_id: uuid.UUID,
+        answer_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+        req: SingleAnswerUpdateRequest,
+    ) -> AnswerItemResponse:
+        """PATCH handler for a specific answer record by answer_id."""
+        attempt = db.query(ExaminationAttempt).filter(ExaminationAttempt.id == attempt_id).first()
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+        if attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        if attempt.is_immutable or attempt.status == "submitted":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Attempt is finalized.")
+
+        now = datetime.now(timezone.utc)
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        if attempt.status != "in_progress" or now > deadline:
+            StudentExamService._auto_expire_and_submit_attempt(db, attempt, commit=True)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deadline expired.")
+
+        ans = db.query(AttemptAnswer).filter(
+            AttemptAnswer.id == answer_id,
+            AttemptAnswer.attempt_id == attempt.id,
+        ).first()
+        if not ans:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found.")
+
+        if req.version is not None and req.version < ans.version:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Conflict: Version {req.version} is stale.")
+
+        if req.selected_option_ids is not None:
+            ans.selected_option_ids = req.selected_option_ids
+        if req.text_response is not None:
+            ans.text_response = req.text_response
+        if req.is_flagged_for_review is not None:
+            ans.is_flagged_for_review = req.is_flagged_for_review
+        ans.version += 1
+        ans.time_spent_seconds += req.time_spent_seconds
+        ans.answered_at = now
+
+        has_content = bool(ans.selected_option_ids or (ans.text_response and ans.text_response.strip()))
+        if has_content and ans.is_flagged_for_review:
+            ans.answer_status = "ANSWERED_AND_MARKED"
+        elif has_content:
+            ans.answer_status = "ANSWERED"
+        elif ans.is_flagged_for_review:
+            ans.answer_status = "MARKED_FOR_REVIEW"
+        else:
+            ans.answer_status = "NOT_ANSWERED"
+
+        db.add(AttemptEvent(
+            attempt_id=attempt.id,
+            event_type="ANSWER_UPDATED",
+            event_metadata={"answer_id": str(ans.id), "version": ans.version},
+            actor_type="student",
+            occurred_at=now,
+        ))
+        attempt.last_heartbeat_at = now
+        db.commit()
+        db.refresh(ans)
+
+        return AnswerItemResponse(
+            id=ans.id,
+            attempt_id=ans.attempt_id,
+            quiz_question_id=ans.quiz_question_id,
+            selected_option_ids=ans.selected_option_ids,
+            text_response=ans.text_response,
+            is_flagged_for_review=ans.is_flagged_for_review,
+            version=ans.version,
+            answer_status=ans.answer_status,
+            time_spent_seconds=ans.time_spent_seconds,
+            answered_at=ans.answered_at,
+        )
+
+    @staticmethod
+    def delete_answer_by_id(
+        db: Session,
+        attempt_id: uuid.UUID,
+        answer_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+    ) -> Dict[str, Any]:
+        """Clears an answer's selected options or text response without clearing the review marker."""
+        attempt = db.query(ExaminationAttempt).filter(ExaminationAttempt.id == attempt_id).first()
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+        if attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        if attempt.is_immutable or attempt.status == "submitted":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Attempt is finalized.")
+
+        now = datetime.now(timezone.utc)
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        if attempt.status != "in_progress" or now > deadline:
+            StudentExamService._auto_expire_and_submit_attempt(db, attempt, commit=True)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deadline expired.")
+
+        ans = db.query(AttemptAnswer).filter(
+            AttemptAnswer.id == answer_id,
+            AttemptAnswer.attempt_id == attempt.id,
+        ).first()
+        if not ans:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found.")
+
+        ans.selected_option_ids = None
+        ans.text_response = None
+        ans.version += 1
+        ans.answer_status = "MARKED_FOR_REVIEW" if ans.is_flagged_for_review else "NOT_ANSWERED"
+        ans.answered_at = now
+
+        db.add(AttemptEvent(
+            attempt_id=attempt.id,
+            event_type="ANSWER_CLEARED",
+            event_metadata={"answer_id": str(ans.id), "quiz_question_id": str(ans.quiz_question_id)},
+            actor_type="student",
+            occurred_at=now,
+        ))
+        attempt.last_heartbeat_at = now
+        db.commit()
+
+        return {
+            "success": True,
+            "answer_id": str(ans.id),
+            "quiz_question_id": str(ans.quiz_question_id),
+            "version": ans.version,
+            "answer_status": ans.answer_status,
+        }
+
+    @staticmethod
+    def batch_save_attempt_answers(
+        db: Session,
+        attempt_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+        req: BatchAnswerSaveRequest,
+    ) -> BatchAnswerSaveResponse:
+        """Processes a batch of answer synchronization operations atomically in one transaction."""
+        saved_list = []
+        for op in req.operations:
+            res = StudentExamService.save_attempt_answer(
+                db=db,
+                attempt_id=attempt_id,
+                session_student_id=session_student_id,
+                req=op,
+            )
+            saved_list.append(res)
+
+        return BatchAnswerSaveResponse(
+            success=True,
+            total_processed=len(saved_list),
+            saved_answers=saved_list,
+            server_time=datetime.now(timezone.utc),
+        )
+
+    @staticmethod
+    def get_attempt_answers(
+        db: Session,
+        attempt_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+    ) -> List[AnswerItemResponse]:
+        """Retrieves all persisted answers for the active attempt."""
+        attempt = db.query(ExaminationAttempt).filter(ExaminationAttempt.id == attempt_id).first()
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+        if attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        answers = db.query(AttemptAnswer).filter(AttemptAnswer.attempt_id == attempt.id).all()
+        return [
+            AnswerItemResponse(
+                id=a.id,
+                attempt_id=a.attempt_id,
+                quiz_question_id=a.quiz_question_id,
+                selected_option_ids=a.selected_option_ids,
+                text_response=a.text_response,
+                is_flagged_for_review=a.is_flagged_for_review,
+                version=a.version,
+                answer_status=a.answer_status,
+                time_spent_seconds=a.time_spent_seconds,
+                answered_at=a.answered_at,
+            )
+            for a in answers
+        ]
+
+    @staticmethod
+    def toggle_review_flag(
+        db: Session,
+        attempt_id: uuid.UUID,
+        question_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+        req: ReviewFlagUpdateRequest,
+    ) -> ReviewFlagUpdateResponse:
+        """Persistently marks or unmarks a question for review without altering the answer."""
+        attempt = db.query(ExaminationAttempt).filter(ExaminationAttempt.id == attempt_id).first()
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+        if attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        if attempt.is_immutable or attempt.status == "submitted":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Attempt is finalized.")
+
+        now = datetime.now(timezone.utc)
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        if attempt.status != "in_progress" or now > deadline:
+            StudentExamService._auto_expire_and_submit_attempt(db, attempt, commit=True)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deadline expired.")
+
+        existing = db.query(AttemptAnswer).filter(
+            AttemptAnswer.attempt_id == attempt.id,
+            AttemptAnswer.quiz_question_id == question_id,
+        ).first()
+
+        if existing:
+            existing.is_flagged_for_review = req.is_flagged_for_review
+            existing.version += 1
+            has_content = bool(existing.selected_option_ids or (existing.text_response and existing.text_response.strip()))
+            if has_content and existing.is_flagged_for_review:
+                existing.answer_status = "ANSWERED_AND_MARKED"
+            elif has_content:
+                existing.answer_status = "ANSWERED"
+            elif existing.is_flagged_for_review:
+                existing.answer_status = "MARKED_FOR_REVIEW"
+            else:
+                existing.answer_status = "NOT_ANSWERED"
+        else:
+            status_str = "MARKED_FOR_REVIEW" if req.is_flagged_for_review else "NOT_ANSWERED"
+            new_ans = AttemptAnswer(
+                attempt_id=attempt.id,
+                quiz_question_id=question_id,
+                is_flagged_for_review=req.is_flagged_for_review,
+                answer_status=status_str,
+                version=1,
+                time_spent_seconds=0,
+                answered_at=now,
+            )
+            db.add(new_ans)
+
+        db.add(AttemptEvent(
+            attempt_id=attempt.id,
+            event_type="QUESTION_MARKED_REVIEW",
+            event_metadata={"quiz_question_id": str(question_id), "is_flagged": req.is_flagged_for_review},
+            actor_type="student",
+            occurred_at=now,
+        ))
+        attempt.last_heartbeat_at = now
+        db.commit()
+
+        return ReviewFlagUpdateResponse(
+            success=True,
+            quiz_question_id=question_id,
             is_flagged_for_review=req.is_flagged_for_review,
+            updated_at=now,
+        )
+
+    @staticmethod
+    def get_attempt_progress(
+        db: Session,
+        attempt_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+    ) -> StudentProgressResponse:
+        """Calculates server-authoritative progress, answered statistics, and section requirements."""
+        attempt = db.query(ExaminationAttempt).options(
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.sections).joinedload(QuizSection.questions),
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.quiz_questions),
+            joinedload(ExaminationAttempt.answers),
+        ).filter(ExaminationAttempt.id == attempt_id).first()
+
+        if not attempt or attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        now = datetime.now(timezone.utc)
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        is_expired = now > deadline
+
+        if is_expired and attempt.status == "in_progress":
+            StudentExamService._auto_expire_and_submit_attempt(db, attempt, commit=True)
+
+        quiz = attempt.quiz
+        sections = sorted(quiz.sections, key=lambda s: s.section_order) if quiz.sections else []
+
+        answered_map = {}
+        flagged_map = {}
+        for a in attempt.answers:
+            has_ans = bool(a.selected_option_ids or (a.text_response and a.text_response.strip()))
+            answered_map[a.quiz_question_id] = has_ans
+            flagged_map[a.quiz_question_id] = a.is_flagged_for_review
+
+        total_questions = len(quiz.quiz_questions)
+        total_answered = sum(1 for is_ans in answered_map.values() if is_ans)
+        total_marked = sum(1 for is_flag in flagged_map.values() if is_flag)
+        total_unanswered = max(0, total_questions - total_answered)
+        remaining = max(0, int((deadline - now).total_seconds())) if not is_expired else 0
+
+        sections_prog = []
+        if sections:
+            for s in sections:
+                sqs = s.questions or []
+                stot = len(sqs)
+                sans = sum(1 for q in sqs if answered_map.get(q.id))
+                smark = sum(1 for q in sqs if flagged_map.get(q.id))
+                sunans = max(0, stot - sans)
+                is_sat = True
+                if s.selection_rule == "all_compulsory":
+                    is_sat = (sunans == 0)
+                elif s.selection_rule == "answer_n_of_m" and s.required_question_count:
+                    is_sat = (sans >= s.required_question_count)
+                sections_prog.append({
+                    "section_id": str(s.id),
+                    "title": s.title,
+                    "total": stot,
+                    "answered": sans,
+                    "unanswered": sunans,
+                    "marked": smark,
+                    "selection_rule": s.selection_rule,
+                    "required_count": s.required_question_count,
+                    "is_satisfied": is_sat,
+                })
+
+        return StudentProgressResponse(
+            attempt_id=attempt.id,
+            total_questions=total_questions,
+            answered_count=total_answered,
+            unanswered_count=total_unanswered,
+            marked_for_review_count=total_marked,
+            remaining_seconds=remaining,
+            deadline_at=deadline,
+            status=attempt.status,
+            is_expired=is_expired,
+            sections_progress=sections_prog,
+        )
+
+    @staticmethod
+    def heartbeat(
+        db: Session,
+        attempt_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+        req: StudentHeartbeatRequest,
+    ) -> StudentHeartbeatResponse:
+        """Heartbeat to track session liveness, sync timer, and detect expiry."""
+        attempt = db.query(ExaminationAttempt).filter(ExaminationAttempt.id == attempt_id).first()
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+        if attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        now = datetime.now(timezone.utc)
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        if attempt.status == "in_progress" and now > deadline:
+            StudentExamService._auto_expire_and_submit_attempt(db, attempt, commit=True)
+
+        attempt.last_heartbeat_at = now
+        db.commit()
+
+        remaining = max(0, int((deadline - now).total_seconds())) if now <= deadline else 0
+        return StudentHeartbeatResponse(
+            server_time=now,
+            remaining_seconds=remaining,
+            deadline_at=deadline,
+            status=attempt.status,
+            is_active_session=True,
         )
 
     @staticmethod
@@ -807,6 +1499,7 @@ class StudentExamService:
         db: Session,
         attempt_id: uuid.UUID,
         session_student_id: uuid.UUID,
+        req: Optional[StudentSubmitRequest] = None,
     ) -> StudentSubmitResponse:
         """
         Finalizes candidate submission:
@@ -826,7 +1519,8 @@ class StudentExamService:
         if attempt.student_id != session_student_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-        if attempt.status == "submitted":
+        # Idempotent response if already submitted
+        if attempt.status == "submitted" or attempt.is_immutable:
             return StudentSubmitResponse(
                 success=True,
                 submitted_at=_ensure_utc(attempt.submitted_at) or datetime.now(timezone.utc),
@@ -835,8 +1529,19 @@ class StudentExamService:
             )
 
         now = datetime.now(timezone.utc)
+        deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
+        if now > deadline:
+            submission_reason = "TIME_EXPIRED"
+            submission_source = "server_deadline"
+        else:
+            submission_reason = (req.submission_reason if req and req.submission_reason else "STUDENT_SUBMITTED")
+            submission_source = "web_client"
+
         attempt.status = "submitted"
         attempt.submitted_at = now
+        attempt.submission_reason = submission_reason
+        attempt.submission_source = submission_source
+        attempt.is_immutable = True
 
         # Update participant attempt count
         participant = db.query(QuizParticipant).filter(
@@ -922,6 +1627,14 @@ class StudentExamService:
             )
             db.add(exam_res)
 
+        db.add(AttemptEvent(
+            attempt_id=attempt.id,
+            event_type="SUBMISSION_COMPLETED",
+            event_metadata={"reason": submission_reason, "source": submission_source},
+            actor_type="student",
+            occurred_at=now,
+        ))
+
         db.commit()
 
         return StudentSubmitResponse(
@@ -930,6 +1643,34 @@ class StudentExamService:
             message="Your examination has been submitted successfully.",
             status="submitted",
         )
+
+    @staticmethod
+    def process_expired_attempts(db: Session) -> int:
+        """
+        Proactive worker / scheduler helper:
+        Finds all active in_progress attempts whose deadline has passed and finalizes them safely.
+        """
+        now = datetime.now(timezone.utc)
+        expired_attempts = db.query(ExaminationAttempt).options(
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.configuration),
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.quiz_questions),
+            joinedload(ExaminationAttempt.answers),
+        ).filter(
+            ExaminationAttempt.status == "in_progress",
+            or_(
+                ExaminationAttempt.deadline_at <= now,
+                ExaminationAttempt.expires_at <= now,
+            )
+        ).all()
+
+        count = 0
+        for att in expired_attempts:
+            StudentExamService._auto_expire_and_submit_attempt(db, att, commit=False)
+            count += 1
+
+        if count > 0:
+            db.commit()
+        return count
 
     @staticmethod
     def get_attempt_result(

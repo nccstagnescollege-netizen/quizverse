@@ -318,10 +318,107 @@ export const studentExamService = {
     return res.json();
   },
 
-  async submitAttempt(attemptId: string, sessionToken: string): Promise<{ success: boolean; message: string }> {
+  async toggleReviewFlag(
+    attemptId: string,
+    sessionToken: string,
+    questionId: string,
+    isFlagged: boolean
+  ): Promise<{ success: boolean; quiz_question_id: string; is_flagged_for_review: boolean }> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/questions/${questionId}/review`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ is_flagged_for_review: isFlagged }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to update review status');
+    }
+    return res.json();
+  },
+
+  async deleteAnswer(
+    attemptId: string,
+    sessionToken: string,
+    answerId: string
+  ): Promise<{ success: boolean; answer_id: string; version: number; answer_status: string }> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/answers/${answerId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to clear answer');
+    }
+    return res.json();
+  },
+
+  async batchSaveAnswers(
+    attemptId: string,
+    sessionToken: string,
+    operations: Array<{
+      quiz_question_id: string;
+      selected_option_ids?: string[];
+      text_response?: string;
+      is_flagged_for_review?: boolean;
+      time_spent_seconds?: number;
+      version?: number;
+      idempotency_key?: string;
+    }>
+  ): Promise<{ success: boolean; total_processed: number; saved_answers: any[]; server_time: string }> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/answers/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ operations }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to batch synchronize answers');
+    }
+    return res.json();
+  },
+
+  async getAttemptProgress(attemptId: string, sessionToken: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/progress`, {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to fetch attempt progress');
+    }
+    return res.json();
+  },
+
+  async sendHeartbeat(attemptId: string, sessionToken: string): Promise<{ server_time: string; remaining_seconds: number; deadline_at: string; status: string; is_active_session: boolean }> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/heartbeat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ client_time: new Date().toISOString() }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Heartbeat sync failed');
+    }
+    return res.json();
+  },
+
+  async submitAttempt(attemptId: string, sessionToken: string, submissionReason: string = 'STUDENT_SUBMITTED'): Promise<{ success: boolean; message: string }> {
     const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/submit`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${sessionToken}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ confirm: true, submission_reason: submissionReason }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
