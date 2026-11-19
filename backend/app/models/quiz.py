@@ -85,7 +85,9 @@ class Quiz(Base):
     generation_rules = relationship("QuizGenerationRule", back_populates="quiz", cascade="all, delete-orphan")
     generation_histories = relationship("GenerationHistory", back_populates="quiz", cascade="all, delete-orphan")
     form_fields = relationship("RegistrationFormField", back_populates="quiz", cascade="all, delete-orphan", order_by="RegistrationFormField.display_order")
+    registration_forms = relationship("QuizRegistrationForm", back_populates="quiz", cascade="all, delete-orphan", order_by="QuizRegistrationForm.version_number.desc()")
     invitation_links = relationship("InvitationLink", back_populates="quiz", cascade="all, delete-orphan")
+    participants = relationship("QuizParticipant", back_populates="quiz", cascade="all, delete-orphan")
     attempts = relationship("ExaminationAttempt", back_populates="quiz")
     analytics_snapshots = relationship("AnalyticsSnapshot", back_populates="quiz", cascade="all, delete-orphan")
 

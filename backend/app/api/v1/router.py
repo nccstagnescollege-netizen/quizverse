@@ -12,6 +12,8 @@ from backend.app.api.v1.endpoints import (
     quiz_generator,
     manual_quiz,
     quiz_publishing,
+    invitations,
+    public_registration,
 )
 
 api_router = APIRouter()
@@ -78,4 +80,18 @@ api_router.include_router(
     quiz_generator.router,
     prefix="/quiz-generator",
     tags=["Automatic Quiz & Question Paper Generator"],
+)
+
+# 8. Invitation Links, QR Codes & Student Registration System (Phase 11)
+api_router.include_router(
+    invitations.router,
+    prefix="/invitations",
+    tags=["Invitations & Student Registration Management"],
+)
+
+# 8.1. Public Student Registration Access Portal (Phase 11)
+api_router.include_router(
+    public_registration.router,
+    prefix="/public",
+    tags=["Public Candidate Registration"],
 )

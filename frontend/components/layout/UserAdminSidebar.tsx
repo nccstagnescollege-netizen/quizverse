@@ -19,6 +19,8 @@ import {
   ShieldAlert,
   X,
   Sparkles,
+  QrCode,
+  FileCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +60,18 @@ export function UserAdminSidebar({
         href: '/admin/quiz/manage',
         icon: BookOpen,
         authorized: hasPermission('quiz.view'),
+      },
+      {
+        label: 'Invitations & QR Codes',
+        href: '/admin/invitations',
+        icon: QrCode,
+        authorized: hasPermission('quiz.view'),
+      },
+      {
+        label: 'Registration Forms',
+        href: '/admin/registration-forms',
+        icon: FileCheck,
+        authorized: hasPermission('quiz.create') || hasPermission('quiz.edit'),
       },
       {
         label: 'Create Quiz',

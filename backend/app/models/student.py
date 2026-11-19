@@ -32,6 +32,7 @@ class Student(Base):
     profile = relationship("StudentProfile", back_populates="student", uselist=False, cascade="all, delete-orphan")
     registration_submissions = relationship("RegistrationSubmission", back_populates="student", cascade="all, delete-orphan")
     invitation_usages = relationship("InvitationUsage", back_populates="student", cascade="all, delete-orphan")
+    participants = relationship("QuizParticipant", back_populates="student", cascade="all, delete-orphan")
     attempts = relationship("ExaminationAttempt", back_populates="student")
 
 

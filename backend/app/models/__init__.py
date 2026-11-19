@@ -64,6 +64,8 @@ from backend.app.models.student import (
 from backend.app.models.registration import (
     RegistrationFormField,
     RegistrationSubmission,
+    QuizRegistrationForm,
+    QuizParticipant,
 )
 from backend.app.models.invitation import (
     InvitationLink,
@@ -148,6 +150,8 @@ __all__ = [
     # Registration
     "RegistrationFormField",
     "RegistrationSubmission",
+    "QuizRegistrationForm",
+    "QuizParticipant",
     # Invitation
     "InvitationLink",
     "InvitationUsage",

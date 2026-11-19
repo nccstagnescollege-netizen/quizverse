@@ -24,6 +24,8 @@ import {
   Lock,
   X,
   Sparkles,
+  QrCode,
+  FileCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +37,8 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { label: 'Question Bank', href: '/super-admin/question-bank', icon: HelpCircle },
   { label: 'Quiz Generator', href: '/super-admin/quiz-generator', icon: Sparkles, badge: 'Auto' },
   { label: 'Quiz Management & Publishing', href: '/super-admin/quiz/manage', icon: BookOpen },
+  { label: 'Invitations & QR Codes', href: '/super-admin/invitations', icon: QrCode, badge: 'New' },
+  { label: 'Registration Forms', href: '/super-admin/registration-forms', icon: FileCheck },
   { label: 'Examination Management', href: '/super-admin/dashboard#exams', icon: ClipboardList },
   { label: 'Student Management', href: '/super-admin/dashboard#students', icon: GraduationCap },
   { label: 'Results', href: '/admin/analytics?tab=results', icon: Award },
