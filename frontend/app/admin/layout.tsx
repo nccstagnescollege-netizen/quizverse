@@ -63,6 +63,7 @@ export default function AdminLayout({
     if (pathname.startsWith('/admin/question-bank')) return 'Question Bank Central';
     if (pathname.startsWith('/admin/quiz-generator')) return 'Quiz & Question Paper Generator';
     if (pathname.startsWith('/admin/analytics')) return 'Performance Analytics & Results';
+    if (pathname.startsWith('/admin/security')) return 'Examination Security & Anti-Cheating';
     if (pathname.startsWith('/admin/settings')) return 'Administrator Profile & Security';
     return 'Operational Admin Portal';
   };

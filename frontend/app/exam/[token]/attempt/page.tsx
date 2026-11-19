@@ -38,6 +38,7 @@ import {
   StudentQuestionItem,
   StudentSectionItem,
 } from '@/services/studentExamService';
+import { securityService } from '@/services/securityService';
 
 export default function ExamAttemptPage() {
   const params = useParams();
@@ -74,6 +75,12 @@ export default function ExamAttemptPage() {
 
   // Time spent per question tracking
   const questionStartTimeRef = useRef<number>(Date.now());
+
+  // Phase 14 Security & Anti-Cheating Telemetry State
+  const [securityWarning, setSecurityWarning] = useState<string | null>(null);
+  const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
+  const [fullscreenRequiredPrompt, setFullscreenRequiredPrompt] = useState<boolean>(false);
+  const eventSequenceRef = useRef<number>(1);
 
   // 1. Initial Load & Attempt Verification
   useEffect(() => {
@@ -143,6 +150,138 @@ export default function ExamAttemptPage() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // 2b. Phase 14 Security Telemetry Sender
+  const sendSecurityEvent = useCallback(async (
+    category: string,
+    eventName: string,
+    durationMs?: number,
+    metadata?: Record<string, any>
+  ) => {
+    if (!attemptDetail || !sessionToken) return;
+    try {
+      const seq = eventSequenceRef.current++;
+      const res = await securityService.submitSecurityEvents(attemptDetail.attempt_id, sessionToken, [{
+        event_category: category,
+        event_name: eventName,
+        client_timestamp: new Date().toISOString(),
+        duration_ms: durationMs,
+        sequence_number: seq,
+        event_metadata: metadata,
+      }]);
+      if (res.warnings && res.warnings.length > 0) {
+        setSecurityWarning(res.warnings[0]);
+      }
+    } catch {
+      // Non-blocking: Telemetry errors must never disrupt exam flow
+    }
+  }, [attemptDetail, sessionToken]);
+
+  // 2c. Phase 14 Browser Event Listeners
+  useEffect(() => {
+    if (!attemptDetail || !sessionToken) return;
+    const policy = attemptDetail.security_policy;
+    if (!policy) return;
+
+    let hiddenStartTime: number | null = null;
+
+    // Visibility Change listener
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        hiddenStartTime = Date.now();
+        setTabSwitchCount((prev) => prev + 1);
+        sendSecurityEvent('TAB_SWITCH', 'TAB_HIDDEN');
+      } else {
+        const dur = hiddenStartTime ? Date.now() - hiddenStartTime : undefined;
+        hiddenStartTime = null;
+        sendSecurityEvent('TAB_SWITCH', 'TAB_VISIBLE', dur);
+      }
+    };
+
+    // Window Focus / Blur
+    const handleWindowBlur = () => {
+      sendSecurityEvent('FOCUS_LOSS', 'WINDOW_FOCUS_LOST');
+    };
+    const handleWindowFocus = () => {
+      sendSecurityEvent('FOCUS_LOSS', 'WINDOW_FOCUS_GAINED');
+    };
+
+    // Fullscreen change
+    const handleFullscreenChange = () => {
+      const isFs = !!document.fullscreenElement;
+      setIsFullscreen(isFs);
+      if (!isFs && policy.track_fullscreen_exit) {
+        sendSecurityEvent('FULLSCREEN', 'FULLSCREEN_EXIT');
+        if (policy.require_fullscreen) {
+          setFullscreenRequiredPrompt(true);
+        }
+      } else if (isFs) {
+        setFullscreenRequiredPrompt(false);
+      }
+    };
+
+    // Clipboard protection
+    const handleCopy = (e: ClipboardEvent) => {
+      if (policy.block_copy_paste) {
+        e.preventDefault();
+      }
+      if (policy.track_copy_paste) {
+        sendSecurityEvent('CLIPBOARD', 'COPY_ATTEMPT');
+      }
+    };
+    const handlePaste = (e: ClipboardEvent) => {
+      if (policy.block_copy_paste) {
+        e.preventDefault();
+      }
+      if (policy.track_copy_paste) {
+        sendSecurityEvent('CLIPBOARD', 'PASTE_ATTEMPT');
+      }
+    };
+    const handleCut = (e: ClipboardEvent) => {
+      if (policy.block_copy_paste) {
+        e.preventDefault();
+      }
+      if (policy.track_copy_paste) {
+        sendSecurityEvent('CLIPBOARD', 'CUT_ATTEMPT');
+      }
+    };
+
+    // Context menu deterrence
+    const handleContextMenu = (e: MouseEvent) => {
+      if (policy.block_context_menu) {
+        e.preventDefault();
+      }
+      sendSecurityEvent('CONTEXT_MENU', 'CONTEXT_MENU');
+    };
+
+    if (policy.track_tab_switch) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (policy.track_focus_loss) {
+      window.addEventListener('blur', handleWindowBlur);
+      window.addEventListener('focus', handleWindowFocus);
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('paste', handlePaste);
+    document.addEventListener('cut', handleCut);
+    document.addEventListener('contextmenu', handleContextMenu);
+
+    if (policy.require_fullscreen && !document.fullscreenElement) {
+      setFullscreenRequiredPrompt(true);
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('cut', handleCut);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [attemptDetail, sessionToken, sendSecurityEvent]);
 
   // 3. Countdown Timer Engine
   useEffect(() => {
@@ -889,6 +1028,75 @@ export default function ExamAttemptPage() {
                 <span>Proceed to Review</span>
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 14: Dynamic Anti-Screenshot Watermark */}
+      {attemptDetail?.watermark_text && (
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 pointer-events-none z-30 overflow-hidden select-none opacity-[0.035] flex flex-wrap gap-24 p-8 transform -rotate-12 items-center justify-center font-mono text-xs text-white"
+        >
+          {Array.from({ length: 36 }).map((_, i) => (
+            <span key={i} className="whitespace-nowrap tracking-widest font-bold">
+              {attemptDetail.watermark_text}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Phase 14: Non-Accusatory Security Reminder Modal */}
+      {securityWarning && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-card rounded-2xl border border-amber-500/40 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Examination Focus Notice</h3>
+                <p className="text-[11px] text-slate-400">Integrity and Focus Safeguard</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {securityWarning}
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Please keep this examination tab focused in full view. Remaining focused avoids interruptions during submission.
+            </p>
+            <button
+              onClick={() => setSecurityWarning(null)}
+              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs transition"
+            >
+              I Understand &amp; Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 14: Full-Screen Required Prompt Modal */}
+      {fullscreenRequiredPrompt && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-card rounded-2xl border border-primary-500/40 p-6 space-y-4 text-center">
+            <Maximize2 className="w-12 h-12 text-primary-400 mx-auto" />
+            <h3 className="text-base font-bold text-white">Full-Screen Mode Required</h3>
+            <p className="text-xs text-slate-300">
+              This examination configuration requires full-screen continuity. Please click below to resume your examination.
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  await document.documentElement.requestFullscreen();
+                  setFullscreenRequiredPrompt(false);
+                } catch {
+                  setFullscreenRequiredPrompt(false);
+                }
+              }}
+              className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs transition shadow-lg shadow-primary-500/25"
+            >
+              Enter Full-Screen Mode
+            </button>
           </div>
         </div>
       )}

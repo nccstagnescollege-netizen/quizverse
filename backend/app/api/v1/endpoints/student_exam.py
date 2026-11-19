@@ -28,6 +28,14 @@ from backend.app.schemas.student_exam import (
     StudentSubmitResponse,
     StudentResultResponse,
 )
+from backend.app.schemas.security import (
+    SecurityEventSubmitRequest,
+    SecurityEventSubmitResponse,
+    SecurityNoticeResponse,
+    SecurityNoticeAcknowledgeRequest,
+    SecurityNoticeAcknowledgeResponse,
+)
+from backend.app.services.security_service import SecurityService
 
 router = APIRouter()
 
@@ -369,4 +377,63 @@ def get_attempt_result(
         db=db,
         attempt_id=attempt_id,
         session_student_id=student_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 14 Security & Anti-Cheating Telemetry Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/exams/{token}/security-notice", response_model=SecurityNoticeResponse)
+def get_security_notice(
+    token: str = Path(..., description="Invitation Token"),
+    db: Session = Depends(get_db),
+):
+    """
+    Transparent pre-exam security notice detailing monitored activities,
+    anti-cheating policies, and sample dynamic watermark.
+    """
+    details = StudentExamService.get_exam_landing_details(db, token)
+    return SecurityService.get_student_security_notice(db, details.quiz_id)
+
+
+@router.post("/attempts/{attempt_id}/acknowledge-monitoring", response_model=SecurityNoticeAcknowledgeResponse)
+def acknowledge_monitoring(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: SecurityNoticeAcknowledgeRequest = SecurityNoticeAcknowledgeRequest(acknowledged=True),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Records student acknowledgement of examination integrity and monitoring rules.
+    """
+    student_id = uuid.UUID(session["sub"])
+    res = SecurityService.acknowledge_monitoring(db, attempt_id, student_id)
+    return SecurityNoticeAcknowledgeResponse(**res)
+
+
+@router.post("/attempts/{attempt_id}/security-events", response_model=SecurityEventSubmitResponse)
+def submit_security_events(
+    request: Request,
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: SecurityEventSubmitRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Secure client event collector for active examination interface:
+    Captures tab switches, focus losses, fullscreen exits, copy/paste attempts.
+    Calculates updated risk score and generates alerts when thresholds are crossed.
+    """
+    student_id = uuid.UUID(session["sub"])
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    return SecurityService.record_security_events(
+        db=db,
+        attempt_id=attempt_id,
+        session_student_id=student_id,
+        req=req,
+        client_ip=client_ip,
+        user_agent=user_agent,
     )

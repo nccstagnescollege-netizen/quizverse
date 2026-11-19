@@ -87,6 +87,9 @@ from backend.app.models.analytics import (
 from backend.app.models.security_audit import (
     AuditLog,
     SecurityEvent,
+    ExaminationSecurityPolicy,
+    SecurityAlert,
+    SecurityInvestigationNote,
     AccessLog,
 )
 from backend.app.models.notification import (
@@ -169,6 +172,9 @@ __all__ = [
     # Security & Audit
     "AuditLog",
     "SecurityEvent",
+    "ExaminationSecurityPolicy",
+    "SecurityAlert",
+    "SecurityInvestigationNote",
     "AccessLog",
     # Notifications
     "Notification",

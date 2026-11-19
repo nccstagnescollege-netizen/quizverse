@@ -80,6 +80,8 @@ class StudentExamInstructionsResponse(BaseModel):
     allow_answer_change: bool = True
     allow_mark_for_review: bool = True
     navigation_mode: str = "free"
+    security_notice: Optional[Dict[str, Any]] = None
+    monitoring_required: bool = True
 
 
 class StudentExamStartRequest(BaseModel):
@@ -121,6 +123,9 @@ class StudentAttemptDetailResponse(BaseModel):
     sections: List[StudentSectionItemResponse]
     questions: List[StudentQuestionItemResponse]
     answers: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    watermark_text: Optional[str] = None
+    security_policy: Optional[Dict[str, Any]] = None
+    monitoring_acknowledged: bool = False
 
 
 class StudentSaveAnswerRequest(BaseModel):

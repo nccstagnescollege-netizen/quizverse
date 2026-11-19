@@ -15,6 +15,7 @@ from backend.app.api.v1.endpoints import (
     invitations,
     public_registration,
     student_exam,
+    security,
 )
 
 api_router = APIRouter()
@@ -97,9 +98,16 @@ api_router.include_router(
     tags=["Public Candidate Registration"],
 )
 
-# 9. Student Examination Interface (Phase 12)
+# 9. Student Examination Interface (Phase 12 & Phase 13)
 api_router.include_router(
     student_exam.router,
     prefix="/student",
     tags=["Student Examination Interface"],
+)
+
+# 10. Advanced Examination Security & Anti-Cheating System (Phase 14)
+api_router.include_router(
+    security.router,
+    prefix="/security",
+    tags=["Advanced Examination Security & Anti-Cheating"],
 )

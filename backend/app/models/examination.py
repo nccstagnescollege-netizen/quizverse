@@ -1,10 +1,12 @@
 import uuid
+from decimal import Decimal
 from sqlalchemy import (
     Column,
     String,
     Text,
     Integer,
     Boolean,
+    Numeric,
     DateTime,
     Uuid,
     ForeignKey,
@@ -39,6 +41,11 @@ class ExaminationAttempt(Base):
     is_immutable = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     published_quiz_version_id = Column(Uuid, ForeignKey("quiz_published_versions.id", ondelete="SET NULL"), nullable=True, index=True)
     time_spent_seconds = Column(Integer, nullable=False, default=0)
+    risk_score = Column(Numeric(5, 2), nullable=False, default=Decimal("0.00"), server_default=text("0.00"))
+    risk_level = Column(String(32), nullable=False, default="LOW", server_default=text("'LOW'"))  # LOW, MEDIUM, HIGH
+    monitoring_acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    presentation_seed = Column(String(64), nullable=True)
+    question_presentation_order = Column(JSONType, nullable=True)
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
@@ -58,6 +65,9 @@ class ExaminationAttempt(Base):
     events = relationship("AttemptEvent", back_populates="attempt", cascade="all, delete-orphan", order_by="AttemptEvent.occurred_at")
     sessions = relationship("AttemptSession", back_populates="attempt", cascade="all, delete-orphan", order_by="AttemptSession.created_at")
     result = relationship("ExaminationResult", back_populates="attempt", uselist=False, cascade="all, delete-orphan")
+    security_events = relationship("SecurityEvent", back_populates="attempt", cascade="all, delete-orphan", order_by="SecurityEvent.created_at")
+    security_alerts = relationship("SecurityAlert", back_populates="attempt", cascade="all, delete-orphan", order_by="SecurityAlert.created_at")
+    investigation_notes = relationship("SecurityInvestigationNote", back_populates="attempt", cascade="all, delete-orphan", order_by="SecurityInvestigationNote.created_at")
 
 
 class AttemptSession(Base):

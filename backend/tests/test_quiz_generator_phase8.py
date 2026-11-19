@@ -443,7 +443,7 @@ def test_08_question_replacement_and_reordering(app_client, seed_phase8_data):
         "academic_scope": {"subject_id": data["subj_auth_id"]},
         "total_questions": 6,
         "difficulty": {"easy_pct": "50.00", "medium_pct": "33.33", "hard_pct": "16.67"},
-        "exam_settings": {"title": "Replacement Test Paper"},
+        "exam_settings": {"title": "Replacement Test Paper", "seed": 42},
     }
     res_gen = app_client.post(
         "/api/v1/quiz-generator/generate",

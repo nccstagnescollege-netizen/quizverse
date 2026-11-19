@@ -1,6 +1,7 @@
 import uuid
 import re
 import hashlib
+import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 
@@ -447,6 +448,25 @@ class StudentExamService:
             if not cfg.allow_answer_change:
                 rules.append("Answers cannot be modified once selected.")
 
+        from backend.app.services.security_service import SecurityService
+        sec_policy = SecurityService.get_effective_policy(db, quiz.id)
+        sec_notice = {
+            "track_tab_switch": sec_policy.track_tab_switch,
+            "track_focus_loss": sec_policy.track_focus_loss,
+            "require_fullscreen": sec_policy.require_fullscreen,
+            "track_fullscreen_exit": sec_policy.track_fullscreen_exit,
+            "block_copy_paste": sec_policy.block_copy_paste,
+            "track_copy_paste": sec_policy.track_copy_paste,
+            "block_context_menu": sec_policy.block_context_menu,
+            "enable_watermark": sec_policy.enable_watermark,
+            "student_acknowledgement_required": sec_policy.student_acknowledgement_required,
+            "notice_text": sec_policy.student_notice_text or (
+                "Academic integrity monitoring is enabled for this examination. "
+                "The system logs tab switches, window focus changes, and full-screen exits. "
+                "Clipboard actions may be restricted. No personal files or cameras are monitored."
+            ),
+        }
+
         return StudentExamInstructionsResponse(
             quiz_title=quiz.title,
             subject_name=quiz.subject.subject_name if quiz.subject else None,
@@ -463,6 +483,8 @@ class StudentExamService:
             allow_answer_change=cfg.allow_answer_change if cfg else True,
             allow_mark_for_review=cfg.allow_mark_for_review if cfg else True,
             navigation_mode=cfg.navigation_mode if cfg else "free",
+            security_notice=sec_notice,
+            monitoring_required=sec_policy.student_acknowledgement_required,
         )
 
     @staticmethod
@@ -644,6 +666,50 @@ class StudentExamService:
 
         session_id = uuid.uuid4()
 
+        # Phase 14 Question and Option Randomization Engine
+        from backend.app.services.security_service import SecurityService
+        policy = SecurityService.get_effective_policy(db, quiz.id)
+        seed_hex = secrets.token_hex(16)
+        pres_order = None
+
+        if policy.randomize_question_order or policy.randomize_option_order:
+            import random
+            qq_objs = sorted(quiz.quiz_questions, key=lambda q: (q.section_id or uuid.UUID(int=0), q.question_order))
+
+            question_order_list = []
+            if policy.randomize_question_order:
+                by_sec: Dict[Any, List[str]] = {}
+                for qq in qq_objs:
+                    sec_key = str(qq.section_id) if qq.section_id else "default"
+                    by_sec.setdefault(sec_key, []).append(str(qq.id))
+                for sec_key, q_ids in by_sec.items():
+                    rng = random.Random(f"{seed_hex}_{sec_key}")
+                    shuffled = list(q_ids)
+                    rng.shuffle(shuffled)
+                    question_order_list.extend(shuffled)
+            else:
+                question_order_list = [str(qq.id) for qq in qq_objs]
+
+            option_order_dict = {}
+            for qq in qq_objs:
+                snap = qq.question_snapshot or {}
+                q_type = snap.get("question_type") or ""
+                raw_options = snap.get("options") or []
+                opt_ids = [str(o.get("id") or o.get("option_id")) for o in raw_options if (o.get("id") or o.get("option_id"))]
+
+                if policy.randomize_option_order and q_type not in ["true_false", "short_answer"] and len(opt_ids) > 1:
+                    rng_opt = random.Random(f"{seed_hex}_{qq.id}")
+                    shuffled_opts = list(opt_ids)
+                    rng_opt.shuffle(shuffled_opts)
+                    option_order_dict[str(qq.id)] = shuffled_opts
+                else:
+                    option_order_dict[str(qq.id)] = opt_ids
+
+            pres_order = {
+                "question_order": question_order_list,
+                "option_order": option_order_dict,
+            }
+
         new_attempt = ExaminationAttempt(
             quiz_id=quiz.id,
             student_id=student.id,
@@ -655,6 +721,8 @@ class StudentExamService:
             duration_seconds=duration_seconds,
             extra_time_seconds=0,
             published_quiz_version_id=pub_version.id if pub_version else None,
+            presentation_seed=seed_hex,
+            question_presentation_order=pres_order,
             active_session_token=str(session_id),
             last_heartbeat_at=now,
             is_immutable=False,
@@ -768,23 +836,37 @@ class StudentExamService:
 
         # Questions: Sanitized from question_snapshot without answer keys!
         question_responses = []
-        quiz_questions = sorted(quiz.quiz_questions, key=lambda q: (q.section_id or uuid.UUID(int=0), q.question_order))
+
+        # Check for frozen question presentation order (Phase 14 Randomization)
+        pres = attempt.question_presentation_order or {}
+        frozen_q_order = pres.get("question_order") or []
+        frozen_opt_order = pres.get("option_order") or {}
+
+        if frozen_q_order:
+            q_order_map = {qid_str: idx for idx, qid_str in enumerate(frozen_q_order)}
+            quiz_questions = sorted(quiz.quiz_questions, key=lambda q: q_order_map.get(str(q.id), 999999))
+        else:
+            quiz_questions = sorted(quiz.quiz_questions, key=lambda q: (q.section_id or uuid.UUID(int=0), q.question_order))
 
         for qq in quiz_questions:
             snap = qq.question_snapshot or {}
 
             # Sanitize options: exclude is_correct, explanation
             raw_options = snap.get("options") or []
+            qq_id_str = str(qq.id)
+            if frozen_opt_order and qq_id_str in frozen_opt_order:
+                opt_order_map = {opt_id_str: idx for idx, opt_id_str in enumerate(frozen_opt_order[qq_id_str])}
+                raw_options = sorted(raw_options, key=lambda o: opt_order_map.get(str(o.get("id") or o.get("option_id") or ""), 999999))
+
             sanitized_options = []
-            for opt in raw_options:
+            for idx, opt in enumerate(raw_options, start=1):
                 opt_id = str(opt.get("id") or opt.get("option_id") or "")
                 opt_text = opt.get("text") or opt.get("option_text") or ""
-                opt_order = opt.get("order") or opt.get("option_order") or 0
                 opt_img = opt.get("image_url") or opt.get("option_image_path")
                 sanitized_options.append(StudentQuestionOptionResponse(
                     id=opt_id,
                     text=opt_text,
-                    order=opt_order,
+                    order=idx,
                     image_url=opt_img,
                 ))
 
@@ -817,6 +899,36 @@ class StudentExamService:
 
         remaining = max(0, int((expires_at - now).total_seconds())) if attempt.status == "in_progress" else 0
 
+        # Phase 14 Security Policy & Dynamic Watermark
+        from backend.app.services.security_service import SecurityService, _mask_identifier
+        sec_policy = SecurityService.get_effective_policy(db, quiz.id)
+        watermark_str = None
+        if sec_policy.enable_watermark and attempt.student:
+            stud = attempt.student
+            masked_code = _mask_identifier(stud.profile.student_identifier if stud.profile else None)
+            att_slug = str(attempt.id)[:8].upper()
+            watermark_str = sec_policy.watermark_pattern.format(
+                student_name=stud.full_name,
+                masked_reg=masked_code,
+                attempt_id=att_slug,
+            )
+
+        policy_dict = {
+            "track_tab_switch": sec_policy.track_tab_switch,
+            "track_focus_loss": sec_policy.track_focus_loss,
+            "require_fullscreen": sec_policy.require_fullscreen,
+            "track_fullscreen_exit": sec_policy.track_fullscreen_exit,
+            "block_copy_paste": sec_policy.block_copy_paste,
+            "track_copy_paste": sec_policy.track_copy_paste,
+            "block_context_menu": sec_policy.block_context_menu,
+            "track_page_reload": sec_policy.track_page_reload,
+            "enable_watermark": sec_policy.enable_watermark,
+            "max_tab_switches_warning": sec_policy.max_tab_switches_warning,
+            "max_tab_switches_critical": sec_policy.max_tab_switches_critical,
+            "max_focus_losses_warning": sec_policy.max_focus_losses_warning,
+            "max_fullscreen_exits_warning": sec_policy.max_fullscreen_exits_warning,
+        }
+
         return StudentAttemptDetailResponse(
             attempt_id=attempt.id,
             quiz_title=quiz.title,
@@ -836,6 +948,9 @@ class StudentExamService:
             sections=section_responses,
             questions=question_responses,
             answers=answers_dict,
+            watermark_text=watermark_str,
+            security_policy=policy_dict,
+            monitoring_acknowledged=attempt.monitoring_acknowledged_at is not None,
         )
 
     @staticmethod

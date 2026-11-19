@@ -25,6 +25,7 @@ import {
   StudentExamInstructions,
   StudentExamLandingDetails,
 } from '@/services/studentExamService';
+import { securityService } from '@/services/securityService';
 
 export default function ExamInstructionsPage() {
   const params = useParams();
@@ -69,9 +70,17 @@ export default function ExamInstructionsPage() {
       setError(null);
       const session = studentExamService.getSession(token);
 
-      await studentExamService.startOrResumeExam(token, {
+      const startRes = await studentExamService.startOrResumeExam(token, {
         registration_code: session.registrationCode || undefined,
       });
+
+      if (startRes?.attempt_id && startRes?.session_token) {
+        try {
+          await securityService.acknowledgeMonitoring(startRes.attempt_id, startRes.session_token);
+        } catch {
+          // Graceful fallback for offline or pre-acknowledged attempts
+        }
+      }
 
       router.push(`/exam/${token}/attempt`);
     } catch (err: any) {
@@ -262,6 +271,52 @@ export default function ExamInstructionsPage() {
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 If connection is lost, you may reconnect within the remaining examination time. Answers are synced immediately once connection is restored.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Phase 14: Examination Integrity & Anti-Cheating Transparency Notice */}
+        <div className="glass-card rounded-2xl border border-indigo-500/30 p-6 space-y-4 bg-indigo-950/20">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white">Examination Integrity &amp; Transparency Notice</h2>
+              <p className="text-[11px] text-slate-400">Fair evaluation protocols and candidate privacy commitments</p>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed">
+            {instructions.security_notice?.notice_text ||
+              'This examination interface employs non-intrusive integrity safeguards. For verification, the system monitors browser tab visibility, window focus continuity, and full-screen continuity. Clipboard copying and context menu actions may be restricted.'}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 space-y-1">
+              <span className="text-[11px] font-semibold text-indigo-300 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Monitored Safeguards</span>
+              </span>
+              <ul className="text-[11px] text-slate-400 space-y-0.5 list-disc list-inside">
+                <li>Page visibility and tab switches</li>
+                <li>Window focus and full-screen continuity</li>
+                <li>Single concurrent session enforcement</li>
+                <li>Cryptographic question &amp; option randomization</li>
+              </ul>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 space-y-1">
+              <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Candidate Privacy Guarantee</span>
+              </span>
+              <ul className="text-[11px] text-slate-400 space-y-0.5 list-disc list-inside">
+                <li>Zero access to webcam or microphone</li>
+                <li>Zero access to personal files or storage</li>
+                <li>Zero monitoring of external applications</li>
+                <li>Non-punitive risk score (never auto-disqualifies)</li>
+              </ul>
             </div>
           </div>
         </div>

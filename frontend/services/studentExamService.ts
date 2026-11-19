@@ -95,6 +95,24 @@ export interface StudentExamInstructions {
   allow_answer_change: boolean;
   allow_mark_for_review: boolean;
   navigation_mode: string;
+  security_notice?: {
+    quiz_id: string;
+    quiz_title: string;
+    track_tab_switch: boolean;
+    track_focus_loss: boolean;
+    require_fullscreen: boolean;
+    track_fullscreen_exit: boolean;
+    block_copy_paste: boolean;
+    track_copy_paste: boolean;
+    block_context_menu: boolean;
+    enable_watermark: boolean;
+    student_acknowledgement_required: boolean;
+    notice_text: string;
+    watermark_text?: string | null;
+    candidate_name?: string | null;
+    masked_identifier?: string | null;
+  } | null;
+  monitoring_required?: boolean;
 }
 
 export interface StudentExamStartResult {
@@ -138,6 +156,20 @@ export interface StudentAttemptDetail {
   sections: StudentSectionItem[];
   questions: StudentQuestionItem[];
   answers: Record<string, StudentSavedAnswer>;
+  watermark_text?: string | null;
+  security_policy?: {
+    track_tab_switch: boolean;
+    track_focus_loss: boolean;
+    require_fullscreen: boolean;
+    track_fullscreen_exit: boolean;
+    block_copy_paste: boolean;
+    track_copy_paste: boolean;
+    block_context_menu: boolean;
+    enable_watermark: boolean;
+    max_tab_switches_warning: number;
+    single_session_enforced: boolean;
+  } | null;
+  monitoring_acknowledged?: boolean;
 }
 
 export interface StudentReviewSummary {
