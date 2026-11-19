@@ -1,92 +1,309 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, CheckSquare, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { DashboardCard } from '@/components/ui/DashboardCard';
-import { Breadcrumb } from '@/components/ui/Breadcrumb';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  FileText,
+  Clock,
+  Award,
+  Layers,
+  HelpCircle,
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Lock,
+  Compass,
+  Bookmark,
+  RefreshCw,
+  WifiOff,
+} from 'lucide-react';
+import {
+  studentExamService,
+  StudentExamInstructions,
+  StudentExamLandingDetails,
+} from '@/services/studentExamService';
 
 export default function ExamInstructionsPage() {
   const params = useParams();
-  const token = (params?.token as string) || 'DEMO-EXAM-TOKEN';
+  const router = useRouter();
+  const token = (params?.token as string) || '';
+
+  const [loading, setLoading] = useState(true);
+  const [instructions, setInstructions] = useState<StudentExamInstructions | null>(null);
+  const [landingDetails, setLandingDetails] = useState<StudentExamLandingDetails | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!token) return;
+      try {
+        setLoading(true);
+        setError(null);
+        const session = studentExamService.getSession(token);
+
+        const [inst, details] = await Promise.all([
+          studentExamService.getExamInstructions(token),
+          studentExamService.getExamLandingDetails(token, session.registrationCode || undefined),
+        ]);
+
+        setInstructions(inst);
+        setLandingDetails(details);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load instructions.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [token]);
+
+  const handleStartExam = async () => {
+    if (!acknowledged || !token) return;
+    try {
+      setStarting(true);
+      setError(null);
+      const session = studentExamService.getSession(token);
+
+      await studentExamService.startOrResumeExam(token, {
+        registration_code: session.registrationCode || undefined,
+      });
+
+      router.push(`/exam/${token}/attempt`);
+    } catch (err: any) {
+      setError(err.message || 'Unable to launch examination attempt.');
+      setStarting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 rounded-2xl border-2 border-primary-500/20 border-t-primary-500 animate-spin mb-4" />
+        <h2 className="text-sm font-semibold text-slate-300">Loading Examination Protocol...</h2>
+      </div>
+    );
+  }
+
+  if (error && !instructions) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/30 p-6 text-center space-y-4">
+          <AlertTriangle className="w-12 h-12 text-rose-400 mx-auto" />
+          <h1 className="text-base font-bold text-white">Instructions Unavailable</h1>
+          <p className="text-xs text-slate-300">{error}</p>
+          <Link
+            href={`/exam/${token}`}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-xs text-white"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Landing Page
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!instructions) return null;
+
+  const canProceed = landingDetails ? (landingDetails.can_start || landingDetails.can_resume) : true;
 
   return (
-    <div className="min-h-screen bg-surface-base text-slate-100 bg-grid-pattern p-4 sm:p-6 lg:p-8 flex flex-col justify-between">
-      <div className="max-w-3xl mx-auto w-full space-y-6">
-        <Breadcrumb
-          items={[
-            { label: 'Exam Portal', href: `/exam/${token}` },
-            { label: 'Instructions' },
-          ]}
-        />
-
-        <div className="space-y-1">
-          <span className="text-xs font-mono uppercase text-brand-400">Pre-Flight Briefing</span>
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-white">
-            Examination Rules &amp; Protocols
-          </h1>
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Navigation Breadcrumb */}
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <Link href={`/exam/${token}`} className="hover:text-white flex items-center gap-1 transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Examination Landing</span>
+          </Link>
+          <span>/</span>
+          <span className="text-slate-200">Pre-Flight Instructions</span>
         </div>
 
-        <DashboardCard glow="brand" className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl bg-surface-base border border-surface-border">
-              <Clock className="w-4 h-4 text-brand-400 mb-1" />
-              <span className="text-[11px] text-slate-400 block">Total Duration</span>
-              <span className="text-sm font-bold text-white">45 Minutes</span>
-            </div>
+        {/* Title Header */}
+        <div className="space-y-1 border-b border-surface-border pb-4">
+          <span className="text-[10px] uppercase font-mono tracking-wider text-primary-400">
+            Candidate Briefing
+          </span>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">
+            {instructions.quiz_title} — Examination Rules &amp; Protocols
+          </h1>
+          {instructions.subject_name && (
+            <p className="text-xs text-slate-400">{instructions.subject_name}</p>
+          )}
+        </div>
 
-            <div className="p-3.5 rounded-xl bg-surface-base border border-surface-border">
-              <CheckSquare className="w-4 h-4 text-cyber-cyan mb-1" />
-              <span className="text-[11px] text-slate-400 block">Question Items</span>
-              <span className="text-sm font-bold text-white">30 Questions</span>
-            </div>
+        {error && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-            <div className="p-3.5 rounded-xl bg-surface-base border border-surface-border">
-              <ShieldCheck className="w-4 h-4 text-purple-400 mb-1" />
-              <span className="text-[11px] text-slate-400 block">Proctor Tolerance</span>
-              <span className="text-sm font-bold text-white">Strict Fullscreen</span>
-            </div>
+        {/* Examination Summary Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="glass-card rounded-2xl border border-surface-border p-3.5 text-center space-y-0.5">
+            <Clock className="w-4 h-4 text-primary-400 mx-auto mb-1" />
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Duration</span>
+            <span className="text-sm font-bold text-white">{instructions.duration_minutes} Mins</span>
           </div>
 
-          <div className="space-y-3 text-xs text-slate-300">
-            <h2 className="font-semibold text-white tracking-wide uppercase font-mono text-[11px]">
-              Candidate Guidelines
+          <div className="glass-card rounded-2xl border border-surface-border p-3.5 text-center space-y-0.5">
+            <Award className="w-4 h-4 text-amber-400 mx-auto mb-1" />
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Max Marks</span>
+            <span className="text-sm font-bold text-white">{instructions.total_marks} Pts</span>
+          </div>
+
+          <div className="glass-card rounded-2xl border border-surface-border p-3.5 text-center space-y-0.5">
+            <HelpCircle className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Items</span>
+            <span className="text-sm font-bold text-white">{instructions.total_questions} Questions</span>
+          </div>
+
+          <div className="glass-card rounded-2xl border border-surface-border p-3.5 text-center space-y-0.5">
+            <Layers className="w-4 h-4 text-purple-400 mx-auto mb-1" />
+            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Sections</span>
+            <span className="text-sm font-bold text-white">{instructions.total_sections} Parts</span>
+          </div>
+        </div>
+
+        {/* Section Selection Rules Breakdown */}
+        {instructions.sections_summary && instructions.sections_summary.length > 0 && (
+          <div className="glass-card rounded-2xl border border-surface-border p-5 space-y-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-primary-400" />
+              <span>Section Question Selection Rules</span>
             </h2>
-            <ul className="space-y-2 list-disc list-inside text-slate-300 leading-relaxed">
-              <li>Ensure uninterrupted network access before launching the examination.</li>
-              <li>Do not leave or blur the browser tab once the assessment starts.</li>
-              <li>3D spatial inspection tools can be rotated via touch or cursor drag.</li>
-              <li>Answers are automatically synchronized with the FastAPI backend.</li>
-            </ul>
-          </div>
 
-          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-xs text-amber-200">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <span>
-              Closing the window during an active attempt records an early submission event.
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {instructions.sections_summary.map((sec, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-surface-elevated/70 border border-surface-border space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">{sec.title}</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                      {sec.marks} Marks
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300">
+                    {sec.selection_rule === 'all_compulsory' && (
+                      <span className="text-emerald-400 font-medium">All {sec.question_count} questions are compulsory.</span>
+                    )}
+                    {sec.selection_rule === 'answer_n_of_m' && (
+                      <span className="text-amber-400 font-medium">
+                        Answer any {sec.required_question_count} out of {sec.question_count} questions. Extra answers will not earn extra marks.
+                      </span>
+                    )}
+                    {sec.selection_rule === 'all_optional' && (
+                      <span className="text-purple-400 font-medium">All questions are optional choices.</span>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {instructions.selection_rules_notice && (
+              <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl font-medium">
+                {instructions.selection_rules_notice}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Detailed Examination Rules Grid */}
+        <div className="glass-card rounded-2xl border border-surface-border p-5 space-y-4">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Standard Examination Regulations</span>
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-300">
+            <div className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border/60 space-y-1">
+              <span className="font-semibold text-white flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-primary-400" />
+                <span>Navigation Protocol</span>
+              </span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {instructions.allow_previous_nav
+                  ? 'Free navigation is enabled. You may navigate between any questions and sections using the Question Palette.'
+                  : 'Sequential navigation is enforced. Once you advance past a question, you cannot return.'}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border/60 space-y-1">
+              <span className="font-semibold text-white flex items-center gap-1.5">
+                <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+                <span>Mark for Review</span>
+              </span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                You can flag questions for review at any time. Flagged questions are highlighted on the palette and summarized prior to submission.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border/60 space-y-1">
+              <span className="font-semibold text-white flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Browser Refresh &amp; Timer</span>
+              </span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                The timer is authoritative and driven by the server. Refreshing the browser preserves your active attempt and answers without adding extra time.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border/60 space-y-1">
+              <span className="font-semibold text-white flex items-center gap-1.5">
+                <WifiOff className="w-3.5 h-3.5 text-rose-400" />
+                <span>Network Disconnection</span>
+              </span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                If connection is lost, you may reconnect within the remaining examination time. Answers are synced immediately once connection is restored.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Acknowledgement and Start Action */}
+        <div className="glass-card rounded-2xl border border-surface-border p-6 space-y-4">
+          <label className="flex items-start gap-3 text-xs text-slate-200 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => setAcknowledged(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded text-primary-600 focus:ring-primary-500 bg-slate-900 border-slate-700"
+            />
+            <span className="leading-relaxed">
+              I have read, understood, and agree to abide by all the examination instructions, section selection rules, and anti-cheating telemetry protocols above.
             </span>
-          </div>
+          </label>
 
-          <div className="pt-4 border-t border-surface-border flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-surface-border">
             <Link
               href={`/exam/${token}`}
-              className="text-xs text-slate-400 hover:text-slate-200 inline-flex items-center gap-1.5"
+              className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back to Token Screen
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
             </Link>
 
-            <Link href={`/exam/${token}/attempt`} className="w-full sm:w-auto">
-              <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple text-white text-xs font-semibold shadow-glow-purple">
-                Start Examination
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </Link>
+            <button
+              onClick={handleStartExam}
+              disabled={!acknowledged || !canProceed || starting}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all"
+            >
+              {starting ? (
+                <span>Entering Examination Room...</span>
+              ) : (
+                <>
+                  <span>Enter Examination Room</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
           </div>
-        </DashboardCard>
-      </div>
-
-      <div className="text-center py-6 text-xs text-slate-500">
-        Candidate Session &bull; QUIZVERSE Phase 1
+        </div>
       </div>
     </div>
   );

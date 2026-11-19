@@ -14,6 +14,7 @@ from backend.app.api.v1.endpoints import (
     quiz_publishing,
     invitations,
     public_registration,
+    student_exam,
 )
 
 api_router = APIRouter()
@@ -94,4 +95,11 @@ api_router.include_router(
     public_registration.router,
     prefix="/public",
     tags=["Public Candidate Registration"],
+)
+
+# 9. Student Examination Interface (Phase 12)
+api_router.include_router(
+    student_exam.router,
+    prefix="/student",
+    tags=["Student Examination Interface"],
 )
