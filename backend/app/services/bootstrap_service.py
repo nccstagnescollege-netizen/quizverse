@@ -774,3 +774,61 @@ def ensure_system_audit_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"System audit schema upgrade encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_deployment_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 20 Production Deployment & Backup tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        if dialect_name == "postgresql":
+            ddl_statements = [
+                # 1. system_backup_records table
+                """
+                CREATE TABLE IF NOT EXISTS system_backup_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    backup_type VARCHAR(32) NOT NULL DEFAULT 'automated_snapshot',
+                    archive_filename VARCHAR(255) NOT NULL,
+                    storage_path VARCHAR(512) NOT NULL,
+                    file_size_bytes BIGINT NOT NULL DEFAULT 0,
+                    sha256_checksum VARCHAR(64) NOT NULL,
+                    status VARCHAR(32) NOT NULL DEFAULT 'completed',
+                    triggered_by VARCHAR(128) NOT NULL DEFAULT 'system_cron',
+                    error_message TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    completed_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_system_backup_records_created_at ON system_backup_records(created_at);",
+                "CREATE INDEX IF NOT EXISTS ix_system_backup_records_status ON system_backup_records(status);",
+
+                # 2. restoration_test_records table
+                """
+                CREATE TABLE IF NOT EXISTS restoration_test_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    backup_id UUID,
+                    test_status VARCHAR(32) NOT NULL DEFAULT 'passed',
+                    tables_verified_count INTEGER NOT NULL DEFAULT 0,
+                    checksum_verified BOOLEAN NOT NULL DEFAULT true,
+                    log_output TEXT,
+                    performed_by VARCHAR(128) NOT NULL DEFAULT 'super_admin',
+                    performed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_restoration_test_records_performed_at ON restoration_test_records(performed_at);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"Deployment schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 20 Production Deployment & Backup schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Deployment schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+        db.rollback()

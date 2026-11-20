@@ -70,7 +70,7 @@ export function MobileNavigation({ isOpen, onClose }: MobileNavigationProps) {
                   <span>About Platform</span>
                 </Link>
                 <Link
-                  href="/exam/demo-test"
+                  href="/exam"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium min-h-[44px] transition-colors ${
                     pathname?.startsWith('/exam') ? 'bg-cyber-cyan/15 text-cyber-cyan font-semibold' : 'text-slate-300 hover:text-white hover:bg-surface-elevated'

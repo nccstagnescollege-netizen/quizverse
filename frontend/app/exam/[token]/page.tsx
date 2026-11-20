@@ -109,15 +109,48 @@ export default function ExamLandingPage() {
   }
 
   if (error && !details) {
+    const isDemoPlaceholder = token === 'demo-test';
+
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/30 p-6 sm:p-8 text-center space-y-4">
+        <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/30 p-6 sm:p-8 text-center space-y-5">
           <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
             <Lock className="w-7 h-7" />
           </div>
-          <h1 className="text-lg font-bold text-white">Examination Access Unavailable</h1>
-          <p className="text-xs text-slate-300 leading-relaxed">{error}</p>
-          <div className="pt-4 border-t border-surface-border text-[11px] text-slate-500">
+          <div className="space-y-1.5">
+            <h1 className="text-lg font-bold text-white">Examination Access Unavailable</h1>
+            <span className="inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">
+              Code: {token}
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed">
+            {isDemoPlaceholder
+              ? 'The path /exam/demo-test was a demonstration placeholder. Please enter your official invitation token or launch the live published exam.'
+              : error}
+          </p>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Link
+              href="/exam"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-lg shadow-primary-500/20 transition-all"
+            >
+              <span>Go to Examination Gateway</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+
+            {isDemoPlaceholder && (
+              <Link
+                href="/exam/eef84119-3d23-4d9a-956a-71044826a121"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors"
+              >
+                <span>Launch Live Exam ("demi")</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-surface-border text-[11px] text-slate-400">
             Please check your link or contact your examination coordinator.
           </div>
         </div>

@@ -85,7 +85,7 @@ export function TopNavbar({ onToggleMobileMenu, isMobileMenuOpen }: TopNavbarPro
               About
             </Link>
             <Link
-              href="/exam/demo-test"
+              href="/exam"
               className={`text-xs font-medium transition-colors flex items-center gap-1.5 ${
                 pathname?.startsWith('/exam') ? 'text-cyber-cyan' : 'text-slate-300 hover:text-white'
               }`}

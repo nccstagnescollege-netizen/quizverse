@@ -21,6 +21,7 @@ from backend.app.api.v1.endpoints import (
     quiz_analytics,
     monitoring,
     system_audit,
+    deployment,
 )
 
 api_router = APIRouter()
@@ -160,5 +161,12 @@ api_router.include_router(
     system_audit.router,
     prefix="/system/audit",
     tags=["System Audit, Security & Performance Benchmarks"],
+)
+
+# 16. Final Production Deployment, Backup Automation & Launch Operations (Phase 20)
+api_router.include_router(
+    deployment.router,
+    prefix="/system/deployment",
+    tags=["Production Deployment & DR Operations"],
 )
 

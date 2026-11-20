@@ -123,6 +123,10 @@ from backend.app.models.system_audit import (
     LoadTestBenchmark,
     AccessibilityAuditRecord,
 )
+from backend.app.models.deployment import (
+    SystemBackupRecord,
+    RestorationTestRecord,
+)
 
 __all__ = [
     "Base",
@@ -231,4 +235,7 @@ __all__ = [
     "AuditFinding",
     "LoadTestBenchmark",
     "AccessibilityAuditRecord",
+    # Production Deployment & Backups (Phase 20)
+    "SystemBackupRecord",
+    "RestorationTestRecord",
 ]

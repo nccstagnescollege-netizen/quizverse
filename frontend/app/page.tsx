@@ -80,7 +80,7 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-3.5 pt-2">
-              <Link href="/exam/demo-test" className="w-full sm:w-auto">
+              <Link href="/exam" className="w-full sm:w-auto">
                 <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-cyber-purple text-white text-xs sm:text-sm font-semibold shadow-glow-purple border border-purple-400/30 hover:scale-105 active:scale-95 transition-all">
                   Candidate Exam Portal
                   <ArrowRight className="w-4 h-4" />
