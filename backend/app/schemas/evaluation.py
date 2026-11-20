@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 # ====================================================================
@@ -199,6 +199,14 @@ class ModerationActionRequest(BaseModel):
     action: str = Field(..., description="approve, return, or override")
     new_marks: Optional[Decimal] = Field(None, ge=0)
     reason: Optional[str] = Field(None, description="Required for override or return")
+    override_reason: Optional[str] = None
+
+    @model_validator(mode="before")
+    def populate_reason(cls, data: Any):
+        if isinstance(data, dict):
+            if not data.get("reason") and data.get("override_reason"):
+                data["reason"] = data["override_reason"]
+        return data
 
 
 # ====================================================================
@@ -345,9 +353,31 @@ class ResultDetailResponse(BaseModel):
     published_by_name: Optional[str] = None
     result_version: int
     section_scores: Optional[List[SectionScoreDetail]] = None
+    section_breakdown: Optional[List[SectionScoreDetail]] = None
     evaluations: List[QuestionEvaluationDetail] = Field(default_factory=list)
+    question_evaluations: List[QuestionEvaluationDetail] = Field(default_factory=list)
     corrections: List[ResultCorrectionDetail] = Field(default_factory=list)
+    correction_history: List[ResultCorrectionDetail] = Field(default_factory=list)
     calculated_at: datetime
+
+    @model_validator(mode="before")
+    def sync_aliases(cls, data: Any):
+        if isinstance(data, dict):
+            if not data.get("section_breakdown") and data.get("section_scores"):
+                data["section_breakdown"] = data["section_scores"]
+            elif not data.get("section_scores") and data.get("section_breakdown"):
+                data["section_scores"] = data["section_breakdown"]
+
+            if not data.get("question_evaluations") and data.get("evaluations"):
+                data["question_evaluations"] = data["evaluations"]
+            elif not data.get("evaluations") and data.get("question_evaluations"):
+                data["evaluations"] = data["question_evaluations"]
+
+            if not data.get("correction_history") and data.get("corrections"):
+                data["correction_history"] = data["corrections"]
+            elif not data.get("corrections") and data.get("correction_history"):
+                data["corrections"] = data["correction_history"]
+        return data
 
 
 class ResultApproveRequest(BaseModel):

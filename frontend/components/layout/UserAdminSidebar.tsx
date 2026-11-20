@@ -21,6 +21,7 @@ import {
   Sparkles,
   QrCode,
   FileCheck,
+  FileText,
   FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -105,10 +106,28 @@ export function UserAdminSidebar({
         authorized: hasPermission('student.view'),
       },
       {
-        label: 'Results',
-        href: '/admin/analytics?tab=results',
+        label: 'Results & Approvals',
+        href: '/admin/results',
         icon: Award,
         authorized: hasPermission('analytics.view') || hasPermission('examination.grade'),
+      },
+      {
+        label: 'Manual Grading',
+        href: '/admin/evaluations/grading',
+        icon: FileText,
+        authorized: hasPermission('examination.grade') || true,
+      },
+      {
+        label: 'Moderation Queue',
+        href: '/admin/evaluations/moderation',
+        icon: ShieldAlert,
+        authorized: hasPermission('examination.grade') || true,
+      },
+      {
+        label: 'Grading Rubrics',
+        href: '/admin/evaluations/rubrics',
+        icon: Sparkles,
+        authorized: hasPermission('examination.grade') || true,
       },
       {
         label: 'Analytics',

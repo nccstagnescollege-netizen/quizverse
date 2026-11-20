@@ -1,6 +1,7 @@
 import uuid
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 from sqlalchemy.orm import Session
@@ -118,6 +119,18 @@ def process_moderation_decision(
 # 2. MANUAL GRADING WORKSPACE & RUBRICS ROUTER (/grading)
 # ====================================================================
 
+class WorkspaceEvaluateRequest(BaseModel):
+    attempt_id: uuid.UUID
+    quiz_question_id: uuid.UUID
+    marks_awarded: Decimal
+    is_partially_correct: bool = False
+    feedback: Optional[str] = None
+    private_notes: Optional[str] = None
+    rubric_id: Optional[uuid.UUID] = None
+    criterion_scores: Optional[List[Dict[str, Any]]] = None
+    flag_for_moderation: bool = False
+
+
 @grading_router.get("/workspaces/{attempt_id}", response_model=ManualGradingWorkspaceResponse)
 def get_manual_grading_workspace(
     attempt_id: uuid.UUID = Path(..., description="Examination Attempt ID"),
@@ -126,6 +139,79 @@ def get_manual_grading_workspace(
 ):
     """Load candidate answers, rubrics, and feedback fields for manual grading workspace."""
     return EvaluationService.get_manual_grading_workspace(db, attempt_id, admin)
+
+
+@grading_router.get("/workspace")
+def get_grading_workspace_query(
+    attempt_id: uuid.UUID = Query(..., description="Examination Attempt ID"),
+    quiz_question_id: Optional[uuid.UUID] = Query(None, description="Quiz Question ID"),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """Load manual workspace or specific question view for grading."""
+    res = EvaluationService.get_manual_grading_workspace(db, attempt_id, admin)
+    if quiz_question_id:
+        target_q = next((q for q in res.questions if q.quiz_question_id == quiz_question_id), None)
+        if target_q:
+            data = res.model_dump()
+            data.update({
+                "quiz_question_id": str(target_q.quiz_question_id),
+                "submitted_answer_text": target_q.student_answer_text or "",
+                "question_text": target_q.question_text,
+                "max_marks": float(target_q.max_marks),
+                "evaluation_id": str(target_q.evaluation_id),
+                "marks_awarded": float(target_q.marks_awarded),
+                "feedback": target_q.feedback,
+                "private_notes": target_q.private_notes,
+            })
+            return data
+    return res
+
+
+@grading_router.post("/workspace/evaluate")
+def evaluate_workspace_question(
+    req: WorkspaceEvaluateRequest,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """Evaluate a specific question in manual workspace using attempt and quiz question IDs."""
+    from backend.app.models.results import QuestionEvaluation, ExaminationResult
+    ev = db.query(QuestionEvaluation).join(ExaminationResult).filter(
+        ExaminationResult.attempt_id == req.attempt_id,
+        QuestionEvaluation.quiz_question_id == req.quiz_question_id,
+    ).first()
+
+    if not ev:
+        EvaluationService.run_evaluation(db, req.attempt_id, triggered_by=admin)
+        ev = db.query(QuestionEvaluation).join(ExaminationResult).filter(
+            ExaminationResult.attempt_id == req.attempt_id,
+            QuestionEvaluation.quiz_question_id == req.quiz_question_id,
+        ).first()
+
+    if not ev:
+        raise HTTPException(status_code=404, detail="Question evaluation record not found for this attempt")
+
+    save_req = SaveManualEvaluationRequest(
+        marks_awarded=req.marks_awarded,
+        is_partially_correct=req.is_partially_correct,
+        feedback=req.feedback,
+        private_notes=req.private_notes,
+        rubric_id=req.rubric_id,
+        criterion_scores=req.criterion_scores,
+        flag_for_moderation=req.flag_for_moderation,
+    )
+    saved_ev = EvaluationService.save_manual_evaluation(db, ev.id, save_req, admin)
+    res = saved_ev.result
+    return {
+        "success": True,
+        "evaluation_id": str(saved_ev.id),
+        "marks_awarded": float(saved_ev.marks_awarded),
+        "total_score": float(res.score) if res else float(saved_ev.marks_awarded),
+        "percentage": float(res.percentage) if res else 0.0,
+        "is_passed": res.is_passed if res else False,
+        "evaluation_status": res.evaluation_status if res else "EVALUATION_COMPLETED",
+        "is_flagged_for_moderation": saved_ev.is_flagged_for_moderation,
+    }
 
 
 @grading_router.post("/evaluations/{evaluation_id}/save")
@@ -137,10 +223,15 @@ def save_manual_question_score(
 ):
     """Save manual score, criterion breakdown, and feedback for a response."""
     ev = EvaluationService.save_manual_evaluation(db, evaluation_id, req, admin)
+    res = ev.result
     return {
         "success": True,
         "evaluation_id": ev.id,
         "marks_awarded": float(ev.marks_awarded),
+        "total_score": float(res.score) if res else float(ev.marks_awarded),
+        "percentage": float(res.percentage) if res else 0.0,
+        "is_passed": res.is_passed if res else False,
+        "evaluation_status": res.evaluation_status if res else "EVALUATION_COMPLETED",
         "is_flagged_for_moderation": ev.is_flagged_for_moderation,
     }
 
@@ -285,6 +376,7 @@ def publish_result(
         "result_id": res.id,
         "is_published": res.is_published,
         "published_at": res.published_at,
+        "evaluation_status": res.evaluation_status,
     }
 
 
@@ -315,7 +407,9 @@ def override_result_score(
     return {
         "success": True,
         "result_id": res.id,
+        "score": float(res.score),
         "new_score": float(res.score),
+        "percentage": float(res.percentage),
         "new_percentage": float(res.percentage),
         "is_passed": res.is_passed,
         "result_version": res.result_version,

@@ -218,10 +218,12 @@ class EvaluationService:
                 )
                 db.add(eval_record)
                 db.flush()
+                existing_evals[qq.id] = eval_record
             else:
                 eval_record.max_marks = q_marks
                 if ans:
                     eval_record.attempt_answer_id = ans.id
+                existing_evals[qq.id] = eval_record
 
             is_answered = ans and (
                 (ans.selected_option_ids and len(ans.selected_option_ids) > 0) or
@@ -676,7 +678,8 @@ class EvaluationService:
         else:
             stud_ident = student.full_name if student else "Candidate"
             stud_email = student.email if student else None
-            stud_roll = student.profile.roll_number if student and student.profile else None
+            prof_obj = student.profile if student else None
+            stud_roll = getattr(prof_obj, "student_identifier", getattr(prof_obj, "roll_number", None)) if prof_obj else None
 
         answers_by_qq = {a.quiz_question_id: a for a in attempt.answers}
         evals_by_qq = {e.quiz_question_id: e for e in (attempt.result.evaluations if attempt.result else [])}
@@ -1209,6 +1212,11 @@ class EvaluationService:
     ) -> ResultListResponse:
         """List examination results with filters, search, and scoping."""
         is_super = admin.is_super_admin
+        if quiz_id and not is_super:
+            target_quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+            if not target_quiz or not EvaluationService.check_quiz_access(db, admin, target_quiz):
+                raise HTTPException(status_code=403, detail="Not authorized to access results for this quiz")
+
         query = db.query(ExaminationResult).join(Quiz).join(Student).options(
             joinedload(ExaminationResult.quiz).joinedload(Quiz.subject),
             joinedload(ExaminationResult.student).joinedload(Student.profile),
@@ -1250,7 +1258,7 @@ class EvaluationService:
                 student_id=r.student_id,
                 student_name=stud.full_name if stud else "Unknown Candidate",
                 student_email=stud.email if stud else "",
-                student_roll_no=prof.roll_number if prof else None,
+                student_roll_no=getattr(prof, "student_identifier", getattr(prof, "roll_number", None)) if prof else None,
                 score=r.score,
                 maximum_marks=r.maximum_marks,
                 percentage=r.percentage,
@@ -1337,7 +1345,7 @@ class EvaluationService:
             student_id=res.student_id,
             student_name=stud.full_name if stud else "Candidate",
             student_email=stud.email if stud else "",
-            student_roll_no=prof.roll_number if prof else None,
+            student_roll_no=getattr(prof, "student_identifier", getattr(prof, "roll_number", None)) if prof else None,
             score=res.score,
             maximum_marks=res.maximum_marks,
             passing_marks=res.passing_marks,
@@ -1644,7 +1652,8 @@ class EvaluationService:
 
         stud = attempt.student
         stud_name = stud.full_name if stud else "Candidate"
-        stud_roll = stud.profile.roll_number if stud and stud.profile else None
+        prof_obj = stud.profile if stud else None
+        stud_roll = getattr(prof_obj, "student_identifier", getattr(prof_obj, "roll_number", None)) if prof_obj else None
         masked_reg = (stud_roll[:2] + "****" + stud_roll[-2:]) if stud_roll and len(stud_roll) > 4 else stud_roll
 
         # Question breakdowns if permitted
