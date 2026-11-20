@@ -176,6 +176,12 @@ def test_03_live_system_diagnostics():
     assert any("Key" in c or "Cryptographic" in c for c in components)
     assert any("Timer" in c for c in components)
 
+    # Test POST method support
+    res_post = client.post("/api/v1/system/audit/diagnostics", headers=headers)
+    assert res_post.status_code == 200
+    diag_post = res_post.json()
+    assert len(diag_post) >= 4
+
 
 def test_04_audit_findings_crud_and_remediation():
     headers = {"Authorization": f"Bearer {state['super_token']}"}

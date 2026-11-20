@@ -34,6 +34,7 @@ def get_system_audit_summary(
 
 
 @router.get("/diagnostics", response_model=List[DiagnosticsCheckItem])
+@router.post("/diagnostics", response_model=List[DiagnosticsCheckItem])
 def run_live_diagnostics(
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_super_admin),
@@ -41,6 +42,7 @@ def run_live_diagnostics(
     """
     Executes live self-diagnostic health checks across PostgreSQL engine,
     entity schemas, JWT signing keys, and timer synchronization.
+    Supports both GET (query/read) and POST (manual action trigger).
     """
     return SystemAuditService.run_system_diagnostics(db)
 

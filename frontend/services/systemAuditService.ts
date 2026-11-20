@@ -116,10 +116,17 @@ export const systemAuditService = {
   },
 
   async runDiagnostics(token: string): Promise<DiagnosticsCheckItem[]> {
-    const res = await fetch(`${API_BASE_URL}/system/audit/diagnostics`, {
+    let res = await fetch(`${API_BASE_URL}/system/audit/diagnostics`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
+    // Fall back to GET if 405 Method Not Allowed (e.g. against previous backend build)
+    if (res.status === 405) {
+      res = await fetch(`${API_BASE_URL}/system/audit/diagnostics`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error?.message || err.detail || 'Failed to run diagnostics');
