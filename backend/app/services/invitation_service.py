@@ -308,6 +308,8 @@ class InvitationService:
         search: Optional[str] = None,
         page: int = 1,
         limit: int = 20,
+        base_url: Optional[str] = None,
+        request: Optional[Request] = None,
     ) -> InvitationListResponse:
         """
         List invitations with status evaluation, filters, and RBAC scoping.
@@ -371,6 +373,7 @@ class InvitationService:
         end_idx = start_idx + limit
         paginated_items = filtered_items[start_idx:end_idx]
 
+        resolved_base_url = InvitationService._get_base_url(req_base_url=base_url, request=request)
         items = []
         for inv in paginated_items:
             items.append(InvitationResponse(
@@ -400,7 +403,7 @@ class InvitationService:
                 created_by_name=inv.creator.full_name if inv.creator else None,
                 created_at=inv.created_at,
                 updated_at=inv.updated_at,
-                access_url=None,
+                access_url=f"{resolved_base_url}/join/{inv.id}",
                 qr_svg=None,
                 qr_png_base64=None,
                 raw_token=None,
@@ -416,7 +419,13 @@ class InvitationService:
         )
 
     @staticmethod
-    def get_invitation(db: Session, admin: Admin, invitation_id: uuid.UUID) -> InvitationResponse:
+    def get_invitation(
+        db: Session,
+        admin: Admin,
+        invitation_id: uuid.UUID,
+        base_url: Optional[str] = None,
+        request: Optional[Request] = None,
+    ) -> InvitationResponse:
         """
         Get invitation detail, checking RBAC scoping.
         """
@@ -431,6 +440,7 @@ class InvitationService:
         if not InvitationService.check_quiz_permission(db, admin, inv.quiz):
             raise HTTPException(status_code=403, detail="Not authorized to access this invitation")
 
+        resolved_base_url = InvitationService._get_base_url(req_base_url=base_url, request=request)
         return InvitationResponse(
             id=inv.id,
             quiz_id=inv.quiz_id,
@@ -458,6 +468,7 @@ class InvitationService:
             created_by_name=inv.creator.full_name if inv.creator else None,
             created_at=inv.created_at,
             updated_at=inv.updated_at,
+            access_url=f"{resolved_base_url}/join/{inv.id}",
         )
 
     @staticmethod

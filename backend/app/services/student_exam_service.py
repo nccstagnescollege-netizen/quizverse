@@ -64,6 +64,20 @@ def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 
+def _filter_invitation_by_token(query, token: str):
+    token_str = str(token).strip() if token else ""
+    token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(token_str)
+    except (ValueError, AttributeError):
+        parsed_uuid = None
+
+    if parsed_uuid:
+        return query.filter(or_(InvitationLink.token_hash == token_hash, InvitationLink.id == parsed_uuid))
+    return query.filter(InvitationLink.token_hash == token_hash)
+
+
 class StudentExamService:
 
     @staticmethod
@@ -239,12 +253,12 @@ class StudentExamService:
         Fetches examination metadata, verifies invitation and schedule eligibility,
         and determines allowed actions based on registration and attempt status.
         """
-        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        inv = db.query(InvitationLink).options(
+        base_query = db.query(InvitationLink).options(
             joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
             joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
             joinedload(InvitationLink.quiz).joinedload(Quiz.sections).joinedload(QuizSection.questions),
-        ).filter(InvitationLink.token_hash == token_hash).first()
+        )
+        inv = _filter_invitation_by_token(base_query, token).first()
 
         if not inv:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid examination invitation token")
@@ -399,12 +413,12 @@ class StudentExamService:
         Retrieves detailed instructions, rules, section breakdown, and selection guidelines
         configured for the examination.
         """
-        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        inv = db.query(InvitationLink).options(
+        base_query = db.query(InvitationLink).options(
             joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
             joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
             joinedload(InvitationLink.quiz).joinedload(Quiz.sections).joinedload(QuizSection.questions),
-        ).filter(InvitationLink.token_hash == token_hash).first()
+        )
+        inv = _filter_invitation_by_token(base_query, token).first()
 
         if not inv or not inv.quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invitation token")
@@ -503,10 +517,10 @@ class StudentExamService:
         - Creates a new attempt if within max_attempts
         - Generates signed JWT session token
         """
-        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        inv = db.query(InvitationLink).options(
+        base_query = db.query(InvitationLink).options(
             joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        ).filter(InvitationLink.token_hash == token_hash).first()
+        )
+        inv = _filter_invitation_by_token(base_query, token).first()
 
         if not inv or not inv.quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invitation token")

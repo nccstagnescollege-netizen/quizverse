@@ -51,6 +51,7 @@ def create_invitation(
 
 @router.get("", response_model=InvitationListResponse)
 def list_invitations(
+    request: Request,
     quiz_id: Optional[uuid.UUID] = Query(None, description="Filter by quiz ID"),
     status: Optional[str] = Query(None, description="Filter by status (active, scheduled, expired, revoked, exhausted, all)"),
     type: Optional[str] = Query(None, description="Filter by invitation type"),
@@ -70,6 +71,7 @@ def list_invitations(
         search=search,
         page=page,
         limit=limit,
+        request=request,
     )
 
 
@@ -165,11 +167,12 @@ def save_quiz_registration_form(
 @router.get("/{invitation_id}", response_model=InvitationResponse)
 def get_invitation_detail(
     invitation_id: uuid.UUID = Path(..., description="Invitation Link ID"),
+    request: Request = None,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
     """Get invitation detail with access restrictions and status."""
-    return InvitationService.get_invitation(db, admin, invitation_id)
+    return InvitationService.get_invitation(db, admin, invitation_id, request=request)
 
 
 @router.patch("/{invitation_id}", response_model=InvitationResponse)

@@ -31,6 +31,20 @@ def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 
+def _filter_invitation_by_token(query, token: str):
+    token_str = str(token).strip() if token else ""
+    token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(token_str)
+    except (ValueError, AttributeError):
+        parsed_uuid = None
+
+    if parsed_uuid:
+        return query.filter(or_(InvitationLink.token_hash == token_hash, InvitationLink.id == parsed_uuid))
+    return query.filter(InvitationLink.token_hash == token_hash)
+
+
 DEFAULT_REGISTRATION_FIELDS: List[Dict[str, Any]] = [
     {
         "field_name": "full_name",
@@ -227,15 +241,14 @@ class StudentRegistrationService:
     def validate_public_token(db: Session, token: str) -> PublicInvitationValidationResponse:
         """
         Public token validation for candidates scanning QR or following invitation link.
-        Validates token hash, status, expiration, quotas, and quiz eligibility.
+        Validates token hash or invitation ID, status, expiration, quotas, and quiz eligibility.
         Never reveals whether candidate records exist.
         """
-        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-        inv = db.query(InvitationLink).options(
+        base_query = db.query(InvitationLink).options(
             joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
             joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        ).filter(InvitationLink.token_hash == token_hash).first()
+        )
+        inv = _filter_invitation_by_token(base_query, token).first()
 
         if not inv:
             return PublicInvitationValidationResponse(
@@ -325,13 +338,12 @@ class StudentRegistrationService:
         - Creates QuizParticipant
         - Logs InvitationUsage
         """
-        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-        # Atomic lock on invitation row
-        inv = db.query(InvitationLink).options(
+        # Atomic lock on invitation row (by token hash or UUID id)
+        base_query = db.query(InvitationLink).options(
             joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
             joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        ).filter(InvitationLink.token_hash == token_hash).with_for_update().first()
+        )
+        inv = _filter_invitation_by_token(base_query, token).with_for_update().first()
 
         if not inv:
             raise HTTPException(status_code=404, detail="Invalid invitation token")

@@ -310,6 +310,14 @@ def test_03_public_invitation_token_validation():
     assert val_data["registration_form"] is not None
     assert len(val_data["registration_form"]) >= 3
 
+    # Public candidate also validates using invitation UUID id (from dashboard link/QR)
+    inv_id = create_resp.json()["id"]
+    val_id_resp = client.get(f"/api/v1/public/invitations/{inv_id}/validate")
+    assert val_id_resp.status_code == 200
+    val_id_data = val_id_resp.json()
+    assert val_id_data["is_valid"] is True
+    assert val_id_data["quiz_title"] == "Midterm Examination - Deep Learning"
+
     # Invalid token check
     invalid_resp = client.get("/api/v1/public/invitations/non-existent-token-12345/validate")
     assert invalid_resp.status_code == 200
@@ -575,6 +583,23 @@ def test_08_candidate_registration_and_duplicate_prevention():
     assert r2.status_code == 409
     err_msg = r2.json().get("error", {}).get("message") or r2.text
     assert "already registered" in err_msg.lower()
+
+    # Registration using invitation UUID id (from dashboard link/QR) also works
+    inv_id = inv_resp.json()["id"]
+    candidate2_payload = {
+        "form_data": {
+            "full_name": "Arthur Curry",
+            "email": "arthur.curry@gtu.edu",
+            "lab_group": "Group B",
+            "honor_code_agreement": "true",
+        }
+    }
+    r3 = client.post(f"/api/v1/public/invitations/{inv_id}/register", json=candidate2_payload)
+    assert r3.status_code == 201, r3.text
+    receipt3 = r3.json()
+    assert receipt3["success"] is True
+    assert receipt3["student_name"] == "Arthur Curry"
+    assert "REG-" in receipt3["registration_code"]
 
 
 # ====================================================================
