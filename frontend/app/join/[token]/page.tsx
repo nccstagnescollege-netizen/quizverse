@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   GraduationCap,
@@ -125,6 +126,9 @@ export default function PublicRegistrationPage() {
     try {
       const res = await invitationService.registerCandidate(token, formData);
       setReceipt(res);
+      if (typeof window !== 'undefined' && res.registration_code) {
+        localStorage.setItem(`exam_reg_code_${token}`, res.registration_code);
+      }
     } catch (err: any) {
       setSubmitError(err.message || 'Failed to complete registration. Please check your information.');
     } finally {
@@ -325,13 +329,20 @@ export default function PublicRegistrationPage() {
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <Link
+              href={`/exam/${token}`}
+              className="w-full flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-600 via-indigo-600 to-cyber-purple hover:from-primary-500 hover:to-purple-500 text-xs text-white font-bold shadow-lg shadow-primary-500/25 transition-all text-center"
+            >
+              <span>Enter Examination Gateway</span>
+              <ChevronRight className="w-4 h-4" />
+            </Link>
             <button
               onClick={() => window.print()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-elevated hover:bg-slate-800 border border-surface-border text-xs text-white font-semibold transition-colors"
+              className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-elevated hover:bg-slate-800 border border-surface-border text-xs text-slate-300 hover:text-white font-semibold transition-colors"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Registration Slip</span>
+              <span>Print Slip</span>
             </button>
           </div>
         </div>

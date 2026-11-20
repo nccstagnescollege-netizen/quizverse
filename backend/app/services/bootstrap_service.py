@@ -417,3 +417,245 @@ def ensure_analytics_reports_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"Analytics & Reports schema upgrade encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_examination_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 12 & 13 Examination Engine tables and columns exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        if dialect_name == "postgresql":
+            ddl_statements = [
+                # 1. examination_attempts columns
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS deadline_at TIMESTAMPTZ;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS duration_seconds INTEGER NOT NULL DEFAULT 3600;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS extra_time_seconds INTEGER NOT NULL DEFAULT 0;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS submission_reason VARCHAR(32);",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS submission_source VARCHAR(32);",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS active_session_token VARCHAR(255);",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS is_immutable BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS published_quiz_version_id UUID REFERENCES quiz_published_versions(id) ON DELETE SET NULL;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS time_spent_seconds INTEGER NOT NULL DEFAULT 0;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS risk_score NUMERIC(5,2) DEFAULT 0.00;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS risk_level VARCHAR(32) DEFAULT 'LOW';",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS monitoring_acknowledged_at TIMESTAMPTZ;",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS presentation_seed VARCHAR(64);",
+                "ALTER TABLE examination_attempts ADD COLUMN IF NOT EXISTS question_presentation_order JSONB;",
+
+                # 2. attempt_answers columns
+                "ALTER TABLE attempt_answers ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;",
+                "ALTER TABLE attempt_answers ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(128);",
+                "ALTER TABLE attempt_answers ADD COLUMN IF NOT EXISTS answer_status VARCHAR(32) NOT NULL DEFAULT 'NOT_ANSWERED';",
+                "ALTER TABLE attempt_answers ADD COLUMN IF NOT EXISTS client_timestamp TIMESTAMPTZ;",
+                "ALTER TABLE attempt_answers ADD COLUMN IF NOT EXISTS source_question_id UUID;",
+
+                # 3. attempt_sessions table
+                """
+                CREATE TABLE IF NOT EXISTS attempt_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    session_token_hash VARCHAR(128) UNIQUE NOT NULL,
+                    device_info VARCHAR(255),
+                    ip_address VARCHAR(45),
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    terminated_reason VARCHAR(64)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_attempt_sessions_attempt_id ON attempt_sessions(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_attempt_sessions_session_token_hash ON attempt_sessions(session_token_hash);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"Examination schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 12 & 13 Examination schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Examination schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
+def ensure_monitoring_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 18 Live Examination Monitoring & Invigilator tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        if dialect_name == "postgresql":
+            ddl_statements = [
+                # 1. Invigilator Assignments
+                """
+                CREATE TABLE IF NOT EXISTS invigilator_assignments (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    invigilator_id UUID NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+                    is_lead BOOLEAN NOT NULL DEFAULT false,
+                    permissions JSONB,
+                    status VARCHAR(32) NOT NULL DEFAULT 'active',
+                    assigned_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_invigilator_quiz_admin UNIQUE (quiz_id, invigilator_id)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_invigilator_assignments_quiz_id ON invigilator_assignments(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_invigilator_assignments_invigilator_id ON invigilator_assignments(invigilator_id);",
+
+                # 2. Invigilator Activity Logs
+                """
+                CREATE TABLE IF NOT EXISTS invigilator_activity_logs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    assignment_id UUID REFERENCES invigilator_assignments(id) ON DELETE SET NULL,
+                    invigilator_id UUID NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    action VARCHAR(64) NOT NULL,
+                    details JSONB,
+                    ip_address VARCHAR(45),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_invigilator_activity_logs_quiz_id ON invigilator_activity_logs(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_invigilator_activity_logs_invigilator_id ON invigilator_activity_logs(invigilator_id);",
+
+                # 3. Examination Announcements
+                """
+                CREATE TABLE IF NOT EXISTS examination_announcements (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    sender_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    title VARCHAR(255) NOT NULL,
+                    message TEXT NOT NULL,
+                    announcement_type VARCHAR(32) NOT NULL DEFAULT 'general',
+                    target_scope VARCHAR(32) NOT NULL DEFAULT 'all_participants',
+                    target_participant_ids JSONB,
+                    requires_acknowledgement BOOLEAN NOT NULL DEFAULT false,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_examination_announcements_quiz_id ON examination_announcements(quiz_id);",
+
+                # 4. Announcement Acknowledgements
+                """
+                CREATE TABLE IF NOT EXISTS announcement_acknowledgements (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    announcement_id UUID NOT NULL REFERENCES examination_announcements(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    acknowledged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_announcement_student_ack UNIQUE (announcement_id, student_id)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_announcement_acknowledgements_announcement_id ON announcement_acknowledgements(announcement_id);",
+
+                # 5. Examination Incidents
+                """
+                CREATE TABLE IF NOT EXISTS examination_incidents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    incident_code VARCHAR(64) UNIQUE NOT NULL,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    category VARCHAR(64) NOT NULL,
+                    severity VARCHAR(32) NOT NULL DEFAULT 'medium',
+                    status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT NOT NULL,
+                    reported_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    assigned_to UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    resolution_notes TEXT,
+                    resolved_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_examination_incidents_quiz_id ON examination_incidents(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_examination_incidents_incident_code ON examination_incidents(incident_code);",
+
+                # 6. Incident Notes
+                """
+                CREATE TABLE IF NOT EXISTS examination_incident_notes (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    incident_id UUID NOT NULL REFERENCES examination_incidents(id) ON DELETE CASCADE,
+                    author_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    note TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_examination_incident_notes_incident_id ON examination_incident_notes(incident_id);",
+
+                # 7. Monitoring Alerts
+                """
+                CREATE TABLE IF NOT EXISTS monitoring_alerts (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    alert_type VARCHAR(64) NOT NULL,
+                    priority VARCHAR(32) NOT NULL DEFAULT 'MEDIUM',
+                    title VARCHAR(255) NOT NULL,
+                    details JSONB,
+                    is_acknowledged BOOLEAN NOT NULL DEFAULT false,
+                    acknowledged_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    acknowledged_at TIMESTAMPTZ,
+                    is_resolved BOOLEAN NOT NULL DEFAULT false,
+                    resolved_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    resolved_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_monitoring_alerts_quiz_id ON monitoring_alerts(quiz_id);",
+
+                # 8. Monitoring Interventions
+                """
+                CREATE TABLE IF NOT EXISTS monitoring_interventions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    action_type VARCHAR(64) NOT NULL,
+                    performed_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    target_type VARCHAR(32) NOT NULL DEFAULT 'all',
+                    target_id VARCHAR(128),
+                    reason TEXT NOT NULL,
+                    previous_state JSONB,
+                    new_state JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_monitoring_interventions_quiz_id ON monitoring_interventions(quiz_id);",
+
+                # 9. Examination Extension History
+                """
+                CREATE TABLE IF NOT EXISTS examination_extension_history (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    extended_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    extension_minutes INTEGER NOT NULL,
+                    previous_deadline TIMESTAMPTZ NOT NULL,
+                    new_deadline TIMESTAMPTZ NOT NULL,
+                    reason TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_examination_extension_history_quiz_id ON examination_extension_history(quiz_id);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"Monitoring schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 18 Live Monitoring schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Monitoring schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
