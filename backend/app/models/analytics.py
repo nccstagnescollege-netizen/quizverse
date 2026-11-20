@@ -42,7 +42,7 @@ class ReportExport(Base):
 
     id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     admin_id = Column(Uuid, ForeignKey("admins.id", ondelete="SET NULL"), nullable=True, index=True)
-    report_type = Column(String(64), nullable=False, index=True)  # examination_summary, student_performance, academic_performance, evaluation_summary, question_bank, examination_activity
+    report_type = Column(String(64), nullable=False, index=True)  # examination_summary, student_performance, academic_performance, evaluation_summary, question_bank, examination_activity, quiz_performance, detailed_student, question_analysis, time_analysis, security_summary
     export_format = Column(String(16), nullable=False)  # csv, xlsx, pdf
     status = Column(String(32), nullable=False, default="completed")  # pending, completed, failed
     file_name = Column(String(255), nullable=False)
@@ -91,4 +91,23 @@ class AnalyticsRefreshHistory(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
 
     # Relationships
+    admin = relationship("Admin")
+
+
+class QuestionReviewFlag(Base):
+    __tablename__ = "question_review_flags"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    quiz_question_id = Column(Uuid, ForeignKey("quiz_questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    admin_id = Column(Uuid, ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    flag_type = Column(String(64), nullable=False)  # low_accuracy, high_unanswered, weak_discrimination, rarely_selected_distractors
+    status = Column(String(32), nullable=False, default="pending")  # pending, reviewed, resolved, dismissed
+    internal_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
+
+    # Relationships
+    quiz = relationship("Quiz")
+    quiz_question = relationship("QuizQuestion")
     admin = relationship("Admin")

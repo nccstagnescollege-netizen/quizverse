@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Plus,
   Sliders,
+  BarChart3,
 } from 'lucide-react';
 import {
   quizPublishingService,
@@ -411,6 +412,17 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
                     >
                       <Clock className="w-4 h-4" />
                     </button>
+                  )}
+
+                  {/* Analytics Link */}
+                  {(quiz.status === 'published' || quiz.status === 'scheduled' || quiz.status === 'archived') && (
+                    <Link
+                      href={`${basePath}/quiz/${quiz.id}/analytics`}
+                      title="Individual Quiz Analytics & Student Performance"
+                      className="p-1.5 rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                    </Link>
                   )}
 
                   {/* Unpublish */}

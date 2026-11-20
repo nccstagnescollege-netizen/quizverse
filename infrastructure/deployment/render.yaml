@@ -20,5 +20,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: FRONTEND_URL
+        value: "https://quizverse-iota.vercel.app"
       - key: BACKEND_CORS_ORIGINS
-        value: "https://quizverse.vercel.app,http://localhost:3000"
+        value: "https://quizverse-iota.vercel.app,https://quizverse.vercel.app,http://localhost:3000,http://127.0.0.1:3000"

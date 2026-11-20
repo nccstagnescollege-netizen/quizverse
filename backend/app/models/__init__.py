@@ -92,6 +92,7 @@ from backend.app.models.analytics import (
     ReportExport,
     SavedReportConfig,
     AnalyticsRefreshHistory,
+    QuestionReviewFlag,
 )
 from backend.app.models.security_audit import (
     AuditLog,
@@ -182,11 +183,12 @@ __all__ = [
     "GradingAssignment",
     "EvaluationJob",
     "ResultCorrection",
-    # Analytics & Reports (Phase 16)
+    # Analytics & Reports (Phase 16 & 17)
     "AnalyticsSnapshot",
     "ReportExport",
     "SavedReportConfig",
     "AnalyticsRefreshHistory",
+    "QuestionReviewFlag",
     # Security & Audit
     "AuditLog",
     "SecurityEvent",

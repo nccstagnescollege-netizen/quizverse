@@ -207,7 +207,7 @@ export function QRCodeModal({ invitation, accessUrl, isOpen, onClose }: QRCodeMo
           {/* Quick Copy Link Box */}
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-surface-elevated border border-surface-border rounded-xl px-3 py-2 text-xs text-slate-300 font-mono truncate select-all">
-              {accessUrl}
+              {resolvedUrl}
             </div>
             <button
               onClick={handleCopy}

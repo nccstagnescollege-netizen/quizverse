@@ -18,6 +18,7 @@ from backend.app.api.v1.endpoints import (
     security,
     evaluation,
     analytics,
+    quiz_analytics,
 )
 
 api_router = APIRouter()
@@ -136,4 +137,11 @@ api_router.include_router(
     analytics.router,
     prefix="/analytics",
     tags=["Admin Analytics & Examination Reports"],
+)
+
+# 13. Individual Quiz Analytics & Detailed Student Performance (Phase 17)
+api_router.include_router(
+    quiz_analytics.router,
+    prefix="/analytics",
+    tags=["Individual Quiz Analytics & Student Performance"],
 )

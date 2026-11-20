@@ -346,6 +346,206 @@ class ReportService:
             return headers, rows
 
         # -------------------------------------------------------------
+        # G. Quiz Performance Report (Phase 17)
+        # -------------------------------------------------------------
+        elif report_type == "quiz_performance" and specific_quiz_id:
+            from backend.app.services.quiz_analytics_service import QuizAnalyticsService
+            overview = QuizAnalyticsService.get_overview(db, admin, specific_quiz_id)
+            info = overview.quiz_info
+
+            headers = [
+                "Quiz ID",
+                "Quiz Title",
+                "Subject",
+                "Duration (Mins)",
+                "Total Questions",
+                "Total Registered",
+                "Started Attempts",
+                "Submitted Attempts",
+                "Evaluations Completed",
+                "Pass Count",
+                "Fail Count",
+                "Average %",
+                "Highest %",
+                "Lowest %",
+                "Median %",
+                "Pass %",
+                "Completion Rate %",
+            ]
+            rows = [[
+                str(info.id)[:8],
+                info.title,
+                info.subject_name or "General",
+                info.duration_minutes,
+                info.total_questions,
+                overview.total_registered,
+                overview.started_attempts,
+                overview.submitted_attempts,
+                overview.completed_evaluations,
+                overview.pass_count,
+                overview.fail_count,
+                f"{overview.average_percentage}%",
+                f"{overview.highest_percentage}%",
+                f"{overview.lowest_percentage}%",
+                f"{overview.median_percentage}%",
+                f"{overview.pass_percentage}%",
+                f"{overview.completion_rate}%",
+            ]]
+            return headers, rows
+
+        # -------------------------------------------------------------
+        # H. Detailed Student Performance Report (Phase 17)
+        # -------------------------------------------------------------
+        elif report_type == "detailed_student" and specific_quiz_id:
+            from backend.app.services.quiz_analytics_service import QuizAnalyticsService
+            perf = QuizAnalyticsService.get_student_performance_table(db, admin, specific_quiz_id, page=1, limit=5000)
+
+            headers = [
+                "Rank",
+                "Student Name",
+                "Register Number",
+                "Programme",
+                "Class",
+                "Attempt #",
+                "Submission Status",
+                "Evaluation Status",
+                "Score Obtained",
+                "Max Marks",
+                "Percentage",
+                "Pass / Fail",
+                "Submission Time",
+            ]
+            rows = []
+            for item in perf.items:
+                pass_label = "Passed" if item.is_passed is True else ("Failed" if item.is_passed is False else "Pending")
+                sub_time = item.submission_time.strftime("%Y-%m-%d %H:%M") if item.submission_time else "In Progress"
+                rows.append([
+                    item.rank or "-",
+                    item.student_name,
+                    item.register_number or "-",
+                    item.programme_name or "-",
+                    item.class_name or "-",
+                    item.attempt_number,
+                    item.submission_status,
+                    item.evaluation_status,
+                    item.obtained_marks,
+                    item.max_marks,
+                    f"{item.percentage:.2f}%",
+                    pass_label,
+                    sub_time,
+                ])
+            return headers, rows
+
+        # -------------------------------------------------------------
+        # I. Question Analysis Report (Phase 17)
+        # -------------------------------------------------------------
+        elif report_type == "question_analysis" and specific_quiz_id:
+            from backend.app.services.quiz_analytics_service import QuizAnalyticsService
+            q_res = QuizAnalyticsService.get_question_analysis(db, admin, specific_quiz_id)
+
+            headers = [
+                "Order",
+                "Type",
+                "Question Text",
+                "Max Marks",
+                "Difficulty",
+                "Unit",
+                "Presentations",
+                "Responses",
+                "Correct",
+                "Accuracy %",
+                "Unanswered %",
+                "Difficulty Index (P)",
+                "Discrimination (D)",
+                "Review Flags",
+            ]
+            rows = []
+            for q in q_res.items:
+                d_val = f"{q.discrimination_index:.2f}" if q.discrimination_index is not None else "Insufficient Data"
+                rows.append([
+                    q.question_order,
+                    q.question_type,
+                    q.question_text[:80],
+                    q.max_marks,
+                    q.assigned_difficulty.capitalize(),
+                    q.unit or "Not classified",
+                    q.presentations_count,
+                    q.responses_count,
+                    q.correct_count,
+                    f"{q.correct_percentage:.1f}%",
+                    f"{q.unanswered_percentage:.1f}%",
+                    f"{q.difficulty_index:.2f}",
+                    d_val,
+                    "; ".join(q.review_flags) if q.review_flags else "None",
+                ])
+            return headers, rows
+
+        # -------------------------------------------------------------
+        # J. Academic Performance Report (Phase 17)
+        # -------------------------------------------------------------
+        elif report_type == "academic_performance" and specific_quiz_id:
+            from backend.app.services.quiz_analytics_service import QuizAnalyticsService
+            acad = QuizAnalyticsService.get_academic_analysis(db, admin, specific_quiz_id)
+
+            headers = [
+                "Category",
+                "Academic Component",
+                "Questions Count",
+                "Max Possible Marks",
+                "Average Accuracy %",
+                "Average Awarded Marks",
+                "Unanswered Rate %",
+            ]
+            rows = []
+            for u in acad.units:
+                rows.append(["Unit", u.name, u.questions_count, u.max_possible_marks, f"{u.average_accuracy_percentage}%", u.average_awarded_marks, f"{u.unanswered_rate}%"])
+            for c in acad.chapters:
+                rows.append(["Chapter", c.name, c.questions_count, c.max_possible_marks, f"{c.average_accuracy_percentage}%", c.average_awarded_marks, f"{c.unanswered_rate}%"])
+            for t in acad.topics:
+                rows.append(["Topic", t.name, t.questions_count, t.max_possible_marks, f"{t.average_accuracy_percentage}%", t.average_awarded_marks, f"{t.unanswered_rate}%"])
+            return headers, rows
+
+        # -------------------------------------------------------------
+        # K. Time Analysis Report (Phase 17)
+        # -------------------------------------------------------------
+        elif report_type == "time_analysis" and specific_quiz_id:
+            from backend.app.services.quiz_analytics_service import QuizAnalyticsService
+            t_data = QuizAnalyticsService.get_time_analysis(db, admin, specific_quiz_id)
+
+            headers = ["Metric", "Value", "Unit / Status"]
+            rows = [
+                ["Configured Duration", t_data.configured_duration_minutes, "Minutes"],
+                ["Average Time Spent", t_data.average_time_spent_seconds, "Seconds"],
+                ["Median Time Spent", t_data.median_time_spent_seconds, "Seconds"],
+                ["Average Time Remaining", t_data.average_time_remaining_seconds, "Seconds"],
+                ["Average Time Per Question", t_data.average_time_per_question_seconds, "Seconds"],
+                ["Longest Question Interaction", t_data.longest_question_seconds, "Seconds"],
+                ["Shortest Question Interaction", t_data.shortest_question_seconds, "Seconds"],
+                ["Data Reliability Status", t_data.data_reliability_label, "Telemetry Status"],
+            ]
+            return headers, rows
+
+        # -------------------------------------------------------------
+        # L. Security Summary Report (Phase 17)
+        # -------------------------------------------------------------
+        elif report_type == "security_summary" and specific_quiz_id:
+            from backend.app.services.quiz_analytics_service import QuizAnalyticsService
+            sec = QuizAnalyticsService.get_security_summary(db, admin, specific_quiz_id)
+
+            headers = ["Security Indicator", "Count / Value", "Severity Level"]
+            rows = [
+                ["Total Security Events", sec.total_security_events, "All Events"],
+                ["Low Severity Events", sec.low_severity_events, "Low"],
+                ["Medium Severity Events", sec.medium_severity_events, "Medium"],
+                ["High Severity Events", sec.high_severity_events, "High"],
+                ["Unreviewed Security Alerts", sec.unreviewed_alerts, "Pending Review"],
+                ["Resolved Security Alerts", sec.resolved_alerts, "Resolved"],
+                ["Overall Integrity Status", sec.integrity_status.replace("_", " ").title(), "Overall Risk"],
+                ["Attempts with Security Flags", sec.attempts_with_security_flags, "Affected Candidates"],
+            ]
+            return headers, rows
+
+        # -------------------------------------------------------------
         # F. Examination Activity Report
         # -------------------------------------------------------------
         else:
