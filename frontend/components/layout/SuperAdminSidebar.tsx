@@ -49,6 +49,7 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { label: 'Analytics', href: '/super-admin/analytics', icon: BarChart3 },
   { label: 'Reports & Exports', href: '/super-admin/analytics/reports', icon: FileSpreadsheet },
   { label: 'Live Monitoring', href: '/super-admin/monitoring', icon: Activity },
+  { label: 'System Audit & QA', href: '/super-admin/system/audit', icon: ShieldCheck, badge: 'Phase 19' },
   { label: 'Security Center', href: '/super-admin/admins?tab=security', icon: ShieldAlert },
   { label: 'Audit Logs', href: '/super-admin/admins?tab=audit', icon: FileText },
   { label: 'Platform Settings', href: '/admin/settings', icon: Settings },

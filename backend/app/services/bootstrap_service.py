@@ -659,3 +659,112 @@ def ensure_monitoring_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"Monitoring schema upgrade encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_system_audit_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 19 System Audit, Quality Assurance & Performance tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        if dialect_name == "postgresql":
+            ddl_statements = [
+                # 1. Audit Test Runs
+                """
+                CREATE TABLE IF NOT EXISTS audit_test_runs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    run_type VARCHAR(64) NOT NULL DEFAULT 'FULL_REGRESSION',
+                    runner VARCHAR(64) NOT NULL DEFAULT 'SYSTEM_AUDITOR',
+                    status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
+                    total_tests INTEGER NOT NULL DEFAULT 0,
+                    passed_tests INTEGER NOT NULL DEFAULT 0,
+                    failed_tests INTEGER NOT NULL DEFAULT 0,
+                    skipped_tests INTEGER NOT NULL DEFAULT 0,
+                    duration_seconds NUMERIC(8,2) NOT NULL DEFAULT 0.0,
+                    details JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_audit_test_runs_run_type ON audit_test_runs(run_type);",
+
+                # 2. Audit Findings
+                """
+                CREATE TABLE IF NOT EXISTS audit_findings (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    finding_code VARCHAR(64) UNIQUE NOT NULL,
+                    category VARCHAR(64) NOT NULL,
+                    severity VARCHAR(32) NOT NULL DEFAULT 'MEDIUM',
+                    affected_module VARCHAR(128) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT NOT NULL,
+                    reproduction_steps TEXT,
+                    evidence TEXT,
+                    root_cause TEXT,
+                    recommended_remediation TEXT,
+                    remediation_status VARCHAR(32) NOT NULL DEFAULT 'RESOLVED',
+                    remediation_notes TEXT,
+                    verified_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    retested_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_audit_findings_finding_code ON audit_findings(finding_code);",
+                "CREATE INDEX IF NOT EXISTS ix_audit_findings_severity ON audit_findings(severity);",
+                "CREATE INDEX IF NOT EXISTS ix_audit_findings_category ON audit_findings(category);",
+                "CREATE INDEX IF NOT EXISTS ix_audit_findings_remediation_status ON audit_findings(remediation_status);",
+
+                # 3. Load Test Benchmarks
+                """
+                CREATE TABLE IF NOT EXISTS load_test_benchmarks (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    scenario_name VARCHAR(128) NOT NULL,
+                    virtual_users INTEGER NOT NULL,
+                    duration_seconds INTEGER NOT NULL DEFAULT 30,
+                    total_requests INTEGER NOT NULL DEFAULT 0,
+                    successful_requests INTEGER NOT NULL DEFAULT 0,
+                    failed_requests INTEGER NOT NULL DEFAULT 0,
+                    requests_per_second NUMERIC(8,2) NOT NULL DEFAULT 0.0,
+                    latency_p50_ms NUMERIC(8,2) NOT NULL DEFAULT 0.0,
+                    latency_p95_ms NUMERIC(8,2) NOT NULL DEFAULT 0.0,
+                    latency_p99_ms NUMERIC(8,2) NOT NULL DEFAULT 0.0,
+                    latency_avg_ms NUMERIC(8,2) NOT NULL DEFAULT 0.0,
+                    error_rate_pct NUMERIC(5,2) NOT NULL DEFAULT 0.0,
+                    concurrency_target_met BOOLEAN NOT NULL DEFAULT true,
+                    bottleneck_identified VARCHAR(255),
+                    environment VARCHAR(64) NOT NULL DEFAULT 'STAGE_TEST',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_load_test_benchmarks_virtual_users ON load_test_benchmarks(virtual_users);",
+
+                # 4. Accessibility Audit Records
+                """
+                CREATE TABLE IF NOT EXISTS accessibility_audit_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    checkpoint_code VARCHAR(32) UNIQUE NOT NULL,
+                    checkpoint_name VARCHAR(255) NOT NULL,
+                    wcag_level VARCHAR(8) NOT NULL DEFAULT 'AA',
+                    category VARCHAR(64) NOT NULL,
+                    compliance_status VARCHAR(32) NOT NULL DEFAULT 'COMPLIANT',
+                    automated_score INTEGER NOT NULL DEFAULT 100,
+                    manual_verification_notes TEXT,
+                    tested_components JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_accessibility_audit_records_checkpoint_code ON accessibility_audit_records(checkpoint_code);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"System audit schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 19 System Audit & Quality Assurance schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"System audit schema upgrade encountered non-fatal error: {e}")
+        db.rollback()

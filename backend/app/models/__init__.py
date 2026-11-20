@@ -117,6 +117,12 @@ from backend.app.models.monitoring import (
     MonitoringIntervention,
     ExaminationExtensionHistory,
 )
+from backend.app.models.system_audit import (
+    AuditTestRun,
+    AuditFinding,
+    LoadTestBenchmark,
+    AccessibilityAuditRecord,
+)
 
 __all__ = [
     "Base",
@@ -220,4 +226,9 @@ __all__ = [
     "MonitoringAlert",
     "MonitoringIntervention",
     "ExaminationExtensionHistory",
+    # Quality Assurance, Security & Performance Audit (Phase 19)
+    "AuditTestRun",
+    "AuditFinding",
+    "LoadTestBenchmark",
+    "AccessibilityAuditRecord",
 ]

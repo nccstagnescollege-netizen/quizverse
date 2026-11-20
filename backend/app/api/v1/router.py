@@ -20,6 +20,7 @@ from backend.app.api.v1.endpoints import (
     analytics,
     quiz_analytics,
     monitoring,
+    system_audit,
 )
 
 api_router = APIRouter()
@@ -152,5 +153,12 @@ api_router.include_router(
     monitoring.router,
     prefix="/monitoring",
     tags=["Live Examination Monitoring & Invigilator Control Center"],
+)
+
+# 15. Complete Security Audit, Performance & Quality Assurance (Phase 19)
+api_router.include_router(
+    system_audit.router,
+    prefix="/system/audit",
+    tags=["System Audit, Security & Performance Benchmarks"],
 )
 

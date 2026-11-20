@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 import jwt
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, desc
 
 from backend.app.core.config import settings
 from backend.app.models.base import utc_now
