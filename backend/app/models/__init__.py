@@ -80,6 +80,12 @@ from backend.app.models.examination import (
 from backend.app.models.results import (
     ExaminationResult,
     QuestionEvaluation,
+    GradingRubric,
+    GradingCriterion,
+    GradingRubricVersion,
+    GradingAssignment,
+    EvaluationJob,
+    ResultCorrection,
 )
 from backend.app.models.analytics import (
     AnalyticsSnapshot,
@@ -164,9 +170,15 @@ __all__ = [
     "AttemptAnswer",
     "AttemptEvent",
     "AttemptSession",
-    # Results & Evaluation
+    # Results & Evaluation (Phase 15)
     "ExaminationResult",
     "QuestionEvaluation",
+    "GradingRubric",
+    "GradingCriterion",
+    "GradingRubricVersion",
+    "GradingAssignment",
+    "EvaluationJob",
+    "ResultCorrection",
     # Analytics
     "AnalyticsSnapshot",
     # Security & Audit

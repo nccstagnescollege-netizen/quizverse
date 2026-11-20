@@ -29,6 +29,7 @@ from backend.app.models.examination import (
     AttemptSession,
 )
 from backend.app.models.results import ExaminationResult, QuestionEvaluation
+from backend.app.services.evaluation_service import EvaluationService
 from backend.app.schemas.student_exam import (
     StudentExamLandingResponse,
     StudentExamInstructionsResponse,
@@ -78,6 +79,88 @@ def _filter_invitation_by_token(query, token: str):
     return query.filter(InvitationLink.token_hash == token_hash)
 
 
+def _resolve_invitation_or_quiz(db: Session, token: str, load_sections: bool = False):
+    """
+    Robustly resolves an InvitationLink from:
+    1. Cryptographic token hash
+    2. Invitation UUID
+    3. Quiz UUID (auto-links to active invitation or provisions one)
+    4. Quiz Slug (auto-links to active invitation or provisions one)
+    """
+    token_str = str(token).strip() if token else ""
+    token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(token_str)
+    except (ValueError, AttributeError):
+        parsed_uuid = None
+
+    opts = [
+        joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
+        joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
+    ]
+    if load_sections:
+        opts.append(joinedload(InvitationLink.quiz).joinedload(Quiz.sections).joinedload(QuizSection.questions))
+
+    base_query = db.query(InvitationLink).options(*opts)
+    if parsed_uuid:
+        inv = base_query.filter(or_(InvitationLink.token_hash == token_hash, InvitationLink.id == parsed_uuid)).first()
+    else:
+        inv = base_query.filter(InvitationLink.token_hash == token_hash).first()
+
+    if inv:
+        return inv
+
+    # Fallback to Quiz UUID or Slug
+    quiz_opts = [
+        joinedload(Quiz.subject),
+        joinedload(Quiz.configuration),
+    ]
+    if load_sections:
+        quiz_opts.append(joinedload(Quiz.sections).joinedload(QuizSection.questions))
+
+    quiz = None
+    if parsed_uuid:
+        quiz = db.query(Quiz).options(*quiz_opts).filter(Quiz.id == parsed_uuid).first()
+    if not quiz and token_str:
+        quiz = db.query(Quiz).options(*quiz_opts).filter(Quiz.slug == token_str).first()
+
+    if quiz:
+        if quiz.status == "draft":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The examination '{quiz.title}' is currently saved as a Draft. Please publish the quiz in the Quiz Management dashboard before starting attempts."
+            )
+        active_inv = db.query(InvitationLink).options(*opts).filter(
+            InvitationLink.quiz_id == quiz.id,
+            InvitationLink.is_revoked == False,
+        ).order_by(desc(InvitationLink.created_at)).first()
+
+        if not active_inv:
+            import secrets
+            raw_tok = secrets.token_urlsafe(32)
+            tok_hash = hashlib.sha256(raw_tok.encode("utf-8")).hexdigest()
+            active_inv = InvitationLink(
+                id=uuid.uuid4(),
+                quiz_id=quiz.id,
+                token_hash=tok_hash,
+                name=f"{quiz.title} - Official Invitation",
+                invitation_type="general",
+                category="Regular",
+                status="active",
+                max_uses=1000,
+                used_count=0,
+                is_reusable=True,
+            )
+            db.add(active_inv)
+            db.commit()
+            db.refresh(active_inv)
+
+        return active_inv
+
+    return None
+
+
 class StudentExamService:
 
     @staticmethod
@@ -102,78 +185,8 @@ class StudentExamService:
 
     @staticmethod
     def _evaluate_objective_scoring(db: Session, attempt: ExaminationAttempt, calculated_at: datetime):
-        """Internal helper: Computes objective question scores and records ExaminationResult."""
-        quiz = attempt.quiz
-        cfg = quiz.configuration
-        total_quiz_marks = float(quiz.total_marks or 100.0)
-        passing_pct = float(cfg.passing_percentage if cfg else 40.0)
-
-        answers_by_qq = {a.quiz_question_id: a for a in attempt.answers}
-        total_correct = 0
-        total_incorrect = 0
-        total_unanswered = 0
-        earned_marks = 0.0
-
-        for qq in quiz.quiz_questions:
-            snap = qq.question_snapshot or {}
-            ans = answers_by_qq.get(qq.id)
-
-            if not ans or (not ans.selected_option_ids and not (ans.text_response and ans.text_response.strip())):
-                total_unanswered += 1
-                continue
-
-            qtype = snap.get("question_type")
-            q_marks = float(qq.marks or snap.get("marks") or 1.0)
-            q_neg_marks = float(qq.negative_marks or snap.get("negative_marks") or 0.0)
-
-            # Evaluate objective questions (single_choice, multiple_choice, true_false)
-            if qtype in ["single_choice", "true_false", "multiple_choice"]:
-                correct_opts = []
-                for opt in snap.get("options") or []:
-                    if opt.get("is_correct"):
-                        correct_opts.append(str(opt.get("id") or opt.get("option_id")))
-                if not correct_opts and snap.get("correct_answers"):
-                    correct_opts = [str(x) for x in snap.get("correct_answers")]
-
-                user_selected = [str(x) for x in (ans.selected_option_ids or [])]
-
-                if sorted(user_selected) == sorted(correct_opts) and len(correct_opts) > 0:
-                    total_correct += 1
-                    earned_marks += q_marks
-                else:
-                    total_incorrect += 1
-                    earned_marks -= q_neg_marks
-
-        if total_quiz_marks > 0:
-            pct = round((earned_marks / total_quiz_marks) * 100.0, 2)
-        else:
-            pct = 0.0
-
-        is_passed = (pct >= passing_pct)
-
-        existing_res = db.query(ExaminationResult).filter(ExaminationResult.attempt_id == attempt.id).first()
-        if existing_res:
-            existing_res.score = earned_marks
-            existing_res.percentage = pct
-            existing_res.is_passed = is_passed
-            existing_res.total_correct = total_correct
-            existing_res.total_incorrect = total_incorrect
-            existing_res.total_unanswered = total_unanswered
-            existing_res.calculated_at = calculated_at
-        else:
-            exam_res = ExaminationResult(
-                attempt_id=attempt.id,
-                quiz_id=quiz.id,
-                student_id=attempt.student_id,
-                score=earned_marks,
-                percentage=pct,
-                is_passed=is_passed,
-                total_correct=total_correct,
-                total_incorrect=total_incorrect,
-                total_unanswered=total_unanswered,
-                calculated_at=calculated_at,
-            )
-            db.add(exam_res)
+        """Internal helper: Computes objective question scores and records ExaminationResult via EvaluationService."""
+        EvaluationService.run_evaluation(db, attempt.id)
 
     @staticmethod
     def _auto_expire_and_submit_attempt(
@@ -253,12 +266,7 @@ class StudentExamService:
         Fetches examination metadata, verifies invitation and schedule eligibility,
         and determines allowed actions based on registration and attempt status.
         """
-        base_query = db.query(InvitationLink).options(
-            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.sections).joinedload(QuizSection.questions),
-        )
-        inv = _filter_invitation_by_token(base_query, token).first()
+        inv = _resolve_invitation_or_quiz(db, token, load_sections=True)
 
         if not inv:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid examination invitation token")
@@ -413,12 +421,7 @@ class StudentExamService:
         Retrieves detailed instructions, rules, section breakdown, and selection guidelines
         configured for the examination.
         """
-        base_query = db.query(InvitationLink).options(
-            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.sections).joinedload(QuizSection.questions),
-        )
-        inv = _filter_invitation_by_token(base_query, token).first()
+        inv = _resolve_invitation_or_quiz(db, token, load_sections=True)
 
         if not inv or not inv.quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invitation token")
@@ -517,10 +520,7 @@ class StudentExamService:
         - Creates a new attempt if within max_attempts
         - Generates signed JWT session token
         """
-        base_query = db.query(InvitationLink).options(
-            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        )
-        inv = _filter_invitation_by_token(base_query, token).first()
+        inv = _resolve_invitation_or_quiz(db, token, load_sections=False)
 
         if not inv or not inv.quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invitation token")
@@ -1680,81 +1680,8 @@ class StudentExamService:
         if participant:
             participant.attempt_count += 1
 
-        # Preliminary scoring evaluation
-        quiz = attempt.quiz
-        cfg = quiz.configuration
-        total_quiz_marks = float(quiz.total_marks or 100.0)
-        passing_pct = float(cfg.passing_percentage if cfg else 40.0)
-
-        # Compute objective question evaluation
-        answers_by_qq = {a.quiz_question_id: a for a in attempt.answers}
-        total_correct = 0
-        total_incorrect = 0
-        total_unanswered = 0
-        earned_marks = 0.0
-
-        for qq in quiz.quiz_questions:
-            snap = qq.question_snapshot or {}
-            ans = answers_by_qq.get(qq.id)
-
-            if not ans or (not ans.selected_option_ids and not (ans.text_response and ans.text_response.strip())):
-                total_unanswered += 1
-                continue
-
-            qtype = snap.get("question_type")
-            q_marks = float(qq.marks or snap.get("marks") or 1.0)
-            q_neg_marks = float(qq.negative_marks or snap.get("negative_marks") or 0.0)
-
-            # Evaluate objective questions (single_choice, multiple_choice, true_false)
-            if qtype in ["single_choice", "true_false", "multiple_choice"]:
-                # Correct options from snapshot
-                correct_opts = []
-                for opt in snap.get("options") or []:
-                    if opt.get("is_correct"):
-                        correct_opts.append(str(opt.get("id") or opt.get("option_id")))
-                if not correct_opts and snap.get("correct_answers"):
-                    correct_opts = [str(x) for x in snap.get("correct_answers")]
-
-                user_selected = [str(x) for x in (ans.selected_option_ids or [])]
-
-                if sorted(user_selected) == sorted(correct_opts) and len(correct_opts) > 0:
-                    total_correct += 1
-                    earned_marks += q_marks
-                else:
-                    total_incorrect += 1
-                    earned_marks -= q_neg_marks
-
-        if total_quiz_marks > 0:
-            pct = round((earned_marks / total_quiz_marks) * 100.0, 2)
-        else:
-            pct = 0.0
-
-        is_passed = (pct >= passing_pct)
-
-        # Upsert ExaminationResult
-        existing_res = db.query(ExaminationResult).filter(ExaminationResult.attempt_id == attempt.id).first()
-        if existing_res:
-            existing_res.score = earned_marks
-            existing_res.percentage = pct
-            existing_res.is_passed = is_passed
-            existing_res.total_correct = total_correct
-            existing_res.total_incorrect = total_incorrect
-            existing_res.total_unanswered = total_unanswered
-            existing_res.calculated_at = now
-        else:
-            exam_res = ExaminationResult(
-                attempt_id=attempt.id,
-                quiz_id=quiz.id,
-                student_id=attempt.student_id,
-                score=earned_marks,
-                percentage=pct,
-                is_passed=is_passed,
-                total_correct=total_correct,
-                total_incorrect=total_incorrect,
-                total_unanswered=total_unanswered,
-                calculated_at=now,
-            )
-            db.add(exam_res)
+        # Authoritative scoring evaluation via Phase 15 Evaluation Engine
+        EvaluationService.run_evaluation(db, attempt.id)
 
         db.add(AttemptEvent(
             attempt_id=attempt.id,
@@ -1871,4 +1798,5 @@ class StudentExamService:
             total_correct=res.total_correct,
             total_incorrect=res.total_incorrect,
             total_unanswered=res.total_unanswered,
+            sections_breakdown=res.section_scores,
         )

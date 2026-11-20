@@ -152,26 +152,60 @@ export default function PublicRegistrationPage() {
 
   // 2. Invalid / Expired / Revoked / Exhausted State
   if (!validation || !validation.is_valid) {
+    const isDraft = validation?.error_code === 'QUIZ_DRAFT';
+
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/30 p-6 sm:p-8 text-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
-            <Lock className="w-7 h-7" />
+        <div
+          className={`max-w-md w-full glass-card rounded-2xl border p-6 sm:p-8 text-center space-y-4 ${
+            isDraft ? 'border-amber-500/30' : 'border-rose-500/30'
+          }`}
+        >
+          <div
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto border ${
+              isDraft
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+            }`}
+          >
+            {isDraft ? <AlertCircle className="w-7 h-7" /> : <Lock className="w-7 h-7" />}
           </div>
 
           <div className="space-y-1.5">
-            <h1 className="text-lg font-bold text-white">Invitation Unavailable</h1>
-            <span className="inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">
+            <h1 className="text-lg font-bold text-white">
+              {isDraft ? 'Examination in Draft Status' : 'Invitation Unavailable'}
+            </h1>
+            <span
+              className={`inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+                isDraft
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+              }`}
+            >
               Code: {validation?.error_code || 'INVALID_LINK'}
             </span>
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed">
-            {validation?.error_message || 'This examination link is invalid, expired, revoked, or has reached maximum candidate capacity.'}
+            {validation?.error_message ||
+              'This examination link is invalid, expired, revoked, or has reached maximum candidate capacity.'}
           </p>
 
+          {isDraft && (
+            <div className="pt-2">
+              <a
+                href="/admin/quiz/manage"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-colors"
+              >
+                Go to Quiz Management to Publish
+              </a>
+            </div>
+          )}
+
           <div className="pt-4 border-t border-surface-border text-[11px] text-slate-400">
-            Please contact your course instructor or exam administrator to request a valid invitation token.
+            {isDraft
+              ? 'Instructors & Administrators: Publish the quiz to make it accessible to students.'
+              : 'Please contact your course instructor or exam administrator to request a valid invitation token.'}
           </div>
         </div>
       </div>

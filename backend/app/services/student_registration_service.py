@@ -45,6 +45,110 @@ def _filter_invitation_by_token(query, token: str):
     return query.filter(InvitationLink.token_hash == token_hash)
 
 
+def resolve_invitation_or_quiz(
+    db: Session, token: str, for_update: bool = False
+) -> Tuple[Optional[InvitationLink], Optional[str], Optional[str]]:
+    """
+    Robustly resolves an invitation link or quiz from:
+    1. Cryptographic token hash (raw token)
+    2. Invitation UUID (invitation.id)
+    3. Quiz UUID (quiz.id)
+    4. Quiz Slug (quiz.slug)
+
+    Returns (invitation, error_code, error_message).
+    """
+    token_str = str(token).strip() if token else ""
+    token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(token_str)
+    except (ValueError, AttributeError):
+        parsed_uuid = None
+
+    base_query = db.query(InvitationLink).options(
+        joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
+        joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
+    )
+    if parsed_uuid:
+        inv_query = base_query.filter(or_(InvitationLink.token_hash == token_hash, InvitationLink.id == parsed_uuid))
+    else:
+        inv_query = base_query.filter(InvitationLink.token_hash == token_hash)
+
+    if for_update:
+        inv = inv_query.with_for_update().first()
+    else:
+        inv = inv_query.first()
+
+    if inv:
+        return inv, None, None
+
+    # Fallback: check if token represents a Quiz UUID or Quiz Slug
+    quiz = None
+    if parsed_uuid:
+        quiz = db.query(Quiz).options(
+            joinedload(Quiz.subject),
+            joinedload(Quiz.configuration),
+        ).filter(Quiz.id == parsed_uuid).first()
+    if not quiz and token_str:
+        quiz = db.query(Quiz).options(
+            joinedload(Quiz.subject),
+            joinedload(Quiz.configuration),
+        ).filter(Quiz.slug == token_str).first()
+
+    if quiz:
+        if quiz.status == "draft":
+            return (
+                None,
+                "QUIZ_DRAFT",
+                f"The examination '{quiz.title}' is currently saved as a Draft. Please publish the quiz in the Quiz Management dashboard before inviting candidates.",
+            )
+        if quiz.status not in ["published", "scheduled"]:
+            return (
+                None,
+                "QUIZ_INELIGIBLE",
+                "The associated examination is currently not open for candidate registration.",
+            )
+
+        # Look for existing active invitation for this published quiz
+        active_query = db.query(InvitationLink).options(
+            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
+            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
+        ).filter(
+            InvitationLink.quiz_id == quiz.id,
+            InvitationLink.is_revoked == False,
+        ).order_by(desc(InvitationLink.created_at))
+
+        if for_update:
+            active_inv = active_query.with_for_update().first()
+        else:
+            active_inv = active_query.first()
+
+        if not active_inv:
+            # Auto-provision a default official invitation so candidates can enter seamlessly
+            import secrets
+            raw_tok = secrets.token_urlsafe(32)
+            tok_hash = hashlib.sha256(raw_tok.encode("utf-8")).hexdigest()
+            active_inv = InvitationLink(
+                id=uuid.uuid4(),
+                quiz_id=quiz.id,
+                token_hash=tok_hash,
+                name=f"{quiz.title} - Official Invitation",
+                invitation_type="general",
+                category="Regular",
+                status="active",
+                max_uses=1000,
+                used_count=0,
+                is_reusable=True,
+            )
+            db.add(active_inv)
+            db.commit()
+            db.refresh(active_inv)
+
+        return active_inv, None, None
+
+    return None, "INVALID", "The invitation link is invalid or does not exist."
+
+
 DEFAULT_REGISTRATION_FIELDS: List[Dict[str, Any]] = [
     {
         "field_name": "full_name",
@@ -244,17 +348,13 @@ class StudentRegistrationService:
         Validates token hash or invitation ID, status, expiration, quotas, and quiz eligibility.
         Never reveals whether candidate records exist.
         """
-        base_query = db.query(InvitationLink).options(
-            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        )
-        inv = _filter_invitation_by_token(base_query, token).first()
+        inv, err_code, err_msg = resolve_invitation_or_quiz(db, token, for_update=False)
 
         if not inv:
             return PublicInvitationValidationResponse(
                 is_valid=False,
-                error_code="INVALID",
-                error_message="The invitation link is invalid or does not exist."
+                error_code=err_code or "INVALID",
+                error_message=err_msg or "The invitation link is invalid or does not exist."
             )
 
         if inv.is_revoked:
@@ -338,15 +438,13 @@ class StudentRegistrationService:
         - Creates QuizParticipant
         - Logs InvitationUsage
         """
-        # Atomic lock on invitation row (by token hash or UUID id)
-        base_query = db.query(InvitationLink).options(
-            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        )
-        inv = _filter_invitation_by_token(base_query, token).with_for_update().first()
+        inv, err_code, err_msg = resolve_invitation_or_quiz(db, token, for_update=True)
 
         if not inv:
-            raise HTTPException(status_code=404, detail="Invalid invitation token")
+            raise HTTPException(
+                status_code=400 if err_code == "QUIZ_DRAFT" else 404,
+                detail=err_msg or "Invalid invitation token",
+            )
 
         if inv.is_revoked:
             raise HTTPException(status_code=400, detail="This invitation link has been revoked")

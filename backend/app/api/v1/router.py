@@ -16,6 +16,7 @@ from backend.app.api.v1.endpoints import (
     public_registration,
     student_exam,
     security,
+    evaluation,
 )
 
 api_router = APIRouter()
@@ -110,4 +111,21 @@ api_router.include_router(
     security.router,
     prefix="/security",
     tags=["Advanced Examination Security & Anti-Cheating"],
+)
+
+# 11. Evaluation, Manual Grading & Results Management (Phase 15)
+api_router.include_router(
+    evaluation.evaluations_router,
+    prefix="/evaluations",
+    tags=["Evaluation Jobs & Tasks"],
+)
+api_router.include_router(
+    evaluation.grading_router,
+    prefix="/grading",
+    tags=["Manual Grading Workspace & Rubrics"],
+)
+api_router.include_router(
+    evaluation.results_router,
+    prefix="/results",
+    tags=["Results Management, Approval & Publication"],
 )

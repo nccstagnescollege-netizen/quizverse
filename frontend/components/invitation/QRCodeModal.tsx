@@ -27,12 +27,21 @@ interface QRCodeModalProps {
 export function QRCodeModal({ invitation, accessUrl, isOpen, onClose }: QRCodeModalProps) {
   const [copied, setCopied] = useState(false);
   const [highContrast, setHighContrast] = useState(false);
+  const [domainMode, setDomainMode] = useState<'production' | 'current'>('production');
   const printRef = useRef<HTMLDivElement>(null);
+
+  const resolvedUrl = React.useMemo(() => {
+    if (!accessUrl) return '';
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const prodUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quizverse-iota.vercel.app';
+    const targetOrigin = domainMode === 'production' ? prodUrl : currentOrigin;
+    return accessUrl.replace(/https?:\/\/[^/]+/, targetOrigin);
+  }, [accessUrl, domainMode]);
 
   if (!isOpen) return null;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(accessUrl);
+    navigator.clipboard.writeText(resolvedUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -71,14 +80,14 @@ export function QRCodeModal({ invitation, accessUrl, isOpen, onClose }: QRCodeMo
       <div className="hidden">
         <QRCodeCanvas
           id="qr-canvas-download"
-          value={accessUrl}
+          value={resolvedUrl}
           size={1024}
           level="H"
           includeMargin={true}
         />
         <QRCodeSVG
           id="qr-svg-download"
-          value={accessUrl}
+          value={resolvedUrl}
           size={1024}
           level="H"
           includeMargin={true}
@@ -131,7 +140,7 @@ export function QRCodeModal({ invitation, accessUrl, isOpen, onClose }: QRCodeMo
           {/* QR Container */}
           <div className="p-3.5 bg-white rounded-xl shadow-md border border-slate-200 flex items-center justify-center">
             <QRCodeSVG
-              value={accessUrl}
+              value={resolvedUrl}
               size={180}
               level="H"
               includeMargin={false}
@@ -142,11 +151,37 @@ export function QRCodeModal({ invitation, accessUrl, isOpen, onClose }: QRCodeMo
 
           {/* Details below QR */}
           <div className="mt-4 text-center space-y-1 w-full max-w-xs">
-            <span className="text-[11px] font-mono tracking-wide text-slate-400 uppercase">
-              Scan to Register & Access
-            </span>
+            <div className="flex items-center justify-between text-[11px] mb-1">
+              <span className="font-mono tracking-wide text-slate-400 uppercase">
+                Target Domain:
+              </span>
+              <div className="flex items-center bg-slate-950 border border-slate-700/60 rounded-lg p-0.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setDomainMode('production')}
+                  className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                    domainMode === 'production'
+                      ? 'bg-cyan-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Vercel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDomainMode('current')}
+                  className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                    domainMode === 'current'
+                      ? 'bg-cyan-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Localhost
+                </button>
+              </div>
+            </div>
             <p className="text-xs font-medium break-all select-all font-mono py-1 px-2 rounded bg-slate-800/40 border border-slate-700/50 mt-1">
-              {accessUrl}
+              {resolvedUrl}
             </p>
           </div>
 

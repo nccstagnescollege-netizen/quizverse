@@ -175,3 +175,168 @@ def ensure_security_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"Schema upgrade check encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_evaluation_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 15 evaluation, grading & results tables and columns exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        if dialect_name == "postgresql":
+            ddl_statements = [
+                # Examination results columns
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS maximum_marks NUMERIC(8,2) DEFAULT 100.00;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS passing_marks NUMERIC(8,2);",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS objective_marks NUMERIC(8,2) DEFAULT 0.00;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS manual_marks NUMERIC(8,2) DEFAULT 0.00;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS negative_marks NUMERIC(8,2) DEFAULT 0.00;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS evaluation_status VARCHAR(32) DEFAULT 'RESULT_READY';",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS section_scores JSONB;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES admins(id) ON DELETE SET NULL;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS approval_notes TEXT;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS published_by UUID REFERENCES admins(id) ON DELETE SET NULL;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS scoring_policy_snapshot JSONB;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS result_version INTEGER DEFAULT 1;",
+                "ALTER TABLE examination_results ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();",
+
+                # Question evaluations columns
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS attempt_answer_id UUID REFERENCES attempt_answers(id) ON DELETE SET NULL;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS max_marks NUMERIC(6,2) DEFAULT 1.00;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS negative_deduction NUMERIC(6,2) DEFAULT 0.00;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS evaluation_type VARCHAR(32) DEFAULT 'auto_objective';",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS scoring_reason TEXT;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS private_notes TEXT;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS evaluator_id UUID REFERENCES admins(id) ON DELETE SET NULL;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS rubric_id UUID;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS rubric_version INTEGER;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS criterion_scores JSONB;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS is_flagged_for_moderation BOOLEAN DEFAULT false;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS moderator_id UUID REFERENCES admins(id) ON DELETE SET NULL;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(32);",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS override_reason TEXT;",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS original_marks NUMERIC(6,2);",
+                "ALTER TABLE question_evaluations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();",
+
+                # Grading Rubrics
+                """
+                CREATE TABLE IF NOT EXISTS grading_rubrics (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    applicable_question_types JSONB NOT NULL DEFAULT '[]',
+                    total_max_marks NUMERIC(6,2) NOT NULL DEFAULT 10.00,
+                    status VARCHAR(32) NOT NULL DEFAULT 'approved',
+                    version INTEGER NOT NULL DEFAULT 1,
+                    grading_instructions TEXT,
+                    created_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+
+                # Grading Criteria
+                """
+                CREATE TABLE IF NOT EXISTS grading_criteria (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    rubric_id UUID NOT NULL REFERENCES grading_rubrics(id) ON DELETE CASCADE,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    max_marks NUMERIC(6,2) NOT NULL DEFAULT 2.00,
+                    criterion_order INTEGER NOT NULL DEFAULT 0,
+                    partial_credit_levels JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+
+                # Grading Rubric Versions
+                """
+                CREATE TABLE IF NOT EXISTS grading_rubric_versions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    rubric_id UUID NOT NULL REFERENCES grading_rubrics(id) ON DELETE CASCADE,
+                    version_number INTEGER NOT NULL,
+                    snapshot_data JSONB NOT NULL,
+                    created_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+
+                # Grading Assignments
+                """
+                CREATE TABLE IF NOT EXISTS grading_assignments (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    evaluator_id UUID NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+                    assigned_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    assignment_scope VARCHAR(32) NOT NULL DEFAULT 'all',
+                    target_section_id UUID REFERENCES quiz_sections(id) ON DELETE CASCADE,
+                    target_quiz_question_id UUID REFERENCES quiz_questions(id) ON DELETE CASCADE,
+                    target_student_group VARCHAR(64),
+                    target_attempt_id UUID REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    anonymous_grading BOOLEAN NOT NULL DEFAULT false,
+                    deadline_at TIMESTAMPTZ,
+                    status VARCHAR(32) NOT NULL DEFAULT 'active',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+
+                # Evaluation Jobs
+                """
+                CREATE TABLE IF NOT EXISTS evaluation_jobs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID UNIQUE NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                    total_questions INTEGER NOT NULL DEFAULT 0,
+                    auto_evaluated_count INTEGER NOT NULL DEFAULT 0,
+                    manual_eval_count INTEGER NOT NULL DEFAULT 0,
+                    manual_eval_completed INTEGER NOT NULL DEFAULT 0,
+                    error_message TEXT,
+                    retry_count INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    completed_at TIMESTAMPTZ
+                );
+                """,
+
+                # Result Corrections
+                """
+                CREATE TABLE IF NOT EXISTS result_corrections (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    result_id UUID NOT NULL REFERENCES examination_results(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    previous_score NUMERIC(8,2) NOT NULL,
+                    new_score NUMERIC(8,2) NOT NULL,
+                    previous_percentage NUMERIC(5,2) NOT NULL,
+                    new_percentage NUMERIC(5,2) NOT NULL,
+                    previous_status VARCHAR(32),
+                    new_status VARCHAR(32),
+                    reason TEXT NOT NULL,
+                    corrected_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    correction_type VARCHAR(32) NOT NULL DEFAULT 'manual_override',
+                    snapshot_before JSONB,
+                    snapshot_after JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"DDL statement executed with note: {ex}")
+            db.commit()
+            logger.info("Phase 15 Evaluation, Manual Grading & Results schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Evaluation schema upgrade check encountered non-fatal error: {e}")
+        db.rollback()

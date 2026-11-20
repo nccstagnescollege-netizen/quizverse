@@ -131,7 +131,7 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
       .filter(Boolean);
 
     try {
-      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const prodUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quizverse-iota.vercel.app';
       const result = await invitationService.createInvitation(token, {
         quiz_id: selectedQuiz.id,
         name: name.trim(),
@@ -149,12 +149,9 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
         starts_at: startsAt ? new Date(startsAt).toISOString() : null,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         timezone,
-        base_url: currentOrigin,
+        base_url: prodUrl,
       });
 
-      if (currentOrigin && result.access_url && result.access_url.includes('localhost')) {
-        result.access_url = result.access_url.replace(/https?:\/\/localhost(:\d+)?/, currentOrigin);
-      }
       setGeneratedResult(result);
     } catch (err: any) {
       setError(err.message || 'Failed to generate invitation');
@@ -163,14 +160,15 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
     }
   };
 
+  const [domainMode, setDomainMode] = useState<'production' | 'current'>('production');
+
   const effectiveAccessUrl = useMemo(() => {
     if (!generatedResult?.access_url) return '';
-    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-    if (currentOrigin && generatedResult.access_url.includes('localhost')) {
-      return generatedResult.access_url.replace(/https?:\/\/localhost(:\d+)?/, currentOrigin);
-    }
-    return generatedResult.access_url;
-  }, [generatedResult]);
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const prodUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quizverse-iota.vercel.app';
+    const targetOrigin = domainMode === 'production' ? prodUrl : currentOrigin;
+    return generatedResult.access_url.replace(/https?:\/\/[^/]+/, targetOrigin);
+  }, [generatedResult, domainMode]);
 
   const handleCopyLink = () => {
     if (!effectiveAccessUrl) return;
@@ -221,7 +219,33 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
             </div>
 
             <div className="w-full max-w-md space-y-2">
-              <span className="text-[11px] font-medium text-slate-400">Direct Invitation URL:</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-slate-400">Direct Invitation URL:</span>
+                <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setDomainMode('production')}
+                    className={`px-2.5 py-0.5 rounded font-semibold transition-colors ${
+                      domainMode === 'production'
+                        ? 'bg-cyan-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Vercel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDomainMode('current')}
+                    className={`px-2.5 py-0.5 rounded font-semibold transition-colors ${
+                      domainMode === 'current'
+                        ? 'bg-cyan-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Localhost
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 truncate select-all">
                   {effectiveAccessUrl}

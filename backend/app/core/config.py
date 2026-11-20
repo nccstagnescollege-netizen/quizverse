@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # CORS Configuration
-    FRONTEND_URL: Optional[str] = "https://quizverse.vercel.app"
+    FRONTEND_URL: Optional[str] = "https://quizverse-iota.vercel.app"
     BACKEND_CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
 
     # Super Admin Bootstrap Settings
-    SUPER_ADMIN_DEFAULT_EMAIL: str = "superadmin@quizverse.io"
-    SUPER_ADMIN_DEFAULT_PASSWORD: str = "QuizverseSuperAdmin2026!"
+    SUPER_ADMIN_DEFAULT_EMAIL: str = "dhanush10607@gmail.com"
+    SUPER_ADMIN_DEFAULT_PASSWORD: str = "Dhanush@062007"
     SUPER_ADMIN_DEFAULT_NAME: str = "System Super Administrator"
 
     @property

@@ -37,11 +37,16 @@ async def lifespan(app: FastAPI):
     # Attempt server-side super admin bootstrap if database is accessible
     try:
         from backend.app.core.database import SessionLocal
-        from backend.app.services.bootstrap_service import ensure_super_admin_exists, ensure_security_schema_exists
+        from backend.app.services.bootstrap_service import (
+            ensure_super_admin_exists,
+            ensure_security_schema_exists,
+            ensure_evaluation_schema_exists,
+        )
         if SessionLocal:
             with SessionLocal() as db:
                 ensure_super_admin_exists(db)
                 ensure_security_schema_exists(db)
+                ensure_evaluation_schema_exists(db)
     except Exception as e:
         logger.warning(f"Super admin bootstrap deferred or skipped: {e}")
 

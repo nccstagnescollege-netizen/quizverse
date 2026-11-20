@@ -96,25 +96,33 @@ class InvitationService:
 
     @staticmethod
     def _get_base_url(req_base_url: Optional[str] = None, request: Optional[Request] = None) -> str:
+        frontend_url = getattr(settings, "FRONTEND_URL", None)
+
         # 1. Explicitly passed in payload or function argument
         if req_base_url and req_base_url.strip():
-            return req_base_url.strip().rstrip("/")
+            url = req_base_url.strip().rstrip("/")
+            if "localhost" not in url:
+                return url
+            # If localhost was passed, prefer configured FRONTEND_URL for public sharing
+            if frontend_url:
+                return frontend_url.rstrip("/")
+            return url
 
         # 2. Extract from request Origin or Referer header (sent by browsers on web requests)
         if request:
             origin = request.headers.get("origin")
-            if origin and origin.strip():
+            if origin and origin.strip() and "localhost" not in origin:
                 return origin.strip().rstrip("/")
             referer = request.headers.get("referer")
-            if referer and referer.strip():
+            if referer and referer.strip() and "localhost" not in referer:
                 from urllib.parse import urlparse
                 parsed = urlparse(referer)
                 if parsed.scheme and parsed.netloc:
                     return f"{parsed.scheme}://{parsed.netloc}"
 
         # 3. Environment configuration settings.FRONTEND_URL
-        if getattr(settings, "FRONTEND_URL", None):
-            return settings.FRONTEND_URL.rstrip("/")
+        if frontend_url:
+            return frontend_url.rstrip("/")
 
         # 4. Fallback to production CORS origin if present
         cors = getattr(settings, "BACKEND_CORS_ORIGINS", None)
