@@ -271,18 +271,25 @@ export const studentExamService = {
     token: string,
     payload: { registration_code?: string; student_identifier?: string; email?: string }
   ): Promise<StudentExamStartResult> {
-    const res = await fetch(`${API_BASE_URL}/student/exams/${token}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || err.detail || 'Failed to start examination');
+    try {
+      const res = await fetch(`${API_BASE_URL}/student/exams/${token}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || err.detail || 'Failed to start examination');
+      }
+      const data: StudentExamStartResult = await res.json();
+      this.setSession(token, data.attempt_id, data.session_token, payload.registration_code);
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' || err.message?.includes('fetch') || err.message?.includes('Failed to fetch')) {
+        throw new Error('Connection failed: The backend server is currently spinning up from cold sleep or completing deployment. Please wait a few seconds and try again.');
+      }
+      throw err;
     }
-    const data: StudentExamStartResult = await res.json();
-    this.setSession(token, data.attempt_id, data.session_token, payload.registration_code);
-    return data;
   },
 
   async getAttemptQuestions(attemptId: string, sessionToken: string): Promise<StudentAttemptDetail> {
