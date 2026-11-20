@@ -470,6 +470,12 @@ def ensure_examination_schema_exists(db: Session) -> None:
                 """,
                 "CREATE INDEX IF NOT EXISTS ix_attempt_sessions_attempt_id ON attempt_sessions(attempt_id);",
                 "CREATE INDEX IF NOT EXISTS ix_attempt_sessions_session_token_hash ON attempt_sessions(session_token_hash);",
+
+                # 4. attempt_events columns & indexes
+                "ALTER TABLE attempt_events ADD COLUMN IF NOT EXISTS actor_type VARCHAR(32) NOT NULL DEFAULT 'student';",
+                "ALTER TABLE attempt_events ADD COLUMN IF NOT EXISTS actor_id VARCHAR(64);",
+                "CREATE INDEX IF NOT EXISTS ix_attempt_events_attempt_id ON attempt_events(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_attempt_events_occurred_at ON attempt_events(occurred_at);",
             ]
             for stmt in ddl_statements:
                 try:
