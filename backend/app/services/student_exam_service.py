@@ -1748,31 +1748,8 @@ class StudentExamService:
         return count
 
     @staticmethod
-    def get_attempt_result(
-        db: Session,
-        attempt_id: uuid.UUID,
-        session_student_id: uuid.UUID,
-    ) -> StudentResultResponse:
-        """
-        Retrieves result if permitted according to Phase 10 visibility settings.
-        PROTECTION: Never exposes answer keys or explanations when restricted!
-        """
-        attempt = db.query(ExaminationAttempt).options(
-            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.configuration),
-            joinedload(ExaminationAttempt.student).joinedload(Student.profile),
-            joinedload(ExaminationAttempt.result),
-        ).filter(ExaminationAttempt.id == attempt_id).first()
-
-        if not attempt:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
-        if attempt.student_id != session_student_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
-        quiz = attempt.quiz
-        cfg = quiz.configuration
+    def _build_result_response(quiz: Quiz, cfg: Optional[QuizConfiguration], attempt: ExaminationAttempt) -> StudentResultResponse:
         now = datetime.now(timezone.utc)
-
-        # Check visibility policy
         policy = cfg.result_release_policy if cfg else "immediate"
 
         is_released = False
@@ -1819,3 +1796,96 @@ class StudentExamService:
             total_unanswered=res.total_unanswered,
             sections_breakdown=res.section_scores,
         )
+
+    @staticmethod
+    def get_attempt_result(
+        db: Session,
+        attempt_id: uuid.UUID,
+        session_student_id: uuid.UUID,
+    ) -> StudentResultResponse:
+        """
+        Retrieves result if permitted according to Phase 10 visibility settings.
+        PROTECTION: Never exposes answer keys or explanations when restricted!
+        """
+        attempt = db.query(ExaminationAttempt).options(
+            joinedload(ExaminationAttempt.quiz).joinedload(Quiz.configuration),
+            joinedload(ExaminationAttempt.student).joinedload(Student.profile),
+            joinedload(ExaminationAttempt.result),
+        ).filter(ExaminationAttempt.id == attempt_id).first()
+
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+        if attempt.student_id != session_student_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        return StudentExamService._build_result_response(attempt.quiz, attempt.quiz.configuration, attempt)
+
+    @staticmethod
+    def get_exam_result_by_candidate(
+        db: Session,
+        token: str,
+        registration_code: Optional[str] = None,
+        email: Optional[str] = None,
+        student_identifier: Optional[str] = None,
+    ) -> StudentResultResponse:
+        """
+        Retrieves the finalized examination result scorecard for a candidate identified
+        by their registration code, roll number, or email without requiring an ephemeral in-exam JWT.
+        """
+        inv = _resolve_invitation_or_quiz(db, token, load_sections=False)
+        if not inv or not inv.quiz:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invitation token")
+
+        quiz = inv.quiz
+
+        # Resolve student candidate
+        student: Optional[Student] = None
+        if registration_code:
+            code_clean = registration_code.strip().upper()
+            all_parts = (
+                db.query(QuizParticipant)
+                .options(joinedload(QuizParticipant.student).joinedload(Student.profile))
+                .filter(QuizParticipant.quiz_id == quiz.id)
+                .all()
+            )
+            for p in all_parts:
+                expected_code = f"REG-{str(p.id)[:8].upper()}"
+                if expected_code == code_clean or str(p.id).upper() == code_clean:
+                    student = p.student
+                    break
+        elif email:
+            student = db.query(Student).filter(func.lower(Student.email) == email.strip().lower()).first()
+        elif student_identifier:
+            prof = db.query(StudentProfile).filter(StudentProfile.student_identifier == student_identifier.strip()).first()
+            if prof:
+                student = prof.student
+
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Candidate record not found. Please provide a valid registration code."
+            )
+
+        # Locate completed or submitted attempt for this student
+        attempt = (
+            db.query(ExaminationAttempt)
+            .options(
+                joinedload(ExaminationAttempt.quiz).joinedload(Quiz.configuration),
+                joinedload(ExaminationAttempt.student).joinedload(Student.profile),
+                joinedload(ExaminationAttempt.result),
+            )
+            .filter(
+                ExaminationAttempt.quiz_id == quiz.id,
+                ExaminationAttempt.student_id == student.id,
+            )
+            .order_by(ExaminationAttempt.attempt_number.desc())
+            .first()
+        )
+
+        if not attempt:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No examination attempt found for this candidate."
+            )
+
+        return StudentExamService._build_result_response(quiz, quiz.configuration, attempt)

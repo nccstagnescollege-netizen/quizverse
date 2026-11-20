@@ -477,4 +477,23 @@ export const studentExamService = {
     }
     return res.json();
   },
+
+  async getPublicExamResult(
+    token: string,
+    registrationCode?: string,
+    email?: string,
+    studentIdentifier?: string
+  ): Promise<StudentResultDetail> {
+    const url = new URL(`${API_BASE_URL}/student/exams/${token}/result`);
+    if (registrationCode) url.searchParams.set('registration_code', registrationCode);
+    if (email) url.searchParams.set('email', email);
+    if (studentIdentifier) url.searchParams.set('student_identifier', studentIdentifier);
+
+    const res = await fetch(url.toString(), { cache: 'no-store' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to retrieve examination results');
+    }
+    return res.json();
+  },
 };

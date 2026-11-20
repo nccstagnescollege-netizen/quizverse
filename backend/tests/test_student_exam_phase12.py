@@ -484,15 +484,27 @@ def test_08_submit_attempt():
 def test_09_result_visibility_policies():
     attempt_id = state["attempt_id"]
     session_token = state["session_token"]
+    token = state["raw_token"]
+    part1 = state["participant1"]
+    reg_code = f"REG-{str(part1.id)[:8].upper()}"
     headers = {"Authorization": f"Bearer {session_token}"}
 
-    # Fetch result (immediate release policy)
+    # 1. Fetch result via active attempt session token
     res_res = client.get(f"/api/v1/student/attempts/{attempt_id}/result", headers=headers)
     assert res_res.status_code == 200
     data = res_res.json()
     assert data["is_released"] is True
     assert data["submission_status"] == "submitted"
     assert "percentage" in data
+
+    # 2. Fetch result via public candidate registration code without session token
+    res_pub = client.get(f"/api/v1/student/exams/{token}/result?registration_code={reg_code}")
+    assert res_pub.status_code == 200
+    pub_data = res_pub.json()
+    assert pub_data["is_released"] is True
+    assert pub_data["student_name"] == "Alice Student"
+    assert pub_data["submission_status"] == "submitted"
+    assert pub_data["score"] == data["score"]
 
 
 def test_10_attempt_ownership_isolation():

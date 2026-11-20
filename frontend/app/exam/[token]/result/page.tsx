@@ -29,6 +29,8 @@ export default function ExamResultPage() {
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<StudentResultDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [manualCode, setManualCode] = useState('');
+  const [promptCode, setPromptCode] = useState(false);
 
   useEffect(() => {
     // 1. Mark examination as concluded in session and local storage
@@ -48,34 +50,121 @@ export default function ExamResultPage() {
     }
   }, [token]);
 
-  useEffect(() => {
-    async function loadResult() {
-      if (!token) return;
-      try {
-        setLoading(true);
-        setError(null);
-        const session = studentExamService.getSession(token);
-        if (!session.sessionToken || !session.attemptId) {
-          router.replace(`/exam/${token}`);
+  const retrieveResult = async (explicitCode?: string) => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      setError(null);
+      setPromptCode(false);
+
+      const session = studentExamService.getSession(token);
+      const urlCode = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('reg_code') || new URLSearchParams(window.location.search).get('registration_code')
+        : null;
+      const storedCode = typeof window !== 'undefined' ? localStorage.getItem(`exam_reg_code_${token}`) : null;
+      const targetCode = explicitCode || urlCode || session.registrationCode || storedCode;
+
+      let data: StudentResultDetail | null = null;
+
+      // 1. Try active session attempt fetch if sessionToken exists
+      if (session.sessionToken && session.attemptId) {
+        try {
+          data = await studentExamService.getAttemptResult(session.attemptId, session.sessionToken);
+        } catch {
+          // Token might be expired/submitted, fall back to candidate code lookup below
+        }
+      }
+
+      // 2. If not retrieved yet, query by candidate registration code
+      if (!data && targetCode) {
+        try {
+          data = await studentExamService.getPublicExamResult(token, targetCode.trim());
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`exam_reg_code_${token}`, targetCode.trim());
+          }
+        } catch (err: any) {
+          setError(err.message || 'Failed to retrieve examination results.');
+          setLoading(false);
           return;
         }
-
-        const data = await studentExamService.getAttemptResult(session.attemptId, session.sessionToken);
-        setResult(data);
-      } catch (err: any) {
-        setError(err.message || 'Failed to retrieve examination results.');
-      } finally {
-        setLoading(false);
       }
+
+      if (!data) {
+        // Candidate code not detected in storage or URL query, prompt user directly
+        setPromptCode(true);
+        setLoading(false);
+        return;
+      }
+
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to retrieve examination results.');
+    } finally {
+      setLoading(false);
     }
-    loadResult();
-  }, [token, router]);
+  };
+
+  useEffect(() => {
+    retrieveResult();
+  }, [token]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 rounded-2xl border-2 border-primary-500/20 border-t-primary-500 animate-spin mb-4" />
         <h2 className="text-sm font-semibold text-slate-300">Retrieving Official Examination Record...</h2>
+      </div>
+    );
+  }
+
+  // If no registration code could be found in URL or storage, prompt candidate directly
+  if (promptCode && !result) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full glass-card rounded-2xl border border-surface-border p-6 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center mx-auto">
+            <BarChart2 className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-base font-bold text-white">Retrieve Examination Results</h1>
+            <p className="text-xs text-slate-400">
+              Please enter your Candidate Registration Code (e.g. REG-D280DB0A) to load your results.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualCode.trim()) retrieveResult(manualCode.trim());
+            }}
+            className="space-y-3"
+          >
+            <input
+              type="text"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="e.g. REG-D280DB0A"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-surface-border text-center font-mono text-sm text-white focus:outline-none focus:border-primary-500 uppercase"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={!manualCode.trim()}
+              className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all"
+            >
+              View Examination Result
+            </button>
+          </form>
+
+          <div className="pt-2">
+            <Link
+              href={`/exam/${token}`}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Return to Examination Gateway
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -87,12 +176,38 @@ export default function ExamResultPage() {
           <AlertTriangle className="w-12 h-12 text-rose-400 mx-auto" />
           <h1 className="text-base font-bold text-white">Results Unavailable</h1>
           <p className="text-xs text-slate-300">{error}</p>
-          <Link
-            href={`/exam/${token}`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-xs text-white"
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualCode.trim()) retrieveResult(manualCode.trim());
+            }}
+            className="space-y-3 pt-2"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Return to Examination Gateway
-          </Link>
+            <input
+              type="text"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="e.g. REG-D280DB0A"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-surface-border text-center font-mono text-sm text-white focus:outline-none focus:border-primary-500 uppercase"
+            />
+            <button
+              type="submit"
+              disabled={!manualCode.trim()}
+              className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all"
+            >
+              Retry with Registration Code
+            </button>
+          </form>
+
+          <div className="pt-2">
+            <Link
+              href={`/exam/${token}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-xs text-white"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Return to Examination Gateway
+            </Link>
+          </div>
         </div>
       </div>
     );

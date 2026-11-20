@@ -94,6 +94,29 @@ def get_exam_instructions(
     return StudentExamService.get_exam_instructions(db, token)
 
 
+@router.get("/exams/{token}/result", response_model=StudentResultResponse)
+def get_public_exam_result(
+    token: str = Path(..., description="Cryptographic invitation token"),
+    registration_code: Optional[str] = Query(None, description="Candidate registration code (e.g. REG-ABC12345)"),
+    email: Optional[str] = Query(None, description="Candidate email address"),
+    student_identifier: Optional[str] = Query(None, description="Candidate roll or register number"),
+    db: Session = Depends(get_db),
+):
+    """
+    Public candidate result scorecard endpoint:
+    Allows verified candidates who completed the examination to access their official
+    result scorecard using their registration code or roll number without requiring
+    an ephemeral in-exam JWT session token.
+    """
+    return StudentExamService.get_exam_result_by_candidate(
+        db=db,
+        token=token,
+        registration_code=registration_code,
+        email=email,
+        student_identifier=student_identifier,
+    )
+
+
 @router.post("/exams/{token}/start", response_model=StudentExamStartResponse, status_code=status.HTTP_200_OK)
 def start_or_resume_exam(
     token: str = Path(..., description="Cryptographic invitation token"),

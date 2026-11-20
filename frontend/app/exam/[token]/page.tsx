@@ -64,6 +64,9 @@ export default function ExamLandingPage() {
 
         const data = await studentExamService.getExamLandingDetails(token, savedCode);
         setDetails(data);
+        if (data?.candidate?.registration_code && typeof window !== 'undefined') {
+          localStorage.setItem(`exam_reg_code_${token}`, data.candidate.registration_code);
+        }
       } catch (err: any) {
         setError(err.message || 'Unable to access examination session.');
       } finally {
@@ -379,7 +382,7 @@ export default function ExamLandingPage() {
                       Your examination answers have been submitted and finalized. Re-entering the active examination room is strictly prohibited.
                     </p>
                     <Link
-                      href={`/exam/${token}/result`}
+                      href={`/exam/${token}/result?reg_code=${encodeURIComponent(regCodeInput.trim() || details?.candidate?.registration_code || '')}`}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all text-center"
                     >
                       <BarChart2 className="w-4 h-4" />
@@ -424,7 +427,7 @@ export default function ExamLandingPage() {
                 {/* 5. View Result (Fallback if not shown in notice) */}
                 {!isConcluded && details.allowed_actions.includes('view_result') && (
                   <Link
-                    href={`/exam/${token}/result`}
+                    href={`/exam/${token}/result?reg_code=${encodeURIComponent(regCodeInput.trim() || details?.candidate?.registration_code || '')}`}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-medium transition-colors text-center"
                   >
                     <BarChart2 className="w-4 h-4" />
