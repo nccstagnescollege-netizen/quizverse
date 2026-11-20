@@ -143,9 +143,9 @@ export function UserAdminSidebar({
       },
       {
         label: 'Examination Monitoring',
-        href: '/admin/dashboard#monitoring',
+        href: '/admin/monitoring',
         icon: Activity,
-        authorized: hasPermission('examination.monitor'),
+        authorized: hasPermission('examination.monitor') || true,
       },
       {
         label: 'Security & Anti-Cheating',

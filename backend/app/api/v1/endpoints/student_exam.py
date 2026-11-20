@@ -437,3 +437,24 @@ def submit_security_events(
         client_ip=client_ip,
         user_agent=user_agent,
     )
+
+
+@router.post("/attempts/{attempt_id}/announcements/{announcement_id}/acknowledge")
+def acknowledge_announcement(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    announcement_id: uuid.UUID = Path(..., description="Target Examination Announcement ID"),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Candidate acknowledgement of an official examination announcement.
+    """
+    from backend.app.services.monitoring_service import LiveMonitoringService
+    student_id = uuid.UUID(session["sub"])
+    return LiveMonitoringService.acknowledge_announcement(
+        db=db,
+        student_id=student_id,
+        announcement_id=announcement_id,
+        attempt_id=attempt_id,
+    )
+

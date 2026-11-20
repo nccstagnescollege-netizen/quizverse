@@ -546,6 +546,47 @@ class ReportService:
             return headers, rows
 
         # -------------------------------------------------------------
+        # M. Live Monitoring Summary Report (Phase 18)
+        # -------------------------------------------------------------
+        elif report_type == "monitoring_summary" and specific_quiz_id:
+            from backend.app.services.monitoring_service import LiveMonitoringService
+            room = LiveMonitoringService.list_room_participants(db, admin, specific_quiz_id)
+
+            headers = [
+                "Candidate Name",
+                "Register Number",
+                "Email",
+                "Group",
+                "Attempt Status",
+                "Connection Status",
+                "Sync Status",
+                "Answered",
+                "Progress %",
+                "Time Spent (Sec)",
+                "Remaining (Sec)",
+                "Security Alerts",
+                "IP Address",
+            ]
+            rows = []
+            for p in room.items:
+                rows.append([
+                    p.full_name,
+                    p.register_number or "-",
+                    p.email,
+                    p.student_group or "-",
+                    p.attempt_status,
+                    p.connection_status,
+                    p.sync_status,
+                    p.answered_count,
+                    f"{p.progress_percentage:.1f}%",
+                    p.time_spent_seconds,
+                    p.remaining_seconds,
+                    p.security_alerts_count,
+                    p.ip_address or "-",
+                ])
+            return headers, rows
+
+        # -------------------------------------------------------------
         # F. Examination Activity Report
         # -------------------------------------------------------------
         else:

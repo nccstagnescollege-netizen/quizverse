@@ -19,6 +19,7 @@ from backend.app.api.v1.endpoints import (
     evaluation,
     analytics,
     quiz_analytics,
+    monitoring,
 )
 
 api_router = APIRouter()
@@ -145,3 +146,11 @@ api_router.include_router(
     prefix="/analytics",
     tags=["Individual Quiz Analytics & Student Performance"],
 )
+
+# 14. Live Examination Monitoring & Invigilator Control Center (Phase 18)
+api_router.include_router(
+    monitoring.router,
+    prefix="/monitoring",
+    tags=["Live Examination Monitoring & Invigilator Control Center"],
+)
+

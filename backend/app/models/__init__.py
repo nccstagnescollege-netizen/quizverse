@@ -106,6 +106,17 @@ from backend.app.models.notification import (
     Notification,
     NotificationPreference,
 )
+from backend.app.models.monitoring import (
+    InvigilatorAssignment,
+    InvigilatorActivityLog,
+    ExaminationAnnouncement,
+    AnnouncementAcknowledgement,
+    ExaminationIncident,
+    IncidentNote,
+    MonitoringAlert,
+    MonitoringIntervention,
+    ExaminationExtensionHistory,
+)
 
 __all__ = [
     "Base",
@@ -199,4 +210,14 @@ __all__ = [
     # Notifications
     "Notification",
     "NotificationPreference",
+    # Live Monitoring & Invigilator Control (Phase 18)
+    "InvigilatorAssignment",
+    "InvigilatorActivityLog",
+    "ExaminationAnnouncement",
+    "AnnouncementAcknowledgement",
+    "ExaminationIncident",
+    "IncidentNote",
+    "MonitoringAlert",
+    "MonitoringIntervention",
+    "ExaminationExtensionHistory",
 ]
