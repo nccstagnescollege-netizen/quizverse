@@ -234,13 +234,18 @@ export interface SaveAsDraftResponse {
 function getStoredAdminToken(explicitToken?: string | null): string | null {
   if (explicitToken) return explicitToken;
   if (typeof window === 'undefined') return null;
+
+  // 1. Check localStorage tokens
   const lsToken =
     localStorage.getItem('quizverse_admin_token') ||
     localStorage.getItem('quizverse_token');
   if (lsToken) return lsToken;
 
+  // 2. Check cookies
   try {
-    const match = document.cookie.match(/(?:^|;\s*)quizverse_admin_token=([^;]+)/);
+    const match = document.cookie.match(
+      /(?:^|;\s*)(?:quizverse_auth_token|quizverse_admin_token|quizverse_token|sb-access-token)=([^;]+)/
+    );
     if (match) return decodeURIComponent(match[1]);
   } catch {}
 
@@ -271,6 +276,7 @@ async function fetchWithAuth<T>(
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     const message =
+      errorData.error?.message ||
       errorData.detail?.message ||
       (typeof errorData.detail === 'string' ? errorData.detail : null) ||
       errorData.message ||

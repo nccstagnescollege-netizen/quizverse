@@ -32,11 +32,13 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface QuizGeneratorWizardProps {
   basePath: string; // "/super-admin" or "/admin"
+  token?: string | null;
 }
 
-export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
+export function QuizGeneratorWizard({ basePath, token: propToken }: QuizGeneratorWizardProps) {
   const router = useRouter();
-  const { token, isLoading: authLoading } = useAuth();
+  const { token: authContextToken, isLoading: authLoading } = useAuth();
+  const effectiveToken = propToken || authContextToken;
   const [step, setStep] = useState<number>(1);
 
   // Data Loading
@@ -96,25 +98,30 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
   useEffect(() => {
     async function loadOptions() {
       if (authLoading) return;
+      if (!effectiveToken) return;
+
       setLoadingOptions(true);
       try {
-        const res = await quizGeneratorService.getAcademicOptions(token);
+        const res = await quizGeneratorService.getAcademicOptions(effectiveToken);
         setAcademicOptions(res);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to load academic options', err);
+        if (err.status === 401 && typeof window !== 'undefined') {
+          router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+        }
       } finally {
         setLoadingOptions(false);
       }
     }
     loadOptions();
-  }, [token, authLoading]);
+  }, [effectiveToken, authLoading, router]);
 
   // When subject changes, load syllabus hierarchy
   useEffect(() => {
-    if (academicScope.subject_id) {
+    if (academicScope.subject_id && effectiveToken) {
       setLoadingSyllabus(true);
       quizGeneratorService
-        .getSyllabusHierarchy(academicScope.subject_id, token)
+        .getSyllabusHierarchy(academicScope.subject_id, effectiveToken)
         .then((res) => {
           setSyllabusHierarchy(res);
           // Set default exam title if empty
@@ -125,10 +132,15 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
             }));
           }
         })
-        .catch((err) => console.error('Failed to load syllabus', err))
+        .catch((err: any) => {
+          console.error('Failed to load syllabus', err);
+          if (err.status === 401 && typeof window !== 'undefined') {
+            router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+          }
+        })
         .finally(() => setLoadingSyllabus(false));
     }
-  }, [academicScope.subject_id, token]);
+  }, [academicScope.subject_id, effectiveToken, router, examSettings.title]);
 
   // Execute Generation
   const handleExecuteGenerate = async () => {
@@ -144,7 +156,7 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
         unit_distribution: unitDistribution,
         reuse_policy: reusePolicy,
         exam_settings: examSettings,
-      }, token);
+      }, effectiveToken);
       router.push(`${basePath}/quiz-generator/${session.id}`);
     } catch (err: any) {
       console.error('Generation failed', err);
