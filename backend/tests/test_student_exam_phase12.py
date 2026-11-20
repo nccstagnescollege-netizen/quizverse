@@ -475,6 +475,11 @@ def test_08_submit_attempt():
     )
     assert res_after.status_code == 400
 
+    # Verification: Student CANNOT re-enter the exam hall after submission
+    res_hall_blocked = client.get(f"/api/v1/student/attempts/{attempt_id}/questions", headers=headers)
+    assert res_hall_blocked.status_code == 403
+    assert "submitted and concluded" in res_hall_blocked.text.lower()
+
 
 def test_09_result_visibility_policies():
     attempt_id = state["attempt_id"]

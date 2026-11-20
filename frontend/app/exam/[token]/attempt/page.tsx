@@ -82,6 +82,18 @@ export default function ExamAttemptPage() {
   const [fullscreenRequiredPrompt, setFullscreenRequiredPrompt] = useState<boolean>(false);
   const eventSequenceRef = useRef<number>(1);
 
+  // 0. Guard against accessing concluded examinations
+  useEffect(() => {
+    if (typeof window !== 'undefined' && token) {
+      if (
+        sessionStorage.getItem(`exam_concluded_${token}`) === 'true' ||
+        localStorage.getItem(`exam_concluded_${token}`) === 'true'
+      ) {
+        router.replace(`/exam/${token}/result`);
+      }
+    }
+  }, [token, router]);
+
   // 1. Initial Load & Attempt Verification
   useEffect(() => {
     async function initExam() {
@@ -123,6 +135,15 @@ export default function ExamAttemptPage() {
         setLocalAnswers(initialAnswers);
         setVisitedQuestionIds(initialVisited);
       } catch (err: any) {
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('submitted') || msg.includes('concluded') || msg.includes('finalized') || msg.includes('403')) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`exam_concluded_${token}`, 'true');
+            localStorage.setItem(`exam_concluded_${token}`, 'true');
+          }
+          router.replace(`/exam/${token}/result`);
+          return;
+        }
         setError(err.message || 'Failed to initialize active examination session.');
       } finally {
         setLoading(false);
@@ -307,9 +328,14 @@ export default function ExamAttemptPage() {
     if (!attemptDetail || !sessionToken) return;
     try {
       await studentExamService.submitAttempt(attemptDetail.attempt_id, sessionToken);
-      router.push(`/exam/${token}/result`);
     } catch {
-      router.push(`/exam/${token}/result`);
+      // Ignored if already auto-submitted on server
+    } finally {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`exam_concluded_${token}`, 'true');
+        localStorage.setItem(`exam_concluded_${token}`, 'true');
+      }
+      router.replace(`/exam/${token}/result`);
     }
   };
 

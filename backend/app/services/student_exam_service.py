@@ -820,6 +820,13 @@ class StudentExamService:
         if attempt.student_id != session_student_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this attempt")
 
+        # Once an attempt is submitted, concluded, or immutable, returning to the exam hall is strictly prohibited
+        if attempt.is_immutable or attempt.status in ["submitted", "completed", "evaluated", "timed_out"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This examination attempt has already been submitted and concluded. Returning to the exam hall is not permitted."
+            )
+
         now = datetime.now(timezone.utc)
         expires_at = _ensure_utc(attempt.expires_at)
 
@@ -1420,6 +1427,12 @@ class StudentExamService:
         if not attempt or attempt.student_id != session_student_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
+        if attempt.is_immutable or attempt.status in ["submitted", "completed", "evaluated", "timed_out"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This examination attempt has already been submitted and concluded. Review is unavailable."
+            )
+
         now = datetime.now(timezone.utc)
         deadline = _ensure_utc(attempt.deadline_at or attempt.expires_at)
         is_expired = now > deadline
@@ -1552,6 +1565,12 @@ class StudentExamService:
 
         if not attempt or attempt.student_id != session_student_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        if attempt.is_immutable or attempt.status in ["submitted", "completed", "evaluated", "timed_out"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This examination attempt has already been submitted and concluded. Review is unavailable."
+            )
 
         quiz = attempt.quiz
         sections = sorted(quiz.sections, key=lambda s: s.section_order) if quiz.sections else []

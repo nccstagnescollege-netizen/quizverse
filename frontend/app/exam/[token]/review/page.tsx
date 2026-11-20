@@ -34,6 +34,18 @@ export default function ExamReviewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // 0. Guard against accessing concluded examinations
+  useEffect(() => {
+    if (typeof window !== 'undefined' && token) {
+      if (
+        sessionStorage.getItem(`exam_concluded_${token}`) === 'true' ||
+        localStorage.getItem(`exam_concluded_${token}`) === 'true'
+      ) {
+        router.replace(`/exam/${token}/result`);
+      }
+    }
+  }, [token, router]);
+
   useEffect(() => {
     async function loadSummary() {
       if (!token) return;
@@ -49,6 +61,15 @@ export default function ExamReviewPage() {
         const data = await studentExamService.getAttemptReviewSummary(session.attemptId, session.sessionToken);
         setSummary(data);
       } catch (err: any) {
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('submitted') || msg.includes('concluded') || msg.includes('finalized') || msg.includes('403')) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`exam_concluded_${token}`, 'true');
+            localStorage.setItem(`exam_concluded_${token}`, 'true');
+          }
+          router.replace(`/exam/${token}/result`);
+          return;
+        }
         setError(err.message || 'Failed to generate review summary.');
       } finally {
         setLoading(false);
@@ -68,7 +89,11 @@ export default function ExamReviewPage() {
       }
 
       await studentExamService.submitAttempt(session.attemptId, session.sessionToken);
-      router.push(`/exam/${token}/result`);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`exam_concluded_${token}`, 'true');
+        localStorage.setItem(`exam_concluded_${token}`, 'true');
+      }
+      router.replace(`/exam/${token}/result`);
     } catch (err: any) {
       setError(err.message || 'Submission failed. Please verify your connection.');
       setSubmitting(false);

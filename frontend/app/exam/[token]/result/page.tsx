@@ -31,6 +31,24 @@ export default function ExamResultPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Mark examination as concluded in session and local storage
+    if (typeof window !== 'undefined' && token) {
+      sessionStorage.setItem(`exam_concluded_${token}`, 'true');
+      localStorage.setItem(`exam_concluded_${token}`, 'true');
+
+      // 2. Prevent candidate from navigating back into the exam room using browser back button
+      window.history.pushState(null, '', window.location.href);
+      const handlePopState = () => {
+        window.history.pushState(null, '', window.location.href);
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, [token]);
+
+  useEffect(() => {
     async function loadResult() {
       if (!token) return;
       try {
@@ -208,7 +226,7 @@ export default function ExamResultPage() {
           )}
 
           <Link
-            href={`/exam/${token}`}
+            href="/exam"
             className={`${result.is_released ? 'w-1/2' : 'w-full'} flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all text-center`}
           >
             <span>Finish &amp; Exit</span>

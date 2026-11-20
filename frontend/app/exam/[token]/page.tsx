@@ -37,6 +37,18 @@ export default function ExamLandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [regCodeInput, setRegCodeInput] = useState('');
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [isConcluded, setIsConcluded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && token) {
+      if (
+        sessionStorage.getItem(`exam_concluded_${token}`) === 'true' ||
+        localStorage.getItem(`exam_concluded_${token}`) === 'true'
+      ) {
+        setIsConcluded(true);
+      }
+    }
+  }, [token]);
 
   useEffect(() => {
     async function loadDetails() {
@@ -356,8 +368,28 @@ export default function ExamLandingPage() {
                   </Link>
                 )}
 
-                {/* 2. Resume Active Attempt */}
-                {details.allowed_actions.includes('resume') && (
+                {/* Concluded Examination Notice */}
+                {(isConcluded || details.availability_status === 'completed' || (!details.can_start && !details.can_resume)) && (
+                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center space-y-2.5">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-purple-300">
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Examination Attempt Concluded</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Your examination answers have been submitted and finalized. Re-entering the active examination room is strictly prohibited.
+                    </p>
+                    <Link
+                      href={`/exam/${token}/result`}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all text-center"
+                    >
+                      <BarChart2 className="w-4 h-4" />
+                      <span>View Examination Result</span>
+                    </Link>
+                  </div>
+                )}
+
+                {/* 2. Resume Active Attempt (Only when NOT concluded) */}
+                {!isConcluded && details.allowed_actions.includes('resume') && (
                   <button
                     onClick={() => router.push(`/exam/${token}/attempt`)}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 transition-all text-center"
@@ -367,8 +399,8 @@ export default function ExamLandingPage() {
                   </button>
                 )}
 
-                {/* 3. Start Examination */}
-                {details.allowed_actions.includes('start') && (
+                {/* 3. Start Examination (Only when NOT concluded) */}
+                {!isConcluded && details.allowed_actions.includes('start') && (
                   <button
                     onClick={handleStartExam}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center"
@@ -379,7 +411,7 @@ export default function ExamLandingPage() {
                 )}
 
                 {/* 4. View Instructions */}
-                {details.allowed_actions.includes('view_instructions') && (
+                {!isConcluded && details.allowed_actions.includes('view_instructions') && (
                   <Link
                     href={`/exam/${token}/instructions`}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface-elevated hover:bg-slate-800 border border-surface-border text-slate-300 hover:text-white text-xs font-medium transition-colors text-center"
@@ -389,8 +421,8 @@ export default function ExamLandingPage() {
                   </Link>
                 )}
 
-                {/* 5. View Result */}
-                {details.allowed_actions.includes('view_result') && (
+                {/* 5. View Result (Fallback if not shown in notice) */}
+                {!isConcluded && details.allowed_actions.includes('view_result') && (
                   <Link
                     href={`/exam/${token}/result`}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-medium transition-colors text-center"
