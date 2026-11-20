@@ -89,6 +89,9 @@ from backend.app.models.results import (
 )
 from backend.app.models.analytics import (
     AnalyticsSnapshot,
+    ReportExport,
+    SavedReportConfig,
+    AnalyticsRefreshHistory,
 )
 from backend.app.models.security_audit import (
     AuditLog,
@@ -179,8 +182,11 @@ __all__ = [
     "GradingAssignment",
     "EvaluationJob",
     "ResultCorrection",
-    # Analytics
+    # Analytics & Reports (Phase 16)
     "AnalyticsSnapshot",
+    "ReportExport",
+    "SavedReportConfig",
+    "AnalyticsRefreshHistory",
     # Security & Audit
     "AuditLog",
     "SecurityEvent",

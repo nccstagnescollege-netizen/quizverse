@@ -131,7 +131,7 @@ class InvitationService:
                 if isinstance(o, str) and ("vercel.app" in o or "https://" in o):
                     return o.rstrip("/")
 
-        return "http://localhost:3000"
+        return "https://quizverse-iota.vercel.app"
 
     @staticmethod
     def check_quiz_permission(db: Session, admin: Admin, quiz: Quiz) -> bool:

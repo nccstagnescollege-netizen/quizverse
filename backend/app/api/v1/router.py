@@ -17,6 +17,7 @@ from backend.app.api.v1.endpoints import (
     student_exam,
     security,
     evaluation,
+    analytics,
 )
 
 api_router = APIRouter()
@@ -128,4 +129,11 @@ api_router.include_router(
     evaluation.results_router,
     prefix="/results",
     tags=["Results Management, Approval & Publication"],
+)
+
+# 12. Admin Analytics Dashboard & Examination Reports (Phase 16)
+api_router.include_router(
+    analytics.router,
+    prefix="/analytics",
+    tags=["Admin Analytics & Examination Reports"],
 )

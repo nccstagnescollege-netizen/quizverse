@@ -26,6 +26,7 @@ import {
   Sparkles,
   QrCode,
   FileCheck,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +43,8 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { label: 'Examination Management', href: '/super-admin/dashboard#exams', icon: ClipboardList },
   { label: 'Student Management', href: '/super-admin/dashboard#students', icon: GraduationCap },
   { label: 'Results', href: '/admin/analytics?tab=results', icon: Award },
-  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+  { label: 'Analytics', href: '/super-admin/analytics', icon: BarChart3 },
+  { label: 'Reports & Exports', href: '/super-admin/analytics/reports', icon: FileSpreadsheet },
   { label: 'Live Monitoring', href: '/super-admin/dashboard#monitoring', icon: Activity },
   { label: 'Security Center', href: '/super-admin/admins?tab=security', icon: ShieldAlert },
   { label: 'Audit Logs', href: '/super-admin/admins?tab=audit', icon: FileText },

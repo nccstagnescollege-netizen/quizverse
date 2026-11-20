@@ -96,10 +96,13 @@ export function InvitationDashboard({ basePath }: InvitationDashboardProps) {
   };
 
   const normalizeAccessUrl = (accessUrl?: string | null, fallbackId?: string) => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-    if (!accessUrl) return `${origin}/join/${fallbackId || ''}`;
+    const prodUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quizverse-iota.vercel.app';
+    const origin = typeof window !== 'undefined' ? window.location.origin : prodUrl;
+    // Prefer production domain for student/candidate sharing if current domain is localhost
+    const targetOrigin = origin.includes('localhost') ? prodUrl : origin;
+    if (!accessUrl) return `${targetOrigin}/join/${fallbackId || ''}`;
     if (accessUrl.includes('localhost')) {
-      return accessUrl.replace(/https?:\/\/localhost(:\d+)?/, origin);
+      return accessUrl.replace(/https?:\/\/localhost(:\d+)?/, targetOrigin);
     }
     return accessUrl;
   };

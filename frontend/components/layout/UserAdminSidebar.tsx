@@ -21,6 +21,7 @@ import {
   Sparkles,
   QrCode,
   FileCheck,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -113,6 +114,12 @@ export function UserAdminSidebar({
         label: 'Analytics',
         href: '/admin/analytics',
         icon: BarChart3,
+        authorized: hasPermission('analytics.view'),
+      },
+      {
+        label: 'Reports & Exports',
+        href: '/admin/analytics/reports',
+        icon: FileSpreadsheet,
         authorized: hasPermission('analytics.view'),
       },
       {

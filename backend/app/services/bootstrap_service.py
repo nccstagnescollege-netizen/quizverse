@@ -340,3 +340,80 @@ def ensure_evaluation_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"Evaluation schema upgrade check encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_analytics_reports_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 16 Analytics, Reporting & Export tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        if dialect_name == "postgresql":
+            ddl_statements = [
+                # Report Exports
+                """
+                CREATE TABLE IF NOT EXISTS report_exports (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    report_type VARCHAR(64) NOT NULL,
+                    export_format VARCHAR(16) NOT NULL,
+                    status VARCHAR(32) NOT NULL DEFAULT 'completed',
+                    file_name VARCHAR(255) NOT NULL,
+                    file_path TEXT,
+                    file_size INTEGER NOT NULL DEFAULT 0,
+                    download_url VARCHAR(512),
+                    filter_params JSONB,
+                    row_count INTEGER NOT NULL DEFAULT 0,
+                    expires_at TIMESTAMPTZ,
+                    error_message TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_report_exports_admin_id ON report_exports(admin_id);",
+                "CREATE INDEX IF NOT EXISTS ix_report_exports_report_type ON report_exports(report_type);",
+
+                # Saved Report Configs
+                """
+                CREATE TABLE IF NOT EXISTS saved_report_configs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    admin_id UUID NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    report_type VARCHAR(64) NOT NULL,
+                    filter_params JSONB,
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_saved_report_configs_admin_id ON saved_report_configs(admin_id);",
+
+                # Analytics Refresh History
+                """
+                CREATE TABLE IF NOT EXISTS analytics_refresh_history (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    refresh_type VARCHAR(64) NOT NULL DEFAULT 'manual',
+                    scope VARCHAR(64) NOT NULL DEFAULT 'global',
+                    target_id UUID,
+                    status VARCHAR(32) NOT NULL DEFAULT 'success',
+                    duration_ms INTEGER NOT NULL DEFAULT 0,
+                    details JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_analytics_refresh_history_admin_id ON analytics_refresh_history(admin_id);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"DDL statement executed with note: {ex}")
+            db.commit()
+            logger.info("Phase 16 Analytics & Reports schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Analytics & Reports schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
