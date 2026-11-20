@@ -811,8 +811,12 @@ class QuestionBankService:
         """
         Permanently deletes a question ONLY if it is not referenced by published quizzes or student attempts.
         If referenced, blocks deletion and instructs administrator to archive instead.
+        Idempotent: if question is already deleted, returns cleanly without error.
         """
-        question = cls.get_question_by_id(db, admin, question_id)
+        question = db.query(Question).filter(Question.id == question_id).first()
+        if not question:
+            return
+
         cls.enforce_question_permission_and_scope(db, admin, question, "question.delete", is_write_op=True)
 
         # Check references in quizzes

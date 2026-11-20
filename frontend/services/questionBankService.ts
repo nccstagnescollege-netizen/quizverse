@@ -204,10 +204,18 @@ async function fetchWithAuth<T>(
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     const message = errorData.error?.message || errorData.detail || `Request failed with status ${res.status}`;
-    throw new Error(message);
+    const err: any = new Error(message);
+    err.status = res.status;
+    err.payload = errorData;
+    throw err;
   }
 
-  return res.json();
+  if (res.status === 204) {
+    return null as unknown as T;
+  }
+
+  const text = await res.text();
+  return text ? JSON.parse(text) : (null as unknown as T);
 }
 
 export const questionBankService = {

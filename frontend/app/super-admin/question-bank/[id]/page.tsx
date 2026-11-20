@@ -130,7 +130,11 @@ export default function SuperAdminQuestionDetailPage() {
       await questionBankService.deleteQuestion(question.id, token);
       router.push('/super-admin/question-bank');
     } catch (err: any) {
-      alert(`Delete failed: ${err.message}`);
+      if (err.status === 404 || err.message?.includes('not found') || err.message?.includes('404')) {
+        router.push('/super-admin/question-bank');
+      } else {
+        alert(`Delete failed: ${err.message}`);
+      }
     } finally {
       setDeleteLoading(false);
       setShowDeleteConfirm(false);

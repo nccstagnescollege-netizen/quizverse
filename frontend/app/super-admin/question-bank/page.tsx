@@ -193,8 +193,13 @@ export default function SuperAdminQuestionBankPage() {
       setToastMessage({ type: 'success', text: 'Question permanently deleted.' });
       questionBankService.getStats(token).then(setStats).catch(() => {});
     } catch (err: any) {
-      setQuestions(prev); // Revert on failure
-      setToastMessage({ type: 'error', text: `Delete rejected: ${err.message}` });
+      if (err.status === 404 || err.message?.includes('not found') || err.message?.includes('404')) {
+        setToastMessage({ type: 'success', text: 'Question was already removed.' });
+        questionBankService.getStats(token).then(setStats).catch(() => {});
+      } else {
+        setQuestions(prev); // Revert on failure
+        setToastMessage({ type: 'error', text: `Delete rejected: ${err.message}` });
+      }
     } finally {
       setDeleteLoading(false);
     }
