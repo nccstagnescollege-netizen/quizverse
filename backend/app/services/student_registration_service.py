@@ -65,19 +65,21 @@ def resolve_invitation_or_quiz(
     except (ValueError, AttributeError):
         parsed_uuid = None
 
-    base_query = db.query(InvitationLink).options(
-        joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
-        joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-    )
+    inv_query = db.query(InvitationLink)
     if parsed_uuid:
-        inv_query = base_query.filter(or_(InvitationLink.token_hash == token_hash, InvitationLink.id == parsed_uuid))
+        inv_query = inv_query.filter(or_(InvitationLink.token_hash == token_hash, InvitationLink.id == parsed_uuid))
     else:
-        inv_query = base_query.filter(InvitationLink.token_hash == token_hash)
+        inv_query = inv_query.filter(InvitationLink.token_hash == token_hash)
 
     if for_update:
+        # In PostgreSQL, FOR UPDATE cannot be used with joinedload outer joins.
+        # Query and lock InvitationLink directly; relationships are loaded cleanly after lock.
         inv = inv_query.with_for_update().first()
     else:
-        inv = inv_query.first()
+        inv = inv_query.options(
+            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
+            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
+        ).first()
 
     if inv:
         return inv, None, None
@@ -110,10 +112,7 @@ def resolve_invitation_or_quiz(
             )
 
         # Look for existing active invitation for this published quiz
-        active_query = db.query(InvitationLink).options(
-            joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
-            joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
-        ).filter(
+        active_query = db.query(InvitationLink).filter(
             InvitationLink.quiz_id == quiz.id,
             InvitationLink.is_revoked == False,
         ).order_by(desc(InvitationLink.created_at))
@@ -121,7 +120,10 @@ def resolve_invitation_or_quiz(
         if for_update:
             active_inv = active_query.with_for_update().first()
         else:
-            active_inv = active_query.first()
+            active_inv = active_query.options(
+                joinedload(InvitationLink.quiz).joinedload(Quiz.subject),
+                joinedload(InvitationLink.quiz).joinedload(Quiz.configuration),
+            ).first()
 
         if not active_inv:
             # Auto-provision a default official invitation so candidates can enter seamlessly
