@@ -101,24 +101,25 @@ export interface QuizManagementItem {
   id: string;
   title: string;
   slug: string;
-  description: string | null;
+  description?: string | null;
   status: string;
-  creation_mode: 'manual' | 'automatic';
+  creation_mode: string;
   duration_minutes: number;
-  total_marks: number;
+  total_marks?: number;
+  maximum_marks?: number;
   passing_percentage: number;
   total_questions: number;
-  total_sections: number;
+  total_sections?: number;
   published_version: number;
-  is_draft: boolean;
-  created_by: string;
+  is_draft?: boolean;
+  created_by?: string;
   creator_name: string | null;
   subject_name: string | null;
   programme_name: string | null;
   start_time: string | null;
   end_time: string | null;
   availability_mode: string;
-  last_validated_at: string | null;
+  last_validated_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -144,7 +145,7 @@ export const quizPublishingService = {
   async getQuizzesForManagement(
     token: string,
     params?: { status?: string; creation_mode?: string; search?: string; limit?: number; offset?: number }
-  ): Promise<QuizManagementListResponse> {
+  ): Promise<QuizManagementItem[]> {
     const url = new URL(`${API_BASE_URL}/quizzes/manage`);
     if (params?.status && params.status !== 'all') url.searchParams.set('status', params.status);
     if (params?.creation_mode && params.creation_mode !== 'all') url.searchParams.set('creation_mode', params.creation_mode);
@@ -159,7 +160,8 @@ export const quizPublishingService = {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to load quizzes for management');
     }
-    return res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.items || []);
   },
 
   async getConfiguration(token: string, quizId: string): Promise<QuizConfiguration> {

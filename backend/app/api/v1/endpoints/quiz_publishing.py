@@ -33,12 +33,15 @@ router = APIRouter()
 @router.get("/manage", response_model=List[QuizManagementItem])
 def list_quizzes_for_management(
     status: Optional[str] = Query(None, description="Filter by quiz status"),
+    creation_mode: Optional[str] = Query(None, description="Filter by creation mode: manual, generator, import"),
     search: Optional[str] = Query(None, description="Search by title or slug"),
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
     """List quizzes accessible to the administrator with publishing status and metrics."""
-    return pub_service.get_quizzes_management_list(db, admin, status_filter=status, search=search)
+    return pub_service.get_quizzes_management_list(
+        db, admin, status_filter=status, creation_mode_filter=creation_mode, search=search
+    )
 
 
 @router.get("/{quiz_id}/configuration", response_model=QuizConfigurationResponse)

@@ -876,6 +876,7 @@ def save_generation_as_draft(
         slug=slugify(title),
         description=exam_settings.get("description"),
         instructions=exam_settings.get("instructions"),
+        subject_id=session.subject_id,
         duration_minutes=int(exam_settings.get("duration_minutes", 60)),
         total_marks=total_marks,
         passing_percentage=Decimal(str(exam_settings.get("passing_percentage", 40.0))),
@@ -886,6 +887,7 @@ def save_generation_as_draft(
         show_correct_answers=False,
         allow_review=True,
         status="draft",  # STRICTLY DRAFT in Phase 8
+        creation_mode="generator",
         created_by=admin.id,
     )
     db.add(new_quiz)

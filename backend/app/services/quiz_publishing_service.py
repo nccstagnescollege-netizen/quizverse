@@ -462,6 +462,7 @@ def get_quizzes_management_list(
     db: Session,
     admin: Admin,
     status_filter: Optional[str] = None,
+    creation_mode_filter: Optional[str] = None,
     search: Optional[str] = None,
 ) -> List[QuizManagementItem]:
     """Retrieve quizzes list with strict RBAC enforcement."""
@@ -479,6 +480,11 @@ def get_quizzes_management_list(
     # Status filter
     if status_filter and status_filter != "all":
         query = query.filter(Quiz.status == status_filter)
+
+    # Creation mode filter
+    if creation_mode_filter and creation_mode_filter != "all":
+        mode = "generator" if creation_mode_filter in ("automatic", "generator") else creation_mode_filter
+        query = query.filter(Quiz.creation_mode == mode)
 
     # Search filter
     if search and search.strip():

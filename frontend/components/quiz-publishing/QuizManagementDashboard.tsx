@@ -70,7 +70,8 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
         creation_mode: selectedMode,
         search: searchQuery || undefined,
       });
-      setQuizzes(data.items || []);
+      const list = Array.isArray(data) ? data : (data as any)?.items || [];
+      setQuizzes(list);
     } catch (err: any) {
       setError(err.message || 'Failed to load quizzes.');
     } finally {
@@ -244,7 +245,7 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
             >
               <option value="all">All Modes (Manual &amp; Auto)</option>
               <option value="manual">Manual Authoring</option>
-              <option value="automatic">Automatic Generator</option>
+              <option value="generator">Automatic Generator</option>
             </select>
 
             <button
@@ -344,7 +345,7 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500">Max Marks</div>
-                  <div className="font-bold text-white mt-0.5">{quiz.total_marks}m</div>
+                  <div className="font-bold text-white mt-0.5">{quiz.maximum_marks ?? quiz.total_marks ?? 0}m</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500">Duration</div>
