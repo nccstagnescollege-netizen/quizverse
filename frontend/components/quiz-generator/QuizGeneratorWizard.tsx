@@ -28,6 +28,7 @@ import {
   History,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface QuizGeneratorWizardProps {
   basePath: string; // "/super-admin" or "/admin"
@@ -35,6 +36,7 @@ interface QuizGeneratorWizardProps {
 
 export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
   const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
   const [step, setStep] = useState<number>(1);
 
   // Data Loading
@@ -93,9 +95,10 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
   // Load cascading academic options
   useEffect(() => {
     async function loadOptions() {
+      if (authLoading) return;
       setLoadingOptions(true);
       try {
-        const res = await quizGeneratorService.getAcademicOptions();
+        const res = await quizGeneratorService.getAcademicOptions(token);
         setAcademicOptions(res);
       } catch (err) {
         console.error('Failed to load academic options', err);
@@ -104,14 +107,14 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
       }
     }
     loadOptions();
-  }, []);
+  }, [token, authLoading]);
 
   // When subject changes, load syllabus hierarchy
   useEffect(() => {
     if (academicScope.subject_id) {
       setLoadingSyllabus(true);
       quizGeneratorService
-        .getSyllabusHierarchy(academicScope.subject_id)
+        .getSyllabusHierarchy(academicScope.subject_id, token)
         .then((res) => {
           setSyllabusHierarchy(res);
           // Set default exam title if empty
@@ -125,7 +128,7 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
         .catch((err) => console.error('Failed to load syllabus', err))
         .finally(() => setLoadingSyllabus(false));
     }
-  }, [academicScope.subject_id]);
+  }, [academicScope.subject_id, token]);
 
   // Execute Generation
   const handleExecuteGenerate = async () => {
@@ -141,7 +144,7 @@ export function QuizGeneratorWizard({ basePath }: QuizGeneratorWizardProps) {
         unit_distribution: unitDistribution,
         reuse_policy: reusePolicy,
         exam_settings: examSettings,
-      });
+      }, token);
       router.push(`${basePath}/quiz-generator/${session.id}`);
     } catch (err: any) {
       console.error('Generation failed', err);

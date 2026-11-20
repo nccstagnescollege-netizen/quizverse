@@ -231,17 +231,28 @@ export interface SaveAsDraftResponse {
   redirect_url: string;
 }
 
+function getStoredAdminToken(explicitToken?: string | null): string | null {
+  if (explicitToken) return explicitToken;
+  if (typeof window === 'undefined') return null;
+  const lsToken =
+    localStorage.getItem('quizverse_admin_token') ||
+    localStorage.getItem('quizverse_token');
+  if (lsToken) return lsToken;
+
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)quizverse_admin_token=([^;]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  } catch {}
+
+  return null;
+}
+
 async function fetchWithAuth<T>(
   endpoint: string,
   options: RequestInit = {},
   explicitToken?: string | null
 ): Promise<T> {
-  const token =
-    explicitToken !== undefined
-      ? explicitToken
-      : typeof window !== 'undefined'
-      ? localStorage.getItem('quizverse_token')
-      : null;
+  const token = getStoredAdminToken(explicitToken);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
