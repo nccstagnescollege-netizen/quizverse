@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 import uuid
-from fastapi import APIRouter, Depends, Query, Path, Response, status
+from fastapi import APIRouter, Depends, Query, Path, Response, Request, status
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
@@ -38,6 +38,7 @@ def get_eligible_quizzes(
 @router.post("", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 def create_invitation(
     req: InvitationCreateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
@@ -45,7 +46,7 @@ def create_invitation(
     Generate a unique cryptographic invitation token and QR code for an eligible quiz.
     Stores only the SHA-256 hash. Returns the raw token and QR representations in this response only.
     """
-    return InvitationService.create_invitation(db, admin, req)
+    return InvitationService.create_invitation(db, admin, req, request=request)
 
 
 @router.get("", response_model=InvitationListResponse)

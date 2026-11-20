@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -131,6 +131,7 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
       .filter(Boolean);
 
     try {
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : undefined;
       const result = await invitationService.createInvitation(token, {
         quiz_id: selectedQuiz.id,
         name: name.trim(),
@@ -148,8 +149,12 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
         starts_at: startsAt ? new Date(startsAt).toISOString() : null,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         timezone,
+        base_url: currentOrigin,
       });
 
+      if (currentOrigin && result.access_url && result.access_url.includes('localhost')) {
+        result.access_url = result.access_url.replace(/https?:\/\/localhost(:\d+)?/, currentOrigin);
+      }
       setGeneratedResult(result);
     } catch (err: any) {
       setError(err.message || 'Failed to generate invitation');
@@ -158,9 +163,18 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
     }
   };
 
+  const effectiveAccessUrl = useMemo(() => {
+    if (!generatedResult?.access_url) return '';
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    if (currentOrigin && generatedResult.access_url.includes('localhost')) {
+      return generatedResult.access_url.replace(/https?:\/\/localhost(:\d+)?/, currentOrigin);
+    }
+    return generatedResult.access_url;
+  }, [generatedResult]);
+
   const handleCopyLink = () => {
-    if (!generatedResult?.access_url) return;
-    navigator.clipboard.writeText(generatedResult.access_url);
+    if (!effectiveAccessUrl) return;
+    navigator.clipboard.writeText(effectiveAccessUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -197,7 +211,7 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
 
             <div className="p-4 bg-white rounded-2xl shadow-lg border border-slate-200">
               <QRCodeSVG
-                value={generatedResult.access_url || ''}
+                value={effectiveAccessUrl}
                 size={200}
                 level="H"
                 includeMargin={false}
@@ -210,7 +224,7 @@ export function CreateInvitationWizard({ basePath }: CreateInvitationWizardProps
               <span className="text-[11px] font-medium text-slate-400">Direct Invitation URL:</span>
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 truncate select-all">
-                  {generatedResult.access_url}
+                  {effectiveAccessUrl}
                 </div>
                 <button
                   onClick={handleCopyLink}

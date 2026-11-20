@@ -52,6 +52,7 @@ export interface InvitationCreatePayload {
   require_account?: boolean;
   require_approval?: boolean;
   internal_notes?: string;
+  base_url?: string;
 }
 
 export interface InvitationUpdatePayload {
@@ -69,6 +70,7 @@ export interface InvitationUpdatePayload {
   require_account?: boolean;
   require_approval?: boolean;
   internal_notes?: string;
+  base_url?: string;
 }
 
 export interface InvitationItem {
@@ -232,13 +234,17 @@ export const invitationService = {
   },
 
   async createInvitation(token: string, payload: InvitationCreatePayload): Promise<InvitationItem> {
+    const payloadWithBase = {
+      ...payload,
+      base_url: payload.base_url || (typeof window !== 'undefined' ? window.location.origin : undefined),
+    };
     const res = await fetch(`${API_BASE_URL}/invitations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payloadWithBase),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

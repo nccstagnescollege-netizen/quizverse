@@ -71,6 +71,7 @@ class InvitationCreateRequest(BaseModel):
     require_account: bool = False
     require_approval: bool = False
     internal_notes: Optional[str] = None
+    base_url: Optional[str] = None
 
 
 class InvitationUpdateRequest(BaseModel):

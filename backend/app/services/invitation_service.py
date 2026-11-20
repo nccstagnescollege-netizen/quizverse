@@ -15,7 +15,7 @@ except ImportError:
     QRCODE_AVAILABLE = False
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, desc, select
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
 
 from backend.app.models.invitation import InvitationLink, InvitationUsage
 from backend.app.models.quiz import Quiz, QuizConfiguration
@@ -95,9 +95,35 @@ def is_super_admin(admin: Admin) -> bool:
 class InvitationService:
 
     @staticmethod
-    def _get_base_url() -> str:
-        # Defaults to frontend local port or config
-        return getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    def _get_base_url(req_base_url: Optional[str] = None, request: Optional[Request] = None) -> str:
+        # 1. Explicitly passed in payload or function argument
+        if req_base_url and req_base_url.strip():
+            return req_base_url.strip().rstrip("/")
+
+        # 2. Extract from request Origin or Referer header (sent by browsers on web requests)
+        if request:
+            origin = request.headers.get("origin")
+            if origin and origin.strip():
+                return origin.strip().rstrip("/")
+            referer = request.headers.get("referer")
+            if referer and referer.strip():
+                from urllib.parse import urlparse
+                parsed = urlparse(referer)
+                if parsed.scheme and parsed.netloc:
+                    return f"{parsed.scheme}://{parsed.netloc}"
+
+        # 3. Environment configuration settings.FRONTEND_URL
+        if getattr(settings, "FRONTEND_URL", None):
+            return settings.FRONTEND_URL.rstrip("/")
+
+        # 4. Fallback to production CORS origin if present
+        cors = getattr(settings, "BACKEND_CORS_ORIGINS", None)
+        if cors and isinstance(cors, list):
+            for o in cors:
+                if isinstance(o, str) and ("vercel.app" in o or "https://" in o):
+                    return o.rstrip("/")
+
+        return "http://localhost:3000"
 
     @staticmethod
     def check_quiz_permission(db: Session, admin: Admin, quiz: Quiz) -> bool:
@@ -159,7 +185,12 @@ class InvitationService:
         return results
 
     @staticmethod
-    def create_invitation(db: Session, admin: Admin, req: InvitationCreateRequest) -> InvitationResponse:
+    def create_invitation(
+        db: Session,
+        admin: Admin,
+        req: InvitationCreateRequest,
+        request: Optional[Request] = None,
+    ) -> InvitationResponse:
         """
         Create a secure invitation link for an eligible quiz.
         Generates cryptographic token, stores SHA-256 hash, and generates QR representations.
@@ -229,7 +260,7 @@ class InvitationService:
         db.refresh(invitation)
 
         # Construct URLs & QR code
-        base_url = InvitationService._get_base_url()
+        base_url = InvitationService._get_base_url(req_base_url=getattr(req, "base_url", None), request=request)
         access_url = f"{base_url}/join/{raw_token}"
         qr_svg = generate_qr_svg(access_url)
         qr_png = generate_qr_png_base64(access_url)

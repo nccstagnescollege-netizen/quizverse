@@ -95,10 +95,17 @@ export function InvitationDashboard({ basePath }: InvitationDashboardProps) {
     }
   };
 
-  const handleCopyLink = (inv: InvitationItem) => {
+  const normalizeAccessUrl = (accessUrl?: string | null, fallbackId?: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-    // If raw_token was provided in session, use it; otherwise fallback to join with id
-    const accessUrl = inv.access_url || `${origin}/join/${inv.id}`;
+    if (!accessUrl) return `${origin}/join/${fallbackId || ''}`;
+    if (accessUrl.includes('localhost')) {
+      return accessUrl.replace(/https?:\/\/localhost(:\d+)?/, origin);
+    }
+    return accessUrl;
+  };
+
+  const handleCopyLink = (inv: InvitationItem) => {
+    const accessUrl = normalizeAccessUrl(inv.access_url, inv.id);
     navigator.clipboard.writeText(accessUrl);
     setCopiedId(inv.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -303,8 +310,7 @@ export function InvitationDashboard({ basePath }: InvitationDashboardProps) {
               <tbody className="divide-y divide-surface-border/60">
                 {invitations.map((inv) => {
                   const percent = Math.min(100, Math.round((inv.used_count / (inv.max_uses || 1)) * 100));
-                  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-                  const accessUrl = inv.access_url || `${origin}/join/${inv.id}`;
+                  const accessUrl = normalizeAccessUrl(inv.access_url, inv.id);
 
                   return (
                     <tr
@@ -531,7 +537,7 @@ export function InvitationDashboard({ basePath }: InvitationDashboardProps) {
       {activeQRInvitation && (
         <QRCodeModal
           invitation={activeQRInvitation}
-          accessUrl={activeQRInvitation.access_url || `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/join/${activeQRInvitation.id}`}
+          accessUrl={normalizeAccessUrl(activeQRInvitation.access_url, activeQRInvitation.id)}
           isOpen={!!activeQRInvitation}
           onClose={() => setActiveQRInvitation(null)}
         />
