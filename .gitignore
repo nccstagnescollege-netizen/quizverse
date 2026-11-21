@@ -17,6 +17,7 @@ htmlcov/
 # Next.js Build Outputs
 frontend/.next/
 frontend/out/
+*.tsbuildinfo
 dist/
 build/
 .output/
