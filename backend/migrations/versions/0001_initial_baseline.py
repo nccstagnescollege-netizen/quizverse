@@ -28,6 +28,11 @@ def upgrade() -> None:
         sa.Column('notes', sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
+    # Ensure alembic_version has sufficient length for long revision names
+    try:
+        op.execute(sa.text("ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE character varying(128);"))
+    except Exception:
+        pass
 
 
 def downgrade() -> None:

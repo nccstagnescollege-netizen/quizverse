@@ -114,6 +114,12 @@ def upgrade():
     op.create_index('ix_quiz_attachments_quiz_id', 'quiz_attachments', ['quiz_id'])
     op.create_index('ix_quiz_attachments_quiz_question_id', 'quiz_attachments', ['quiz_question_id'])
 
+    # Ensure alembic_version has sufficient length for subsequent revision 0009
+    try:
+        op.execute(sa.text("ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE character varying(128);"))
+    except Exception:
+        pass
+
 
 def downgrade():
     op.drop_table('quiz_attachments')

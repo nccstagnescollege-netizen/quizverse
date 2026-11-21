@@ -46,5 +46,11 @@ END $$;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA public;
 
+-- 7. Pre-create Alembic version table with adequate length (128 chars) for long revision IDs
+CREATE TABLE IF NOT EXISTS alembic_version (
+    version_num VARCHAR(128) NOT NULL,
+    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+);
+
 -- Comment verification
 COMMENT ON SCHEMA public IS 'QUIZVERSE pristine public schema - ready for migration bootstrap';

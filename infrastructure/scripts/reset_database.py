@@ -105,6 +105,17 @@ def drop_and_recreate_schema():
             cursor.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\" WITH SCHEMA public;")
             cursor.execute("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\" WITH SCHEMA public;")
             
+            # 6. Pre-create Alembic version table with adequate length (128 chars) for long revision IDs
+            print("  -> Initializing Alembic version tracking table (VARCHAR(128))...")
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alembic_version (
+                    version_num VARCHAR(128) NOT NULL,
+                    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+                );
+                """
+            )
+            
         print("  [OK] Database schema wiped and recreated successfully.")
     finally:
         raw_conn.close()
@@ -119,6 +130,7 @@ def run_alembic_migrations():
     ini_path = BACKEND_DIR / "alembic.ini"
     alembic_cfg = Config(str(ini_path))
     alembic_cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
+    alembic_cfg.set_main_option("version_table_pk_length", "128")
     
     try:
         command.upgrade(alembic_cfg, "head")

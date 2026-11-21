@@ -35,6 +35,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table_pk_length=128,
     )
 
     with context.begin_transaction():
@@ -49,8 +50,18 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        import sqlalchemy as sa
+        try:
+            connection.execute(sa.text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(128) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num));"))
+            connection.execute(sa.text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128);"))
+            connection.commit()
+        except Exception:
+            pass
+
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table_pk_length=128,
         )
 
         with context.begin_transaction():
