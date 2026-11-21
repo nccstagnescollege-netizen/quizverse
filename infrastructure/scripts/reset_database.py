@@ -174,9 +174,52 @@ def run_idempotent_bootstraps():
     print("  [OK] All advanced module schemas verified.")
 
 
+def enforce_row_level_security():
+    """Enables Row Level Security (RLS) on 100% of tables and creates service_role policies."""
+    print("\n[Step 5/7] Enforcing PostgreSQL Row Level Security (RLS) across all tables...")
+    with engine.connect() as conn:
+        tables = conn.execute(
+            text(
+                """
+                SELECT tablename 
+                FROM pg_tables 
+                WHERE schemaname = 'public' 
+                ORDER BY tablename;
+                """
+            )
+        ).fetchall()
+        for (tbl,) in tables:
+            conn.execute(text(f'ALTER TABLE "{tbl}" ENABLE ROW LEVEL SECURITY;'))
+            policy_name = f"service_role_manage_{tbl}"[:63]
+            conn.execute(
+                text(
+                    f"""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_policies 
+                            WHERE schemaname = 'public' 
+                              AND tablename = '{tbl}' 
+                              AND policyname = '{policy_name}'
+                        ) THEN
+                            CREATE POLICY "{policy_name}" 
+                            ON "{tbl}" 
+                            FOR ALL 
+                            TO service_role 
+                            USING (true) 
+                            WITH CHECK (true);
+                        END IF;
+                    END $$;
+                    """
+                )
+            )
+        conn.commit()
+    print("  [OK] Row Level Security (RLS) enabled on all tables with service_role governance.")
+
+
 def seed_super_administrators(email: str, password: str, full_name: str):
     """Provisions the requested Super Administrator and the admin@quizverse.io alias."""
-    print("\n[Step 5/6] Provisioning Super Administrator accounts...")
+    print("\n[Step 6/7] Provisioning Super Administrator accounts...")
     with SessionLocal() as db:
         # 1. Fetch super_admin role
         super_role = db.query(Role).filter(Role.role_name == "super_admin").first()
@@ -312,6 +355,7 @@ def main():
         run_alembic_migrations()
         create_declarative_tables()
         run_idempotent_bootstraps()
+        enforce_row_level_security()
         seed_super_administrators(email=args.email, password=args.password, full_name=args.name)
         verify_database_health(email=args.email, password=args.password)
         

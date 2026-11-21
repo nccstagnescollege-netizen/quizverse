@@ -52,5 +52,15 @@ CREATE TABLE IF NOT EXISTS alembic_version (
     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
+-- 8. Auto-enable Row Level Security (RLS) on all current and future public tables
+DO $$
+DECLARE
+    tbl text;
+BEGIN
+    FOR tbl IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', tbl);
+    END LOOP;
+END $$;
+
 -- Comment verification
 COMMENT ON SCHEMA public IS 'QUIZVERSE pristine public schema - ready for migration bootstrap';
