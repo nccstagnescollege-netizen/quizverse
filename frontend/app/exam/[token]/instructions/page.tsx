@@ -26,6 +26,7 @@ import {
   StudentExamLandingDetails,
 } from '@/services/studentExamService';
 import { securityService } from '@/services/securityService';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function ExamInstructionsPage() {
   const params = useParams();
@@ -121,28 +122,31 @@ export default function ExamInstructionsPage() {
   const canProceed = landingDetails ? (landingDetails.can_start || landingDetails.can_resume) : true;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6">
+    <div className="min-h-screen bg-surface-base text-foreground py-10 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <Link href={`/exam/${token}`} className="hover:text-white flex items-center gap-1 transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Examination Landing</span>
-          </Link>
-          <span>/</span>
-          <span className="text-slate-200">Pre-Flight Instructions</span>
+        {/* Navigation Breadcrumb & Theme Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Link href={`/exam/${token}`} className="hover:text-foreground flex items-center gap-1 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Examination Landing</span>
+            </Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Pre-Flight Instructions</span>
+          </div>
+          <ThemeToggle size="sm" showDropdown />
         </div>
 
         {/* Title Header */}
         <div className="space-y-1 border-b border-surface-border pb-4">
-          <span className="text-[10px] uppercase font-mono tracking-wider text-primary-400">
+          <span className="text-[10px] uppercase font-mono tracking-wider text-primary-500 font-semibold">
             Candidate Briefing
           </span>
-          <h1 className="text-xl sm:text-2xl font-bold text-white">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             {instructions.quiz_title} — Examination Rules &amp; Protocols
           </h1>
           {instructions.subject_name && (
-            <p className="text-xs text-slate-400">{instructions.subject_name}</p>
+            <p className="text-xs text-muted-foreground">{instructions.subject_name}</p>
           )}
         </div>
 

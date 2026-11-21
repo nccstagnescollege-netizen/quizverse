@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 import jwt
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_, desc
+from sqlalchemy import func, or_, desc, cast, String
 
 from backend.app.core.config import settings
 from backend.app.models.base import utc_now
@@ -127,17 +127,32 @@ def _resolve_invitation_or_quiz(db: Session, token: str, load_sections: bool = F
 
     # Fallback: Candidate Registration Code (e.g. REG-390DF52D or REG-D280DB0A)
     if not quiz and token_str:
-        clean_code = token_str.upper().replace("REG-", "").strip()
-        if len(clean_code) >= 6:
-            parts = db.query(QuizParticipant).options(
-                joinedload(QuizParticipant.quiz).joinedload(Quiz.subject),
-                joinedload(QuizParticipant.quiz).joinedload(Quiz.configuration),
-            ).all()
-            for p in parts:
-                p_hex = str(p.id).replace("-", "").upper()
-                if p_hex.startswith(clean_code) or str(p.id).upper().startswith(clean_code):
-                    quiz = p.quiz
-                    break
+        clean_code = token_str.upper().replace("REG-", "").strip().lower()
+        if len(clean_code) >= 4:
+            # 1. Direct query on prefix of participant UUID
+            matched_p = (
+                db.query(QuizParticipant)
+                .options(
+                    joinedload(QuizParticipant.quiz).joinedload(Quiz.subject),
+                    joinedload(QuizParticipant.quiz).joinedload(Quiz.configuration),
+                )
+                .filter(cast(QuizParticipant.id, String).ilike(f"{clean_code}%"))
+                .first()
+            )
+            if matched_p and matched_p.quiz:
+                quiz = matched_p.quiz
+            else:
+                # 2. In-memory check on loaded participants
+                parts = db.query(QuizParticipant).options(
+                    joinedload(QuizParticipant.quiz).joinedload(Quiz.subject),
+                    joinedload(QuizParticipant.quiz).joinedload(Quiz.configuration),
+                ).all()
+                for p in parts:
+                    p_hex = str(p.id).replace("-", "").lower()
+                    p_str = str(p.id).lower()
+                    if p_hex.startswith(clean_code) or p_str.startswith(clean_code):
+                        quiz = p.quiz
+                        break
 
     if quiz:
         if quiz.status == "draft":
@@ -286,6 +301,11 @@ class StudentExamService:
         inv = _resolve_invitation_or_quiz(db, token, load_sections=True)
 
         if not inv:
+            if token and token.upper().startswith("REG-"):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Candidate registration code '{token}' was not found. Please verify your registration code or complete exam registration."
+                )
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid examination invitation token")
 
         if inv.is_revoked:
@@ -322,13 +342,21 @@ class StudentExamService:
 
         if registration_code:
             code_clean = registration_code.strip().upper()
+            pure_code = code_clean.replace("REG-", "").strip().lower()
             # Match by participant id prefix or full id
             all_parts = db.query(QuizParticipant).options(
                 joinedload(QuizParticipant.student).joinedload(Student.profile)
             ).filter(QuizParticipant.quiz_id == quiz.id).all()
             for p in all_parts:
+                p_hex = str(p.id).replace("-", "").lower()
+                p_str = str(p.id).lower()
                 expected_code = f"REG-{str(p.id)[:8].upper()}"
-                if expected_code == code_clean or str(p.id).upper() == code_clean:
+                if (
+                    expected_code == code_clean
+                    or str(p.id).upper() == code_clean
+                    or p_str.startswith(pure_code)
+                    or p_hex.startswith(pure_code)
+                ):
                     participant = p
                     student = p.student
                     break
@@ -1865,6 +1893,7 @@ class StudentExamService:
         student: Optional[Student] = None
         if registration_code:
             code_clean = registration_code.strip().upper()
+            pure_code = code_clean.replace("REG-", "").strip().lower()
             all_parts = (
                 db.query(QuizParticipant)
                 .options(joinedload(QuizParticipant.student).joinedload(Student.profile))
@@ -1872,8 +1901,15 @@ class StudentExamService:
                 .all()
             )
             for p in all_parts:
+                p_hex = str(p.id).replace("-", "").lower()
+                p_str = str(p.id).lower()
                 expected_code = f"REG-{str(p.id)[:8].upper()}"
-                if expected_code == code_clean or str(p.id).upper() == code_clean:
+                if (
+                    expected_code == code_clean
+                    or str(p.id).upper() == code_clean
+                    or p_str.startswith(pure_code)
+                    or p_hex.startswith(pure_code)
+                ):
                     student = p.student
                     break
         elif email:
@@ -1910,5 +1946,14 @@ class StudentExamService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No examination attempt found for this candidate."
             )
+
+        # Proactively evaluate scoring if attempt is concluded/submitted but has no result record yet!
+        if not attempt.result:
+            try:
+                EvaluationService.run_evaluation(db, attempt.id)
+                db.commit()
+                db.refresh(attempt)
+            except Exception as eval_err:
+                logger.warning(f"On-demand evaluation warning for attempt {attempt.id}: {eval_err}")
 
         return StudentExamService._build_result_response(quiz, quiz.configuration, attempt)

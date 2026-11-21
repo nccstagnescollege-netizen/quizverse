@@ -41,6 +41,7 @@ import {
 } from 'recharts';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { StatCard } from '@/components/ui/StatCard';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { ChartContainer } from '@/components/ui/ChartContainer';
@@ -69,6 +70,7 @@ interface OverviewStats {
 
 export default function SuperAdminDashboardPage() {
   const { user, token, isSuperAdmin, isLoading: authLoading } = useAuth();
+  const { chartColors } = useTheme();
   const router = useRouter();
 
   const [stats, setStats] = useState<OverviewStats | null>(null);
@@ -406,16 +408,18 @@ export default function SuperAdminDashboardPage() {
                             <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis dataKey="date" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                        <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
                         <Area
                           type="monotone"
@@ -466,16 +470,18 @@ export default function SuperAdminDashboardPage() {
                             <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis dataKey="date" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                        <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
                         <Area
                           type="monotone"
@@ -523,16 +529,18 @@ export default function SuperAdminDashboardPage() {
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={examTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis dataKey="date" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                        <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
                         <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                         <Bar dataKey="attempts" name="Total Attempts" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
@@ -599,22 +607,24 @@ export default function SuperAdminDashboardPage() {
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={scoreData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis dataKey="range" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis dataKey="range" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                        <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           formatter={(val: any, name: any, item: any) => [
                             `${val} candidates (${item.payload.percentage}%)`,
                             'Count',
                           ]}
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
-                        <Bar dataKey="count" fill="#06b6d4" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="count" fill={chartColors.cyan} radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -632,12 +642,12 @@ export default function SuperAdminDashboardPage() {
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={questionData} layout="vertical" margin={{ top: 10, right: 20, left: 20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis type="number" stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis type="number" stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <YAxis
                           type="category"
                           dataKey="unit_code"
-                          stroke="#94a3b8"
+                          stroke={chartColors.text}
                           fontSize={10}
                           tickLine={false}
                           width={60}
@@ -648,13 +658,15 @@ export default function SuperAdminDashboardPage() {
                             'Questions',
                           ]}
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
-                        <Bar dataKey="question_count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="question_count" fill={chartColors.purple} radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -675,18 +687,20 @@ export default function SuperAdminDashboardPage() {
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={quizStatusData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis dataKey="name" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                        <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
-                        <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="count" fill={chartColors.emerald} radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -704,16 +718,18 @@ export default function SuperAdminDashboardPage() {
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={adminActivity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                        <XAxis dataKey="full_name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                        <XAxis dataKey="full_name" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                        <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: '#0f172a',
-                            borderColor: '#334155',
+                            backgroundColor: chartColors.tooltipBg,
+                            borderColor: chartColors.tooltipBorder,
+                            color: chartColors.tooltipText,
                             borderRadius: '0.75rem',
                             fontSize: '12px',
                           }}
+                          itemStyle={{ color: chartColors.tooltipText }}
                         />
                         <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                         <Bar dataKey="quizzes_created" name="Quizzes Created" fill="#8b5cf6" radius={[4, 4, 0, 0]} />

@@ -36,7 +36,7 @@ export function ResponsiveTable<T>({
 
   if (safeData.length === 0) {
     return (
-      <div className={cn('w-full rounded-2xl border border-surface-border glass-card p-8 text-center text-slate-400', className)}>
+      <div className={cn('w-full rounded-2xl border border-surface-border glass-card p-8 text-center text-muted-foreground', className)}>
         {emptyMessage}
       </div>
     );
@@ -49,7 +49,7 @@ export function ResponsiveTable<T>({
         <div className="flex justify-end items-center gap-1.5 md:hidden">
           <button
             onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-surface-border text-[11px] text-slate-300 hover:text-white"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-surface-border text-[11px] text-muted-foreground hover:text-foreground"
             title="Toggle between Card Stack and Horizontal Table"
           >
             {viewMode === 'cards' ? (
@@ -77,13 +77,13 @@ export function ResponsiveTable<T>({
           ) : (
             <div
               key={keyExtractor(row)}
-              className="glass-card rounded-2xl border border-surface-border p-4 space-y-3 transition-colors hover:border-slate-500/40"
+              className="glass-card rounded-2xl border border-surface-border p-4 space-y-3 transition-colors hover:border-primary-500/40"
             >
               <div className="space-y-2">
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-center justify-between text-xs py-1 border-b border-surface-border/40 last:border-b-0">
-                    <span className="text-slate-400 font-mono text-[11px] uppercase tracking-wider">{col.header}</span>
-                    <span className="text-slate-200 font-medium">
+                    <span className="text-muted-foreground font-mono text-[11px] uppercase tracking-wider">{col.header}</span>
+                    <span className="text-foreground font-medium">
                       {col.render ? col.render(row) : ((row as Record<string, unknown>)[col.key] as React.ReactNode)}
                     </span>
                   </div>
@@ -103,7 +103,7 @@ export function ResponsiveTable<T>({
       >
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="border-b border-surface-border bg-surface-elevated/70 text-slate-400 font-mono uppercase tracking-wider">
+            <tr className="border-b border-surface-border bg-surface-elevated text-muted-foreground font-mono uppercase tracking-wider">
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -121,12 +121,12 @@ export function ResponsiveTable<T>({
           </thead>
           <tbody className="divide-y divide-surface-border/60">
             {safeData.map((row) => (
-              <tr key={keyExtractor(row)} className="hover:bg-white/[0.03] transition-colors group">
+              <tr key={keyExtractor(row)} className="hover:bg-primary-500/[0.04] transition-colors group">
                 {columns.map((col) => (
                   <td
                     key={col.key}
                     className={cn(
-                      'px-4 py-3.5 text-slate-200 align-middle',
+                      'px-4 py-3.5 text-foreground align-middle',
                       col.hideOnMobile && 'hidden lg:table-cell',
                       col.className
                     )}

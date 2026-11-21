@@ -4,6 +4,7 @@ import { Settings, Server, Database, Shield, Globe } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import { DashboardCard } from '@/components/ui/DashboardCard';
+import { ThemeSelectorCard } from '@/components/ui/ThemeSelectorCard';
 
 export default function AdminSettingsPage() {
   return (
@@ -11,9 +12,12 @@ export default function AdminSettingsPage() {
       <Breadcrumb items={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Settings' }]} />
 
       <PageHeader
-        title="System Settings"
-        description="Configure FastAPI backend connection, Supabase PostgreSQL poolers, and deployment parameters."
+        title="Settings &amp; Preferences"
+        description="Configure theme appearance, FastAPI backend parameters, Supabase database connections, and operational options."
       />
+
+      {/* Theme & Visual Appearance Preference */}
+      <ThemeSelectorCard />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DashboardCard glow="brand" className="space-y-4">
@@ -22,23 +26,23 @@ export default function AdminSettingsPage() {
               <Server className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">FastAPI Backend Configuration</h3>
-              <p className="text-xs text-slate-400">Render / Local Python Container</p>
+              <h3 className="text-sm font-semibold text-foreground">FastAPI Backend Configuration</h3>
+              <p className="text-xs text-muted-foreground">Render / Cloud Python Application</p>
             </div>
           </div>
 
-          <div className="space-y-2 text-xs font-mono text-slate-300">
+          <div className="space-y-2 text-xs font-mono text-muted-foreground">
             <div className="flex justify-between py-2 border-b border-surface-border">
-              <span className="text-slate-400">Endpoint:</span>
-              <span>http://localhost:8000</span>
+              <span>Endpoint:</span>
+              <span className="text-foreground font-semibold">https://quizverse-ymsg.onrender.com</span>
             </div>
             <div className="flex justify-between py-2 border-b border-surface-border">
-              <span className="text-slate-400">API Prefix:</span>
-              <span>/api/v1</span>
+              <span>API Prefix:</span>
+              <span className="text-foreground">/api/v1</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-slate-400">Deployment Target:</span>
-              <span className="text-cyber-cyan">Render Free Tier</span>
+              <span>Deployment Mode:</span>
+              <span className="text-cyber-cyan font-semibold">Render Free Tier (Zero Cost)</span>
             </div>
           </div>
         </DashboardCard>
@@ -49,23 +53,23 @@ export default function AdminSettingsPage() {
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">Supabase Infrastructure</h3>
-              <p className="text-xs text-slate-400">PostgreSQL 15 &amp; Connection Pooling</p>
+              <h3 className="text-sm font-semibold text-foreground">Supabase Infrastructure</h3>
+              <p className="text-xs text-muted-foreground">PostgreSQL 15 &amp; Connection Pooling</p>
             </div>
           </div>
 
-          <div className="space-y-2 text-xs font-mono text-slate-300">
+          <div className="space-y-2 text-xs font-mono text-muted-foreground">
             <div className="flex justify-between py-2 border-b border-surface-border">
-              <span className="text-slate-400">Database Engine:</span>
-              <span>PostgreSQL 15 (Supabase)</span>
+              <span>Database Engine:</span>
+              <span className="text-foreground">PostgreSQL 15 (Supabase)</span>
             </div>
             <div className="flex justify-between py-2 border-b border-surface-border">
-              <span className="text-slate-400">Migrations:</span>
-              <span>Alembic 1.14</span>
+              <span>Migrations:</span>
+              <span className="text-foreground">Alembic 1.14 (Schema 0010)</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-slate-400">Row Level Security:</span>
-              <span className="text-emerald-400">Enabled</span>
+              <span>Row Level Security (RLS):</span>
+              <span className="text-emerald-500 font-semibold">100% Enforced (92 Tables)</span>
             </div>
           </div>
         </DashboardCard>

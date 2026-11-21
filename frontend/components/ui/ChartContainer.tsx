@@ -33,8 +33,8 @@ export function ChartContainer({
     >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-4">
         <div>
-          <h3 className="text-sm font-semibold text-white tracking-wide">{title}</h3>
-          {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+          <h3 className="text-sm font-semibold text-foreground tracking-wide">{title}</h3>
+          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
         {topAction && <div className="w-full sm:w-auto flex items-center justify-start sm:justify-end overflow-x-auto">{topAction}</div>}
       </div>

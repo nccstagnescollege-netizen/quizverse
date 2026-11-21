@@ -4,23 +4,95 @@
 
 @layer base {
   :root {
+    /* -------------------------------------------------------------
+       DARK MODE DESIGN TOKENS (Deep Cyber-Glass Aesthetic)
+       ------------------------------------------------------------- */
     --background: #080a10;
     --foreground: #f1f5f9;
     --surface-base: #080a10;
     --surface-elevated: #0f1422;
     --surface-panel: #151c30;
-    --surface-card: rgba(21, 28, 48, 0.65);
+    --surface-card: rgba(21, 28, 48, 0.75);
     --surface-border: rgba(255, 255, 255, 0.08);
+    --surface-border-subtle: rgba(255, 255, 255, 0.04);
+
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --heading-color: #ffffff;
+
+    --brand-primary: #6257e8;
+    --brand-accent: #00f5d4;
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-error: #ef4444;
+    --status-info: #3b82f6;
+
+    --input-bg: rgba(15, 20, 34, 0.85);
+    --input-border: rgba(255, 255, 255, 0.12);
+    --input-text: #f8fafc;
+    --input-placeholder: #64748b;
+
+    --popover-bg: #0f1422;
+    --popover-border: rgba(255, 255, 255, 0.1);
+
+    --chart-grid: rgba(255, 255, 255, 0.08);
+    --chart-text: #94a3b8;
+
+    --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+    --nav-bg: rgba(8, 10, 16, 0.85);
+    --radial-glow: radial-gradient(circle at 50% 20%, rgba(70, 104, 250, 0.15) 0%, rgba(8, 10, 16, 0) 70%);
+    --grid-line: rgba(255, 255, 255, 0.03);
   }
 
   .light {
-    --background: #f8fafc;
-    --foreground: #0f172a;
-    --surface-base: #ffffff;
-    --surface-elevated: #f1f5f9;
-    --surface-panel: #e2e8f0;
-    --surface-card: rgba(255, 255, 255, 0.85);
-    --surface-border: rgba(0, 0, 0, 0.1);
+    /* -------------------------------------------------------------
+       LIGHT MODE DESIGN TOKENS (Premium SaaS Studio Aesthetic)
+       ------------------------------------------------------------- */
+    --background: #F7F8FC;
+    --foreground: #182230;
+    --surface-base: #F7F8FC;
+    --surface-elevated: #FFFFFF;
+    --surface-panel: #F1F3F9;
+    --surface-card: #FFFFFF;
+    --surface-border: #E4E7EC;
+    --surface-border-subtle: #EEF2F6;
+
+    --text-primary: #182230;
+    --text-secondary: #475467;
+    --text-muted: #667085;
+    --heading-color: #182230;
+
+    --brand-primary: #6257E8;
+    --brand-accent: #4F46E5;
+    --status-success: #159B68;
+    --status-warning: #D99018;
+    --status-error: #D64545;
+    --status-info: #2878D0;
+
+    --input-bg: #FFFFFF;
+    --input-border: #D0D5DD;
+    --input-text: #182230;
+    --input-placeholder: #98A2B3;
+
+    --popover-bg: #FFFFFF;
+    --popover-border: #E4E7EC;
+
+    --chart-grid: #E4E7EC;
+    --chart-text: #475467;
+
+    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+    --card-shadow: 0 4px 20px -2px rgba(16, 24, 40, 0.06), 0 2px 6px -1px rgba(16, 24, 40, 0.04);
+    --nav-bg: rgba(255, 255, 255, 0.92);
+    --radial-glow: radial-gradient(circle at 50% 20%, rgba(98, 87, 232, 0.08) 0%, rgba(247, 248, 252, 0) 70%);
+    --grid-line: rgba(16, 24, 40, 0.04);
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
@@ -40,12 +112,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--scrollbar-thumb);
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--scrollbar-thumb-hover);
   }
 }
 
@@ -55,10 +127,11 @@
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--surface-border);
+    box-shadow: var(--card-shadow);
   }
 
   .glass-nav {
-    background: rgba(8, 10, 16, 0.82);
+    background: var(--nav-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--surface-border);
@@ -70,15 +143,105 @@
     -webkit-text-fill-color: transparent;
   }
 
+  .light .text-gradient {
+    background: linear-gradient(135deg, #182230 0%, #6257e8 50%, #00b4d8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
   .bg-radial-glow {
-    background: radial-gradient(circle at 50% 20%, rgba(70, 104, 250, 0.15) 0%, rgba(8, 10, 16, 0) 70%);
+    background: var(--radial-glow);
   }
 
   .bg-grid-pattern {
     background-size: 32px 32px;
     background-image: 
-      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  }
+}
+
+/* -------------------------------------------------------------
+   LIGHT MODE CONTEXTUAL INTELLIGENCE & ACCESSIBILITY RULES
+   Ensures cards, text, forms, and tables adapt gracefully to Light Mode
+   ------------------------------------------------------------- */
+.light {
+  /* Typography defaults */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--heading-color);
+  }
+
+  /* Form controls defaults */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+  select,
+  textarea {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--input-border);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--input-placeholder);
+  }
+
+  /* Card and table borders */
+  .border-surface-border {
+    border-color: var(--surface-border) !important;
+  }
+
+  /* Dropdown and Popover surfaces */
+  .bg-surface-elevated {
+    background-color: var(--surface-elevated);
+  }
+
+  /* High-contrast readable text in light mode cards and tables */
+  .glass-card h1, 
+  .glass-card h2, 
+  .glass-card h3, 
+  .glass-card h4 {
+    color: #182230;
+  }
+
+  /* Modal backgrounds must never appear transparent */
+  [role="dialog"],
+  .modal-surface,
+  .fixed.inset-0.z-50 > div {
+    background-color: var(--surface-elevated);
+    border-color: var(--surface-border);
+  }
+
+  /* Table zebra striping and header in light mode */
+  table thead tr {
+    background-color: #F1F3F9 !important;
+    color: #475467 !important;
+  }
+  table tbody tr {
+    border-color: #E4E7EC !important;
+  }
+  table tbody tr:hover {
+    background-color: rgba(98, 87, 232, 0.03);
+  }
+
+  /* StatCard & DashboardCard text adaptability */
+  .glass-card .font-bold.text-white {
+    color: #182230;
+  }
+
+  /* Seamless text adaptation for non-button text */
+  .text-white:not([class*="bg-"]):not([class*="from-"]):not([class*="badge"]):not(button):not(a[class*="bg-"]) {
+    color: #182230;
+  }
+  .text-slate-100:not([class*="bg-"]):not([class*="from-"]) {
+    color: #182230;
+  }
+  .text-slate-200:not([class*="bg-"]):not([class*="from-"]) {
+    color: #344054;
+  }
+  .text-slate-300:not([class*="bg-"]):not([class*="from-"]) {
+    color: #475467;
+  }
+  .text-slate-400:not([class*="bg-"]):not([class*="from-"]) {
+    color: #667085;
   }
 }
 

@@ -31,8 +31,8 @@ export function DashboardCard({
     header ||
     (title && (
       <div>
-        <h3 className="text-sm font-semibold text-white tracking-wide">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        <h3 className="text-sm font-semibold text-foreground tracking-wide">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
       </div>
     ));
 

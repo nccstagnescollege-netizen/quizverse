@@ -44,6 +44,7 @@ import {
   Area,
 } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   analyticsService,
   AnalyticsFilterParams,
@@ -66,6 +67,7 @@ const SCORE_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#2
 
 export function AnalyticsDashboardView() {
   const { token, isSuperAdmin } = useAuth();
+  const { chartColors } = useTheme();
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<
@@ -561,12 +563,12 @@ export function AnalyticsDashboardView() {
                         <Cell fill="#10b981" />
                         <Cell fill="#f43f5e" />
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#090d16', borderColor: '#1e293b', borderRadius: '12px' }} />
+                      <Tooltip contentStyle={{ backgroundColor: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder, color: chartColors.tooltipText, borderRadius: '12px' }} itemStyle={{ color: chartColors.tooltipText }} />
                       <Legend verticalAlign="bottom" height={36} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="text-xs text-slate-500">No evaluated examination records found.</div>
+                  <div className="text-xs text-muted-foreground">No evaluated examination records found.</div>
                 )}
               </div>
             </div>
@@ -574,8 +576,8 @@ export function AnalyticsDashboardView() {
 
           {/* 14-Day Examination Trajectory Chart */}
           <div className="p-5 rounded-2xl bg-surface-card border border-surface-border space-y-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-cyan-500" />
               <span>Examination Activity Trajectory (14 Days)</span>
             </h3>
             <div className="h-64">
@@ -592,10 +594,10 @@ export function AnalyticsDashboardView() {
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="label" stroke="#64748b" textAnchor="end" fontSize={10} />
-                    <YAxis stroke="#64748b" fontSize={10} />
-                    <Tooltip contentStyle={{ backgroundColor: '#090d16', borderColor: '#1e293b', borderRadius: '12px' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                    <XAxis dataKey="label" stroke={chartColors.text} textAnchor="end" fontSize={10} />
+                    <YAxis stroke={chartColors.text} fontSize={10} />
+                    <Tooltip contentStyle={{ backgroundColor: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder, color: chartColors.tooltipText, borderRadius: '12px' }} itemStyle={{ color: chartColors.tooltipText }} />
                     <Legend verticalAlign="top" height={36} />
                     <Area type="monotone" dataKey="attempts" name="Total Attempts" stroke="#06b6d4" fillOpacity={1} fill="url(#colorAttempts)" />
                     <Area type="monotone" dataKey="completed" name="Completed" stroke="#10b981" fillOpacity={1} fill="url(#colorCompleted)" />
@@ -874,11 +876,12 @@ export function AnalyticsDashboardView() {
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={distribution.score_bands}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="band" stroke="#64748b" fontSize={10} />
-                  <YAxis stroke="#64748b" fontSize={10} allowDecimals={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                  <XAxis dataKey="band" stroke={chartColors.text} fontSize={10} />
+                  <YAxis stroke={chartColors.text} fontSize={10} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#090d16', borderColor: '#1e293b', borderRadius: '12px' }}
+                    contentStyle={{ backgroundColor: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder, color: chartColors.tooltipText, borderRadius: '12px' }}
+                    itemStyle={{ color: chartColors.tooltipText }}
                     formatter={(val: any, name: any, item: any) => [`${val} students (${item.payload.percentage}%)`, 'Students']}
                   />
                   <Bar dataKey="count" radius={[6, 6, 0, 0]}>
@@ -1046,10 +1049,10 @@ export function AnalyticsDashboardView() {
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trends.data_points}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="label" stroke="#64748b" fontSize={10} />
-                  <YAxis stroke="#64748b" fontSize={10} />
-                  <Tooltip contentStyle={{ backgroundColor: '#090d16', borderColor: '#1e293b', borderRadius: '12px' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                  <XAxis dataKey="label" stroke={chartColors.text} fontSize={10} />
+                  <YAxis stroke={chartColors.text} fontSize={10} />
+                  <Tooltip contentStyle={{ backgroundColor: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder, color: chartColors.tooltipText, borderRadius: '12px' }} itemStyle={{ color: chartColors.tooltipText }} />
                   <Legend verticalAlign="top" height={36} />
                   <Line type="monotone" dataKey="attempts" name="Total Attempts" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />

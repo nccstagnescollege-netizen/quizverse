@@ -39,6 +39,7 @@ import {
   StudentSectionItem,
 } from '@/services/studentExamService';
 import { securityService } from '@/services/securityService';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function ExamAttemptPage() {
   const params = useParams();
@@ -605,17 +606,17 @@ export default function ExamAttemptPage() {
   const isAnswered = currentAnswer.selected_option_ids.length > 0 || currentAnswer.text_response.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-primary-500/30">
+    <div className="min-h-screen bg-surface-base text-foreground flex flex-col justify-between selection:bg-primary-500/30">
       {/* 1. Header Toolbar */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-surface-border px-4 py-2.5 sm:px-6">
+      <header className="sticky top-0 z-40 bg-surface-elevated/90 backdrop-blur-md border-b border-surface-border px-4 py-2.5 sm:px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Logo & Exam Title */}
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-primary-600/20 border border-primary-500/40 text-primary-400 flex items-center justify-center font-bold shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-primary-600/20 border border-primary-500/40 text-primary-500 flex items-center justify-center font-bold shrink-0">
               <GraduationCap className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xs sm:text-sm font-bold text-white truncate max-w-xs sm:max-w-md">
+              <h1 className="text-xs sm:text-sm font-bold text-foreground truncate max-w-xs sm:max-w-md">
                 {attemptDetail.quiz_title}
               </h1>
               <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
@@ -682,10 +683,13 @@ export default function ExamAttemptPage() {
               <span>{formatTime(remainingSeconds)}</span>
             </div>
 
+            {/* Theme Toggle for reading comfort */}
+            <ThemeToggle size="sm" showDropdown />
+
             {/* Fullscreen Button */}
             <button
               onClick={toggleFullscreen}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden sm:block"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors hidden sm:block cursor-pointer"
               title="Toggle Fullscreen Mode"
             >
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}

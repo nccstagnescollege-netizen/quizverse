@@ -22,6 +22,7 @@ import {
   studentExamService,
   StudentReviewSummary,
 } from '@/services/studentExamService';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function ExamReviewPage() {
   const params = useParams();
@@ -131,26 +132,29 @@ export default function ExamReviewPage() {
   if (!summary) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6">
+    <div className="min-h-screen bg-surface-base text-foreground py-10 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-surface-border pb-4">
           <div className="space-y-1">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-primary-400">
+            <span className="text-[10px] uppercase font-mono tracking-wider text-primary-500 font-semibold">
               Pre-Submission Verification
             </span>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
               Examination Answer Summary
             </h1>
           </div>
 
-          <Link
-            href={`/exam/${token}/attempt`}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-elevated hover:bg-slate-800 border border-surface-border text-xs text-slate-300 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Questions</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle size="sm" showDropdown />
+            <Link
+              href={`/exam/${token}/attempt`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-xs text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Questions</span>
+            </Link>
+          </div>
         </div>
 
         {error && (

@@ -37,6 +37,18 @@ const config: Config = {
           card: 'var(--surface-card)',
           border: 'var(--surface-border)',
         },
+        app: {
+          bg: 'var(--background)',
+          fg: 'var(--foreground)',
+          card: 'var(--surface-card)',
+          border: 'var(--surface-border)',
+          primary: 'var(--brand-primary)',
+          accent: 'var(--brand-accent)',
+          success: 'var(--status-success)',
+          warning: 'var(--status-warning)',
+          error: 'var(--status-error)',
+          info: 'var(--status-info)',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

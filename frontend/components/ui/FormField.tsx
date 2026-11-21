@@ -16,14 +16,14 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
       <div className="space-y-1.5 w-full">
         <label
           htmlFor={inputId}
-          className="block text-xs font-mono uppercase tracking-wider text-slate-300"
+          className="block text-xs font-mono uppercase tracking-wider text-muted-foreground font-medium"
         >
           {label}
         </label>
 
         <div className="relative">
           {icon && (
-            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
               {icon}
             </div>
           )}
@@ -31,19 +31,19 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
             id={inputId}
             ref={ref}
             className={cn(
-              'w-full bg-surface-base border rounded-xl py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors duration-200',
+              'w-full bg-surface-base border rounded-xl py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors duration-200',
               icon ? 'pl-10 pr-4' : 'px-4',
               error
                 ? 'border-rose-500/60 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
-                : 'border-surface-border focus:border-brand-500 focus:ring-1 focus:ring-brand-500',
+                : 'border-surface-border focus:border-primary-500 focus:ring-1 focus:ring-primary-500',
               className
             )}
             {...props}
           />
         </div>
 
-        {hint && !error && <p className="text-[11px] text-slate-400">{hint}</p>}
-        {error && <p className="text-[11px] text-rose-400 font-medium">{error}</p>}
+        {hint && !error && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        {error && <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">{error}</p>}
       </div>
     );
   }

@@ -37,6 +37,7 @@ import {
 } from 'recharts';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { StatCard } from '@/components/ui/StatCard';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { ChartContainer } from '@/components/ui/ChartContainer';
@@ -71,6 +72,7 @@ interface QuizPerformanceItem {
 
 export default function UserAdminDashboardPage() {
   const { user, token, hasPermission, isLoading: authLoading } = useAuth();
+  const { chartColors } = useTheme();
   const router = useRouter();
 
   const [stats, setStats] = useState<UserAdminOverviewStats | null>(null);
@@ -444,16 +446,18 @@ export default function UserAdminDashboardPage() {
                         <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                    <XAxis dataKey="date" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                    <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#0f172a',
-                        borderColor: '#334155',
+                        backgroundColor: chartColors.tooltipBg,
+                        borderColor: chartColors.tooltipBorder,
+                        color: chartColors.tooltipText,
                         borderRadius: '0.75rem',
                         fontSize: '12px',
                       }}
+                      itemStyle={{ color: chartColors.tooltipText }}
                     />
                     <Area
                       type="monotone"
@@ -498,16 +502,18 @@ export default function UserAdminDashboardPage() {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={studentTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                    <XAxis dataKey="date" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                    <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#0f172a',
-                        borderColor: '#334155',
+                        backgroundColor: chartColors.tooltipBg,
+                        borderColor: chartColors.tooltipBorder,
+                        color: chartColors.tooltipText,
                         borderRadius: '0.75rem',
                         fontSize: '12px',
                       }}
+                      itemStyle={{ color: chartColors.tooltipText }}
                     />
                     <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                     <Bar dataKey="attempts" name="Total Attempts" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
@@ -574,22 +580,24 @@ export default function UserAdminDashboardPage() {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={scoreData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                    <XAxis dataKey="range" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                    <XAxis dataKey="range" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                    <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       formatter={(val: any, name: any, item: any) => [
                         `${val} candidates (${item.payload.percentage}%)`,
                         'Count',
                       ]}
                       contentStyle={{
-                        backgroundColor: '#0f172a',
-                        borderColor: '#334155',
+                        backgroundColor: chartColors.tooltipBg,
+                        borderColor: chartColors.tooltipBorder,
+                        color: chartColors.tooltipText,
                         borderRadius: '0.75rem',
                         fontSize: '12px',
                       }}
+                      itemStyle={{ color: chartColors.tooltipText }}
                     />
-                    <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="count" fill={chartColors.emerald} radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -629,22 +637,24 @@ export default function UserAdminDashboardPage() {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={difficultyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                    <XAxis dataKey="difficulty" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                    <XAxis dataKey="difficulty" stroke={chartColors.text} fontSize={10} tickLine={false} />
+                    <YAxis stroke={chartColors.text} fontSize={10} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       formatter={(val: any, name: any, item: any) => [
                         `${val} questions (${item.payload.percentage}%)`,
                         'Count',
                       ]}
                       contentStyle={{
-                        backgroundColor: '#0f172a',
-                        borderColor: '#334155',
+                        backgroundColor: chartColors.tooltipBg,
+                        borderColor: chartColors.tooltipBorder,
+                        color: chartColors.tooltipText,
                         borderRadius: '0.75rem',
                         fontSize: '12px',
                       }}
+                      itemStyle={{ color: chartColors.tooltipText }}
                     />
-                    <Bar dataKey="count" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="count" fill={chartColors.purple} radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

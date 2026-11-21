@@ -26,6 +26,7 @@ import {
   studentExamService,
   StudentExamLandingDetails,
 } from '@/services/studentExamService';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function ExamLandingPage() {
   const params = useParams();
@@ -92,6 +93,9 @@ export default function ExamLandingPage() {
       setDetails(data);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`exam_reg_code_${token}`, regCodeInput.trim());
+        if (data.quiz_id) {
+          localStorage.setItem(`exam_reg_code_${data.quiz_id}`, regCodeInput.trim());
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Candidate verification failed.');
@@ -108,7 +112,7 @@ export default function ExamLandingPage() {
       const session = studentExamService.getSession(token);
       const regCode = regCodeInput.trim() || session.registrationCode || undefined;
 
-      const res = await studentExamService.startOrResumeExam(token, {
+      await studentExamService.startOrResumeExam(token, {
         registration_code: regCode,
       });
 
@@ -121,33 +125,38 @@ export default function ExamLandingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-surface-base text-foreground flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 rounded-2xl border-2 border-primary-500/20 border-t-primary-500 animate-spin mb-4" />
-        <h2 className="text-sm font-semibold text-slate-300">Retrieving Examination Credentials...</h2>
-        <p className="text-xs text-slate-500 mt-1">Verifying cryptographic token and session availability</p>
+        <h2 className="text-sm font-semibold text-foreground">Retrieving Examination Credentials...</h2>
+        <p className="text-xs text-muted-foreground mt-1">Verifying cryptographic token and session availability</p>
       </div>
     );
   }
 
   if (error && !details) {
     const isDemoPlaceholder = token === 'demo-test';
+    const isRegCode = token.toUpperCase().startsWith('REG-') || token.length === 8;
 
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/30 p-6 sm:p-8 text-center space-y-5">
-          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
+      <div className="min-h-screen bg-surface-base text-foreground flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/30 p-6 sm:p-8 text-center space-y-5 shadow-xl">
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto border border-rose-500/20">
             <Lock className="w-7 h-7" />
           </div>
           <div className="space-y-1.5">
-            <h1 className="text-lg font-bold text-white">Examination Access Unavailable</h1>
-            <span className="inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">
+            <h1 className="text-lg font-bold text-foreground">
+              {isRegCode ? 'Registration Code Not Recognized' : 'Examination Access Unavailable'}
+            </h1>
+            <span className="inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30">
               Code: {token}
             </span>
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             {isDemoPlaceholder
               ? 'The path /exam/demo-test was a demonstration placeholder. Please enter your official invitation token or launch the live published exam.'
+              : isRegCode
+              ? `We could not find an active examination matching code "${token}". It may have expired or not yet been published by your administrator.`
               : error}
           </p>
 
@@ -163,7 +172,7 @@ export default function ExamLandingPage() {
             {isDemoPlaceholder && (
               <Link
                 href="/exam/eef84119-3d23-4d9a-956a-71044826a121"
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors"
               >
                 <span>Launch Live Exam ("demi")</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -171,7 +180,7 @@ export default function ExamLandingPage() {
             )}
           </div>
 
-          <div className="pt-3 border-t border-surface-border text-[11px] text-slate-400">
+          <div className="pt-3 border-t border-surface-border text-[11px] text-muted-foreground">
             Please check your link or contact your examination coordinator.
           </div>
         </div>
@@ -183,43 +192,47 @@ export default function ExamLandingPage() {
 
   // Status Badge Colors & Labels
   const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-    available: { label: 'Examination Available', bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-    active: { label: 'Attempt In Progress', bg: 'bg-cyan-500/15', text: 'text-cyan-400', border: 'border-cyan-500/30' },
-    scheduled: { label: 'Scheduled / Upcoming', bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
-    completed: { label: 'Attempts Completed', bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30' },
-    expired: { label: 'Session Expired', bg: 'bg-rose-500/15', text: 'text-rose-400', border: 'border-rose-500/30' },
-    unavailable: { label: 'Closed', bg: 'bg-slate-700/30', text: 'text-slate-400', border: 'border-slate-600' },
+    available: { label: 'Examination Available', bg: 'bg-emerald-500/15', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/30' },
+    active: { label: 'Attempt In Progress', bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400', border: 'border-cyan-500/30' },
+    scheduled: { label: 'Scheduled / Upcoming', bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/30' },
+    completed: { label: 'Attempts Completed', bg: 'bg-purple-500/15', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/30' },
+    expired: { label: 'Session Expired', bg: 'bg-rose-500/15', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-500/30' },
+    unavailable: { label: 'Closed', bg: 'bg-slate-500/15', text: 'text-slate-500', border: 'border-slate-500/30' },
   };
 
   const statusInfo = STATUS_CONFIG[details.availability_status] || STATUS_CONFIG.unavailable;
+  const candidateResultCode = regCodeInput.trim() || details?.candidate?.registration_code || (token?.toUpperCase().startsWith('REG-') ? token : '');
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6">
+    <div className="min-h-screen bg-surface-base text-foreground py-10 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Top Header Pill */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-surface-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-primary-500/15 border border-primary-500/30 text-primary-400 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-primary-500/15 border border-primary-500/30 text-primary-500 flex items-center justify-center font-bold">
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block">
+              <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
                 QUIZVERSE Assessment Gateway
               </span>
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
                 {details.quiz_title}
               </h1>
             </div>
           </div>
 
-          <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border} flex items-center gap-1.5`}>
-            <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-            <span>{statusInfo.label}</span>
+          <div className="flex items-center gap-3">
+            <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border} flex items-center gap-1.5`}>
+              <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+              <span>{statusInfo.label}</span>
+            </div>
+            <ThemeToggle size="sm" showDropdown />
           </div>
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -228,27 +241,27 @@ export default function ExamLandingPage() {
         {/* 4-Stat Primary Metric Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="glass-card rounded-2xl border border-surface-border p-4 text-center space-y-1">
-            <Clock className="w-4 h-4 text-primary-400 mx-auto" />
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Duration</span>
-            <span className="text-lg font-bold text-white">{details.duration_minutes} Mins</span>
+            <Clock className="w-4 h-4 text-primary-500 mx-auto" />
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Duration</span>
+            <span className="text-lg font-bold text-foreground">{details.duration_minutes} Mins</span>
           </div>
 
           <div className="glass-card rounded-2xl border border-surface-border p-4 text-center space-y-1">
-            <Award className="w-4 h-4 text-amber-400 mx-auto" />
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Total Marks</span>
-            <span className="text-lg font-bold text-white">{details.total_marks} Pts</span>
+            <Award className="w-4 h-4 text-amber-500 mx-auto" />
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Total Marks</span>
+            <span className="text-lg font-bold text-foreground">{details.total_marks} Pts</span>
           </div>
 
           <div className="glass-card rounded-2xl border border-surface-border p-4 text-center space-y-1">
-            <HelpCircle className="w-4 h-4 text-cyan-400 mx-auto" />
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Questions</span>
-            <span className="text-lg font-bold text-white">{details.total_questions} Items</span>
+            <HelpCircle className="w-4 h-4 text-cyan-500 mx-auto" />
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Questions</span>
+            <span className="text-lg font-bold text-foreground">{details.total_questions} Items</span>
           </div>
 
           <div className="glass-card rounded-2xl border border-surface-border p-4 text-center space-y-1">
-            <Layers className="w-4 h-4 text-purple-400 mx-auto" />
-            <span className="text-[10px] text-slate-400 font-semibold uppercase block">Sections</span>
-            <span className="text-lg font-bold text-white">{details.total_sections} Parts</span>
+            <Layers className="w-4 h-4 text-purple-500 mx-auto" />
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Sections</span>
+            <span className="text-lg font-bold text-foreground">{details.total_sections} Parts</span>
           </div>
         </div>
 
@@ -257,36 +270,36 @@ export default function ExamLandingPage() {
           {/* Left Column: Details & Instructions */}
           <div className="lg:col-span-7 space-y-5">
             <div className="glass-card rounded-2xl border border-surface-border p-6 space-y-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary-400" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary-500" />
                 <span>Examination Schedule &amp; Scope</span>
               </h2>
 
               <div className="space-y-3 text-xs divide-y divide-surface-border/60">
                 {details.subject_name && (
-                  <div className="flex items-center justify-between py-2 text-slate-300">
-                    <span className="text-slate-400">Academic Subject</span>
-                    <span className="font-semibold text-white">{details.subject_name}</span>
+                  <div className="flex items-center justify-between py-2 text-foreground">
+                    <span className="text-muted-foreground">Academic Subject</span>
+                    <span className="font-semibold">{details.subject_name}</span>
                   </div>
                 )}
-                <div className="flex items-center justify-between py-2 text-slate-300">
-                  <span className="text-slate-400">Attempt Policy</span>
-                  <span className="font-medium text-white">
+                <div className="flex items-center justify-between py-2 text-foreground">
+                  <span className="text-muted-foreground">Attempt Policy</span>
+                  <span className="font-medium">
                     {details.attempts_used} of {details.max_attempts} attempts used
                   </span>
                 </div>
                 {details.start_time && (
-                  <div className="flex items-center justify-between py-2 text-slate-300">
-                    <span className="text-slate-400">Scheduled Start Time</span>
-                    <span className="font-mono text-white">
+                  <div className="flex items-center justify-between py-2 text-foreground">
+                    <span className="text-muted-foreground">Scheduled Start Time</span>
+                    <span className="font-mono">
                       {new Date(details.start_time).toLocaleString()}
                     </span>
                   </div>
                 )}
                 {details.end_time && (
-                  <div className="flex items-center justify-between py-2 text-slate-300">
-                    <span className="text-slate-400">Examination Deadline</span>
-                    <span className="font-mono text-white">
+                  <div className="flex items-center justify-between py-2 text-foreground">
+                    <span className="text-muted-foreground">Examination Deadline</span>
+                    <span className="font-mono">
                       {new Date(details.end_time).toLocaleString()}
                     </span>
                   </div>
@@ -295,10 +308,10 @@ export default function ExamLandingPage() {
 
               {details.instructions && (
                 <div className="pt-3 border-t border-surface-border space-y-1.5">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                     Important Instructions
                   </span>
-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line bg-surface-elevated/50 p-3.5 rounded-xl border border-surface-border/60">
+                  <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-line bg-surface-elevated/50 p-3.5 rounded-xl border border-surface-border/60">
                     {details.instructions}
                   </p>
                 </div>
@@ -310,54 +323,56 @@ export default function ExamLandingPage() {
           <div className="lg:col-span-5 space-y-5">
             {/* Candidate Verification Card */}
             <div className="glass-card rounded-2xl border border-surface-border p-6 space-y-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-emerald-500" />
                 <span>Candidate Identity</span>
               </h2>
 
               {details.candidate ? (
                 <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Candidate Name</span>
-                    <span className="font-semibold text-white">{details.candidate.name}</span>
+                    <span className="text-muted-foreground">Candidate Name</span>
+                    <span className="font-semibold text-foreground">{details.candidate.name}</span>
                   </div>
                   {details.candidate.register_number && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">Register Number</span>
-                      <span className="font-mono text-white">{details.candidate.register_number}</span>
+                      <span className="text-muted-foreground">Register Number</span>
+                      <span className="font-mono text-foreground">{details.candidate.register_number}</span>
                     </div>
                   )}
                   {details.candidate.registration_code && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">Registration Code</span>
-                      <span className="font-mono text-primary-400 font-bold">{details.candidate.registration_code}</span>
+                      <span className="text-muted-foreground">Registration Code</span>
+                      <span className="font-mono text-primary-500 font-bold">{details.candidate.registration_code}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-surface-border/40">
-                    <span className="text-slate-400">Enrollment Status</span>
-                    <span className={`font-semibold capitalize ${
-                      details.participant_status === 'approved' ? 'text-emerald-400' : 'text-amber-400'
-                    }`}>
+                    <span className="text-muted-foreground">Enrollment Status</span>
+                    <span
+                      className={`font-semibold capitalize ${
+                        details.participant_status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                      }`}
+                    >
                       {details.participant_status?.replace('_', ' ')}
                     </span>
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleVerifyCandidate} className="space-y-3">
-                  <p className="text-xs text-slate-400">
-                    Already registered? Enter your Registration Code (e.g. <code>REG-ABC12345</code>) to load your session.
+                  <p className="text-xs text-muted-foreground">
+                    Already registered? Enter your Registration Code (e.g. <code>REG-D280DB0A</code>) to load your session.
                   </p>
                   <input
                     type="text"
                     placeholder="Enter Registration Code..."
                     value={regCodeInput}
                     onChange={(e) => setRegCodeInput(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-surface-border text-xs text-white uppercase font-mono tracking-wider focus:outline-none focus:border-primary-500"
+                    className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-surface-border text-xs text-foreground uppercase font-mono tracking-wider focus:outline-none focus:border-primary-500"
                   />
                   <button
                     type="submit"
                     disabled={verifyingCode || !regCodeInput.trim()}
-                    className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs text-white font-medium transition-colors"
+                    className="w-full py-2 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border disabled:opacity-50 text-xs text-foreground font-medium transition-colors cursor-pointer"
                   >
                     {verifyingCode ? 'Verifying Code...' : 'Verify Candidate Identity'}
                   </button>
@@ -377,31 +392,29 @@ export default function ExamLandingPage() {
                   </Link>
                 )}
 
-                {/* Concluded Examination Notice */}
+                {/* Concluded Examination Notice & View Result Link */}
                 {(isConcluded || details.availability_status === 'completed' || (!details.can_start && !details.can_resume)) && (
                   <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center space-y-2.5">
-                    <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-purple-300">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-300">
                       <Lock className="w-3.5 h-3.5" />
                       <span>Examination Attempt Concluded</span>
                     </div>
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                    <p className="text-[11px] text-foreground/80 leading-relaxed">
                       Your examination answers have been submitted and finalized. Re-entering the active examination room is strictly prohibited.
                     </p>
-                    <button
-                      type="button"
+                    <Link
+                      href={`/exam/${token}/result?reg_code=${encodeURIComponent(candidateResultCode)}`}
                       onClick={() => {
-                        const code = regCodeInput.trim() || details?.candidate?.registration_code || '';
-                        if (typeof window !== 'undefined' && code) {
-                          localStorage.setItem(`exam_reg_code_${token}`, code);
-                          if (details?.quiz_id) localStorage.setItem(`exam_reg_code_${details.quiz_id}`, code);
+                        if (typeof window !== 'undefined' && candidateResultCode) {
+                          localStorage.setItem(`exam_reg_code_${token}`, candidateResultCode);
+                          if (details?.quiz_id) localStorage.setItem(`exam_reg_code_${details.quiz_id}`, candidateResultCode);
                         }
-                        router.push(`/exam/${token}/result?reg_code=${encodeURIComponent(code)}`);
                       }}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all text-center cursor-pointer"
                     >
                       <BarChart2 className="w-4 h-4" />
                       <span>View Examination Result</span>
-                    </button>
+                    </Link>
                   </div>
                 )}
 
@@ -431,30 +444,28 @@ export default function ExamLandingPage() {
                 {!isConcluded && details.allowed_actions.includes('view_instructions') && (
                   <Link
                     href={`/exam/${token}/instructions`}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface-elevated hover:bg-slate-800 border border-surface-border text-slate-300 hover:text-white text-xs font-medium transition-colors text-center"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-foreground text-xs font-medium transition-colors text-center"
                   >
-                    <FileText className="w-4 h-4 text-primary-400" />
+                    <FileText className="w-4 h-4 text-primary-500" />
                     <span>Read Pre-Flight Instructions</span>
                   </Link>
                 )}
 
                 {/* 5. View Result (Fallback if not shown in notice) */}
                 {!isConcluded && details.allowed_actions.includes('view_result') && (
-                  <button
-                    type="button"
+                  <Link
+                    href={`/exam/${token}/result?reg_code=${encodeURIComponent(candidateResultCode)}`}
                     onClick={() => {
-                      const code = regCodeInput.trim() || details?.candidate?.registration_code || '';
-                      if (typeof window !== 'undefined' && code) {
-                        localStorage.setItem(`exam_reg_code_${token}`, code);
-                        if (details?.quiz_id) localStorage.setItem(`exam_reg_code_${details.quiz_id}`, code);
+                      if (typeof window !== 'undefined' && candidateResultCode) {
+                        localStorage.setItem(`exam_reg_code_${token}`, candidateResultCode);
+                        if (details?.quiz_id) localStorage.setItem(`exam_reg_code_${details.quiz_id}`, candidateResultCode);
                       }
-                      router.push(`/exam/${token}/result?reg_code=${encodeURIComponent(code)}`);
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-medium transition-colors text-center cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-600 dark:text-purple-300 hover:text-purple-700 dark:hover:text-white text-xs font-medium transition-colors text-center cursor-pointer"
                   >
                     <BarChart2 className="w-4 h-4" />
                     <span>View Examination Result</span>
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>
