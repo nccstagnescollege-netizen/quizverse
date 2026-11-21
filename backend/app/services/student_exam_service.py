@@ -125,6 +125,20 @@ def _resolve_invitation_or_quiz(db: Session, token: str, load_sections: bool = F
     if not quiz and token_str:
         quiz = db.query(Quiz).options(*quiz_opts).filter(Quiz.slug == token_str).first()
 
+    # Fallback: Candidate Registration Code (e.g. REG-390DF52D or REG-D280DB0A)
+    if not quiz and token_str:
+        clean_code = token_str.upper().replace("REG-", "").strip()
+        if len(clean_code) >= 6:
+            parts = db.query(QuizParticipant).options(
+                joinedload(QuizParticipant.quiz).joinedload(Quiz.subject),
+                joinedload(QuizParticipant.quiz).joinedload(Quiz.configuration),
+            ).all()
+            for p in parts:
+                p_hex = str(p.id).replace("-", "").upper()
+                if p_hex.startswith(clean_code) or str(p.id).upper().startswith(clean_code):
+                    quiz = p.quiz
+                    break
+
     if quiz:
         if quiz.status == "draft":
             raise HTTPException(
@@ -266,6 +280,9 @@ class StudentExamService:
         Fetches examination metadata, verifies invitation and schedule eligibility,
         and determines allowed actions based on registration and attempt status.
         """
+        if not registration_code and token and token.upper().startswith("REG-"):
+            registration_code = token.upper()
+
         inv = _resolve_invitation_or_quiz(db, token, load_sections=True)
 
         if not inv:
@@ -520,6 +537,9 @@ class StudentExamService:
         - Creates a new attempt if within max_attempts
         - Generates signed JWT session token
         """
+        if not req.registration_code and token and token.upper().startswith("REG-"):
+            req.registration_code = token.upper()
+
         inv = _resolve_invitation_or_quiz(db, token, load_sections=False)
 
         if not inv or not inv.quiz:
@@ -1832,6 +1852,9 @@ class StudentExamService:
         Retrieves the finalized examination result scorecard for a candidate identified
         by their registration code, roll number, or email without requiring an ephemeral in-exam JWT.
         """
+        if not registration_code and token and token.upper().startswith("REG-"):
+            registration_code = token.upper()
+
         inv = _resolve_invitation_or_quiz(db, token, load_sections=False)
         if not inv or not inv.quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invitation token")

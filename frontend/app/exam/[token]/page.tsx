@@ -57,15 +57,21 @@ export default function ExamLandingPage() {
         setLoading(true);
         setError(null);
 
-        // Check if registration code was stored locally from registration phase
-        const session = studentExamService.getSession(token);
-        const savedCode = session.registrationCode || undefined;
+        // Check if registration code was stored locally or passed directly in token parameter
+        let savedCode = token.toUpperCase().startsWith('REG-') ? token.toUpperCase() : undefined;
+        if (!savedCode) {
+          const session = studentExamService.getSession(token);
+          savedCode = session.registrationCode || undefined;
+        }
         if (savedCode) setRegCodeInput(savedCode);
 
         const data = await studentExamService.getExamLandingDetails(token, savedCode);
         setDetails(data);
         if (data?.candidate?.registration_code && typeof window !== 'undefined') {
           localStorage.setItem(`exam_reg_code_${token}`, data.candidate.registration_code);
+          if (data.quiz_id) {
+            localStorage.setItem(`exam_reg_code_${data.quiz_id}`, data.candidate.registration_code);
+          }
         }
       } catch (err: any) {
         setError(err.message || 'Unable to access examination session.');
@@ -381,13 +387,21 @@ export default function ExamLandingPage() {
                     <p className="text-[11px] text-slate-300 leading-relaxed">
                       Your examination answers have been submitted and finalized. Re-entering the active examination room is strictly prohibited.
                     </p>
-                    <Link
-                      href={`/exam/${token}/result?reg_code=${encodeURIComponent(regCodeInput.trim() || details?.candidate?.registration_code || '')}`}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all text-center"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = regCodeInput.trim() || details?.candidate?.registration_code || '';
+                        if (typeof window !== 'undefined' && code) {
+                          localStorage.setItem(`exam_reg_code_${token}`, code);
+                          if (details?.quiz_id) localStorage.setItem(`exam_reg_code_${details.quiz_id}`, code);
+                        }
+                        router.push(`/exam/${token}/result?reg_code=${encodeURIComponent(code)}`);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-500/20 transition-all text-center cursor-pointer"
                     >
                       <BarChart2 className="w-4 h-4" />
                       <span>View Examination Result</span>
-                    </Link>
+                    </button>
                   </div>
                 )}
 
@@ -395,7 +409,7 @@ export default function ExamLandingPage() {
                 {!isConcluded && details.allowed_actions.includes('resume') && (
                   <button
                     onClick={() => router.push(`/exam/${token}/attempt`)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 transition-all text-center"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-500/20 transition-all text-center cursor-pointer"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>Resume Examination Attempt</span>
@@ -406,7 +420,7 @@ export default function ExamLandingPage() {
                 {!isConcluded && details.allowed_actions.includes('start') && (
                   <button
                     onClick={handleStartExam}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center cursor-pointer"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>Start Examination</span>
@@ -426,13 +440,21 @@ export default function ExamLandingPage() {
 
                 {/* 5. View Result (Fallback if not shown in notice) */}
                 {!isConcluded && details.allowed_actions.includes('view_result') && (
-                  <Link
-                    href={`/exam/${token}/result?reg_code=${encodeURIComponent(regCodeInput.trim() || details?.candidate?.registration_code || '')}`}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-medium transition-colors text-center"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = regCodeInput.trim() || details?.candidate?.registration_code || '';
+                      if (typeof window !== 'undefined' && code) {
+                        localStorage.setItem(`exam_reg_code_${token}`, code);
+                        if (details?.quiz_id) localStorage.setItem(`exam_reg_code_${details.quiz_id}`, code);
+                      }
+                      router.push(`/exam/${token}/result?reg_code=${encodeURIComponent(code)}`);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-medium transition-colors text-center cursor-pointer"
                   >
                     <BarChart2 className="w-4 h-4" />
                     <span>View Examination Result</span>
-                  </Link>
+                  </button>
                 )}
               </div>
             </div>

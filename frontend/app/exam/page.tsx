@@ -65,6 +65,25 @@ export default function CandidateExamPortalGateway() {
       return;
     }
     setInputError(null);
+
+    // If candidate enters their registration code directly, check if we have mapped invitation token in localStorage
+    if (token.toUpperCase().startsWith('REG-') || token.length === 8) {
+      const codeUpper = token.trim().toUpperCase();
+      if (typeof window !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('exam_reg_code_')) {
+            const saved = localStorage.getItem(key);
+            if (saved && saved.trim().toUpperCase() === codeUpper) {
+              const realToken = key.replace('exam_reg_code_', '');
+              router.push(`/exam/${encodeURIComponent(realToken)}?reg_code=${encodeURIComponent(codeUpper)}`);
+              return;
+            }
+          }
+        }
+      }
+    }
+
     router.push(`/exam/${encodeURIComponent(token)}`);
   };
 
