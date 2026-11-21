@@ -20,12 +20,15 @@ import {
   FileText,
   AlertTriangle,
   X,
+  GraduationCap,
+  Trash2,
 } from 'lucide-react';
 import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { FormField } from '@/components/ui/FormField';
 import { ResponsiveTable, TableColumn } from '@/components/ui/ResponsiveTable';
 import { useAuth } from '@/contexts/AuthContext';
+import { academicService, Institution, Programme, Subject } from '@/services/academicService';
 
 interface AdminUser {
   id: string;
@@ -103,6 +106,20 @@ export default function SuperAdminAdminsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  // Academic Scopes modal state
+  const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
+  const [adminForScope, setAdminForScope] = useState<AdminUser | null>(null);
+  const [scopesList, setScopesList] = useState<any[]>([]);
+  const [loadingScopes, setLoadingScopes] = useState(false);
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [programmes, setProgrammes] = useState<Programme[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedInstId, setSelectedInstId] = useState('');
+  const [selectedProgId, setSelectedProgId] = useState('');
+  const [selectedSubjId, setSelectedSubjId] = useState('');
+  const [assigningScope, setAssigningScope] = useState(false);
+  const [scopeError, setScopeError] = useState<string | null>(null);
 
   const { token } = useAuth();
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -258,6 +275,98 @@ export default function SuperAdminAdminsPage() {
     }, 1000);
   };
 
+  const openScopeModal = async (admin: AdminUser) => {
+    setAdminForScope(admin);
+    setIsScopeModalOpen(true);
+    setScopeError(null);
+    setLoadingScopes(true);
+    setSelectedInstId('');
+    setSelectedProgId('');
+    setSelectedSubjId('');
+    setProgrammes([]);
+    setSubjects([]);
+
+    try {
+      const [scopes, insts, subjs] = await Promise.all([
+        academicService.getScopes(token || '', admin.id).catch(() => []),
+        academicService.getInstitutions(token || '').catch(() => []),
+        academicService.getSubjects(token || '').catch(() => []),
+      ]);
+      setScopesList(scopes);
+      setInstitutions(insts);
+      setSubjects(subjs);
+    } catch (err: any) {
+      setScopeError(err.message || 'Failed to load academic scopes or structure.');
+    } finally {
+      setLoadingScopes(false);
+    }
+  };
+
+  const handleInstChange = async (instId: string) => {
+    setSelectedInstId(instId);
+    setSelectedProgId('');
+    setSelectedSubjId('');
+    if (!instId) {
+      setProgrammes([]);
+      return;
+    }
+    try {
+      const progs = await academicService.getProgrammes(token || '', instId).catch(() => []);
+      setProgrammes(progs);
+    } catch {
+      setProgrammes([]);
+    }
+  };
+
+  const handleAssignScope = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminForScope || !token) return;
+    if (!selectedInstId) {
+      setScopeError('Please select an Institution to assign scope.');
+      return;
+    }
+    setAssigningScope(true);
+    setScopeError(null);
+    try {
+      await academicService.assignScope(token, {
+        admin_id: adminForScope.id,
+        institution_id: selectedInstId,
+        programme_id: selectedProgId || null,
+        subject_id: selectedSubjId || null,
+      });
+      const updatedScopes = await academicService.getScopes(token, adminForScope.id);
+      setScopesList(updatedScopes);
+      setToastMessage({
+        type: 'success',
+        text: `Academic scope successfully assigned to ${adminForScope.full_name}.`,
+      });
+      setSelectedProgId('');
+      setSelectedSubjId('');
+    } catch (err: any) {
+      setScopeError(err.message || 'Failed to assign academic scope.');
+    } finally {
+      setAssigningScope(false);
+    }
+  };
+
+  const handleRevokeScope = async (scopeId: string) => {
+    if (!adminForScope || !token) return;
+    try {
+      await academicService.revokeScope(token, scopeId);
+      const updatedScopes = await academicService.getScopes(token, adminForScope.id);
+      setScopesList(updatedScopes);
+      setToastMessage({
+        type: 'success',
+        text: 'Academic scope revoked successfully.',
+      });
+    } catch (err: any) {
+      setToastMessage({
+        type: 'error',
+        text: err.message || 'Failed to revoke scope.',
+      });
+    }
+  };
+
   const filteredAdmins = admins.filter((admin) => {
     const matchesSearch =
       admin.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -365,6 +474,14 @@ export default function SuperAdminAdminsPage() {
                 className="px-2.5 py-1 rounded-lg text-xs font-medium border border-surface-border text-slate-400 hover:text-white hover:bg-surface-highlight transition-colors"
               >
                 Kill Sessions
+              </button>
+
+              <button
+                onClick={() => openScopeModal(admin)}
+                className="p-1 rounded-lg hover:bg-surface-highlight text-slate-400 hover:text-emerald-400 transition-colors"
+                title="Assign & Manage Academic Curriculum Scopes"
+              >
+                <GraduationCap className="w-4 h-4" />
               </button>
             </>
           )}
@@ -637,6 +754,183 @@ export default function SuperAdminAdminsPage() {
                 className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold"
               >
                 Close Inspector
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Academic Curriculum Scopes Management Modal */}
+      {isScopeModalOpen && adminForScope && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Academic Scope: {adminForScope.full_name}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {adminForScope.email} &bull; Operational User Admin
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsScopeModalOpen(false)}
+                className="text-slate-400 hover:text-white text-xl p-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            {scopeError && (
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{scopeError}</span>
+              </div>
+            )}
+
+            {/* Currently Assigned Scopes List */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-purple-400" />
+                <span>Currently Assigned Scopes ({scopesList.length})</span>
+              </h4>
+
+              {loadingScopes ? (
+                <div className="p-4 rounded-xl bg-surface-base border border-surface-border text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
+                  <span>Loading scopes...</span>
+                </div>
+              ) : scopesList.length === 0 ? (
+                <div className="p-4 rounded-xl bg-surface-base border border-dashed border-surface-border text-center space-y-1">
+                  <p className="text-xs font-semibold text-slate-300">No Academic Scope Assigned</p>
+                  <p className="text-[11px] text-slate-400">
+                    This administrator currently has zero academic access. Use the form below to delegate an institution, programme, or subject.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {scopesList.map((sc) => (
+                    <div
+                      key={sc.id}
+                      className="p-3 rounded-xl bg-surface-base border border-surface-border flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="font-semibold text-white flex items-center gap-1.5 truncate">
+                          <span className="text-emerald-400 font-mono text-[11px]">Institution:</span>
+                          <span className="truncate">{sc.institution_name || 'All Assigned'}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-3">
+                          <span>
+                            <strong className="text-purple-400">Prog:</strong> {sc.programme_name || 'All Programmes'}
+                          </span>
+                          <span>
+                            <strong className="text-cyan-400">Subj:</strong> {sc.subject_name || 'All Subjects'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRevokeScope(sc.id)}
+                        className="p-1.5 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                        title="Revoke this academic scope"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Revoke</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Delegate New Academic Scope Form */}
+            <form onSubmit={handleAssignScope} className="p-4 rounded-xl bg-surface-base border border-surface-border space-y-3.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Delegate New Scope Assignment</span>
+              </h4>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-300">
+                  Institution <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={selectedInstId}
+                  onChange={(e) => handleInstChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-surface-card border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500"
+                  required
+                >
+                  <option value="">-- Select Institution --</option>
+                  {institutions.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.name} ({inst.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-300">
+                  Programme <span className="text-slate-400 text-[10px]">(Optional — Leave blank for all programmes)</span>
+                </label>
+                <select
+                  value={selectedProgId}
+                  onChange={(e) => setSelectedProgId(e.target.value)}
+                  disabled={!selectedInstId}
+                  className="w-full px-3 py-2 rounded-xl bg-surface-card border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                >
+                  <option value="">-- All Programmes in Institution --</option>
+                  {programmes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-300">
+                  Subject <span className="text-slate-400 text-[10px]">(Optional — Leave blank for all subjects)</span>
+                </label>
+                <select
+                  value={selectedSubjId}
+                  onChange={(e) => setSelectedSubjId(e.target.value)}
+                  disabled={!selectedInstId}
+                  className="w-full px-3 py-2 rounded-xl bg-surface-card border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                >
+                  <option value="">-- All Subjects --</option>
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.subject_name} ({s.subject_code || ''})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={assigningScope || !selectedInstId}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-glow-emerald disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  {assigningScope && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{assigningScope ? 'Assigning...' : 'Assign Academic Scope'}</span>
+                </button>
+              </div>
+            </form>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setIsScopeModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-surface-highlight hover:bg-surface-border text-slate-300 text-xs font-medium cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>
