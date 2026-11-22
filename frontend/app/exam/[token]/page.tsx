@@ -15,6 +15,7 @@ import {
   Play,
   RotateCcw,
   ArrowRight,
+  ArrowLeft,
   UserCheck,
   User,
   Shield,
@@ -166,6 +167,21 @@ export default function ExamLandingPage() {
           </p>
 
           <div className="flex flex-col gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push('/exam');
+                }
+              }}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-foreground text-xs font-semibold shadow-sm transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Go Back</span>
+            </button>
+
             <Link
               href="/exam"
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-lg shadow-primary-500/20 transition-all"
@@ -214,6 +230,22 @@ export default function ExamLandingPage() {
         {/* Top Header Pill */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-surface-border pb-4">
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push('/exam');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-xs font-semibold text-foreground hover:text-primary-500 shadow-sm active:scale-95 transition-all cursor-pointer mr-1"
+              title="Go back to previous page"
+              aria-label="Go Back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Go Back</span>
+            </button>
             <div className="w-10 h-10 rounded-xl bg-primary-500/15 border border-primary-500/30 text-primary-500 flex items-center justify-center font-bold">
               <GraduationCap className="w-5 h-5" />
             </div>

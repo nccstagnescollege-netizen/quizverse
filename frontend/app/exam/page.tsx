@@ -7,6 +7,8 @@ import {
   GraduationCap,
   KeyRound,
   ArrowRight,
+  ArrowLeft,
+  Home,
   Shield,
   HelpCircle,
   FileCheck2,
@@ -102,10 +104,46 @@ export default function CandidateExamPortalGateway() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-base text-foreground py-12 px-4 sm:px-6 flex flex-col items-center justify-center relative">
-      {/* Top right theme toggle */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle size="sm" showDropdown />
+    <div className="min-h-screen bg-surface-base text-foreground py-6 sm:py-10 px-4 sm:px-6 flex flex-col items-center justify-start relative">
+      {/* Top Navigation Bar with Go Back */}
+      <div className="w-full max-w-2xl flex items-center justify-between pb-6 border-b border-surface-border/80 mb-6">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/');
+              }
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-xs sm:text-sm font-semibold text-foreground hover:text-primary-500 shadow-sm active:scale-95 transition-all cursor-pointer"
+            title="Go back to previous page"
+            aria-label="Go Back"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Go Back</span>
+          </button>
+
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+            title="Return to Home page"
+          >
+            <Home className="w-4 h-4" />
+            <span className="hidden sm:inline">Home</span>
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/login"
+            className="hidden sm:inline-block text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mr-1"
+          >
+            Staff Login
+          </Link>
+          <ThemeToggle size="sm" showDropdown />
+        </div>
       </div>
 
       <div className="max-w-2xl w-full space-y-8">
