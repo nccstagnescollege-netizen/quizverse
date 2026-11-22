@@ -7,6 +7,7 @@ import jwt
 from httpx import ASGITransport, AsyncClient
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from backend.app.core.config import settings
 from backend.app.core.database import Base, get_db
@@ -22,7 +23,7 @@ from backend.app.models.auth_rbac import (
     AdminSession,
 )
 from backend.app.models.student import Student
-from backend.app.models.quiz import Quiz, QuizQuestion
+from backend.app.models.quiz import Quiz, QuizQuestion, QuizConfiguration
 from backend.app.models.question_bank import Question
 from backend.app.models.academic import Unit, Chapter, Topic
 from backend.app.models.registration import RegistrationSubmission
@@ -44,6 +45,7 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 test_engine = sa.create_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(
     autocommit=False,
@@ -619,7 +621,21 @@ async def test_17_publishing_and_scheduling_scoped():
             db.add(top)
             db.flush()
             db.add(Question(id=q_id, topic_id=top.id, question_text="Text", question_type="single_choice", default_marks=Decimal("1.00"), created_by=alice.id))
-            db.add(QuizQuestion(id=uuid.uuid4(), quiz_id=uuid.UUID(quiz_id), question_id=q_id, marks=Decimal("1.00"), question_snapshot={"text": "Text"}))
+            db.add(QuizQuestion(
+                id=uuid.uuid4(),
+                quiz_id=uuid.UUID(quiz_id),
+                question_id=q_id,
+                marks=Decimal("1.00"),
+                question_snapshot={
+                    "question_text": "Sample Question Text",
+                    "question_type": "single_choice",
+                    "marks": 1.0,
+                    "options": [
+                        {"id": str(uuid.uuid4()), "text": "Option A", "order": 1, "is_correct": True},
+                        {"id": str(uuid.uuid4()), "text": "Option B", "order": 2, "is_correct": False},
+                    ],
+                },
+            ))
             db.commit()
 
         # Bob attempts to publish Alice's quiz -> 403 Forbidden
@@ -639,7 +655,7 @@ async def test_17_publishing_and_scheduling_scoped():
         assert sch_alice.json()["status"] == "scheduled"
 
         # Alice publishes quiz -> 200 OK
-        pub_alice = await client.post(f"/api/v1/quizzes/{quiz_id}/publish", headers=alice_hdr)
+        pub_alice = await client.post(f"/api/v1/quizzes/{quiz_id}/publish", json={"force_immediate": True}, headers=alice_hdr)
         assert pub_alice.status_code == 200
         assert pub_alice.json()["status"] == "published"
 

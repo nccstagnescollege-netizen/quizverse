@@ -112,6 +112,10 @@ class AdminQuizAssignment(Base):
     admin = relationship("Admin", back_populates="quiz_assignments")
     quiz = relationship("Quiz")
 
+    @property
+    def can_edit(self) -> bool:
+        return self.access_level in ["owner", "editor"]
+
 
 class AdminAcademicScope(Base):
     __tablename__ = "admin_academic_scope"

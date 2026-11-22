@@ -57,7 +57,7 @@ def verify_quiz_access(db: Session, admin: Admin, quiz: Quiz, require_edit: bool
         )
 
     if require_edit and not is_owner:
-        if not assignment or not assignment.can_edit:
+        if not assignment or assignment.access_level not in ["owner", "editor"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access Denied: You have read-only access to this quiz.",

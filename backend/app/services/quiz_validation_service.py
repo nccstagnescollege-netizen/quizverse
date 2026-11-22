@@ -75,7 +75,7 @@ def validate_quiz_for_publishing(
             .filter(
                 AdminQuizAssignment.admin_id == admin.id,
                 AdminQuizAssignment.quiz_id == quiz.id,
-                AdminQuizAssignment.can_edit == True,
+                AdminQuizAssignment.access_level.in_(["owner", "editor"]),
             )
             .first()
         )

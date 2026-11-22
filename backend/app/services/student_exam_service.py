@@ -973,10 +973,20 @@ class StudentExamService:
         sec_policy = SecurityService.get_effective_policy(db, quiz.id)
         wm_session = None
         watermark_str = None
-        watermark_enabled = bool(getattr(cfg, "watermark_enabled", sec_policy.enable_watermark))
+        watermark_enabled = bool(sec_policy.enable_watermark or (cfg.watermark_enabled if cfg else False))
         if watermark_enabled and attempt.student:
             wm_session = SecurityService.generate_or_get_watermark_session(db, attempt)
-            watermark_str = wm_session.watermark_text
+            stud = attempt.student
+            masked_code = _mask_identifier(stud.profile.student_identifier if stud.profile else None)
+            att_slug = str(attempt.id)[:8].upper()
+            if getattr(sec_policy, "watermark_pattern", None) and "{student_name}" in sec_policy.watermark_pattern:
+                watermark_str = sec_policy.watermark_pattern.format(
+                    student_name=stud.full_name,
+                    masked_reg=masked_code,
+                    attempt_id=att_slug,
+                )
+            else:
+                watermark_str = wm_session.watermark_text
 
         policy_dict = {
             "track_tab_switch": sec_policy.track_tab_switch,

@@ -176,10 +176,10 @@ export function UserAdminSidebar({
         isMobileDrawer
           ? 'flex flex-col w-72 bg-surface-base h-full border-r border-surface-border'
           : cn(
-              'hidden lg:flex flex-col border-r border-surface-border bg-surface-base/95 backdrop-blur-xl h-screen sticky top-0 transition-all duration-300 z-30',
-              isCollapsed ? 'w-20' : 'w-64',
-              className
-            )
+            'hidden lg:flex flex-col border-r border-surface-border bg-surface-base/95 backdrop-blur-xl h-screen sticky top-0 transition-all duration-300 z-30',
+            isCollapsed ? 'w-20' : 'w-64',
+            className
+          )
       )}
     >
       {/* Brand Header */}
