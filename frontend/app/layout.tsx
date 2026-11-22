@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
 import { Providers } from './providers';
+import { EnvironmentIndicator } from '@/components/layout/EnvironmentIndicator';
 
 export const metadata: Metadata = {
   title: 'QUIZVERSE | Next-Gen 3D Examination Platform',
@@ -46,6 +47,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-surface-base text-foreground font-sans antialiased overflow-x-hidden selection:bg-brand-500 selection:text-white transition-colors duration-200">
+        <EnvironmentIndicator />
         <Providers>{children}</Providers>
       </body>
     </html>

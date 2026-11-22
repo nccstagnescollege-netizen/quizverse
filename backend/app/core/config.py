@@ -55,6 +55,26 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    def validate_production_configuration(self) -> List[str]:
+        """
+        Validates environment configuration against production standards.
+        Returns a list of warnings or advisories without leaking secret values.
+        """
+        warnings = []
+        if self.ENVIRONMENT == "production":
+            if not self.DATABASE_URL:
+                warnings.append("CRITICAL: DATABASE_URL is not configured for production.")
+            if self.SECRET_KEY.startswith("quizverse-jwt-secret-key-change-in-production"):
+                warnings.append("SECURITY: Default SECRET_KEY is in use; rotate to an environment-injected secret.")
+            if not self.SUPABASE_URL:
+                warnings.append("CONFIG: SUPABASE_URL is not configured.")
+            if "*" in (self.BACKEND_CORS_ORIGINS if isinstance(self.BACKEND_CORS_ORIGINS, list) else [self.BACKEND_CORS_ORIGINS]):
+                warnings.append("SECURITY: Wildcard CORS origin detected in production.")
+        elif self.ENVIRONMENT in ("development", "staging", "testing"):
+            if not self.DATABASE_URL:
+                warnings.append("NOTICE: Running in development mode with local/sqlite database.")
+        return warnings
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

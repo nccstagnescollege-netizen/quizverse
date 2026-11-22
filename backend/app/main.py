@@ -95,6 +95,16 @@ def create_application() -> FastAPI:
         from backend.app.api.v1.endpoints.health import get_health
         return await get_health(request)
 
+    @app.get("/health/live", tags=["Health"], include_in_schema=False)
+    async def liveness_alias():
+        from backend.app.api.v1.endpoints.health import get_liveness
+        return await get_liveness()
+
+    @app.get("/health/ready", tags=["Health"], include_in_schema=False)
+    async def readiness_alias():
+        from backend.app.api.v1.endpoints.health import get_readiness
+        return await get_readiness()
+
     @app.get("/health/migrate", tags=["Health"], include_in_schema=False)
     @app.post("/health/migrate", tags=["Health"], include_in_schema=False)
     async def migrate_alias(request: Request):

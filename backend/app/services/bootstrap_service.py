@@ -820,6 +820,40 @@ def ensure_deployment_schema_exists(db: Session) -> None:
                 );
                 """,
                 "CREATE INDEX IF NOT EXISTS ix_restoration_test_records_performed_at ON restoration_test_records(performed_at);",
+
+                # 3. infrastructure_alert_records table (Phase 30 Production Readiness)
+                """
+                CREATE TABLE IF NOT EXISTS infrastructure_alert_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    alert_type VARCHAR(64) NOT NULL,
+                    severity VARCHAR(32) NOT NULL DEFAULT 'warning',
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT NOT NULL,
+                    affected_service VARCHAR(64) NOT NULL,
+                    suggested_action TEXT,
+                    status VARCHAR(32) NOT NULL DEFAULT 'active',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    resolved_at TIMESTAMPTZ,
+                    resolved_by VARCHAR(128)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_infra_alerts_status ON infrastructure_alert_records(status);",
+                "CREATE INDEX IF NOT EXISTS ix_infra_alerts_created_at ON infrastructure_alert_records(created_at);",
+
+                # 4. dr_drill_records table (Phase 30 Disaster Recovery Drills)
+                """
+                CREATE TABLE IF NOT EXISTS dr_drill_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    drill_name VARCHAR(128) NOT NULL,
+                    scenario VARCHAR(64) NOT NULL,
+                    status VARCHAR(32) NOT NULL DEFAULT 'passed',
+                    duration_seconds INTEGER NOT NULL DEFAULT 0,
+                    details TEXT,
+                    conducted_by VARCHAR(128) NOT NULL DEFAULT 'super_admin',
+                    conducted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_dr_drills_conducted_at ON dr_drill_records(conducted_at);",
             ]
             for stmt in ddl_statements:
                 try:
@@ -1894,6 +1928,10 @@ def ensure_supabase_rls_security_policies_exist(db: Session) -> None:
         "privacy_retention_policies",
         "seb_configurations",
         "mobile_exam_sessions",
+        "system_backup_records",
+        "restoration_test_records",
+        "infrastructure_alert_records",
+        "dr_drill_records",
     ]
 
     for tbl in protected_tables:
@@ -1942,13 +1980,13 @@ def run_all_schema_migrations(db: Session) -> Dict[str, str]:
         ("proctoring_schema", ensure_proctoring_schema_exists),
         ("interruption_schema", ensure_interruption_schema_exists),
         ("control_center_schema", ensure_anti_cheating_control_center_schema_exists),
-        ("supabase_rls_security", ensure_supabase_rls_security_policies_exist),
         ("evaluation_schema", ensure_evaluation_schema_exists),
         ("analytics_schema", ensure_analytics_reports_schema_exists),
         ("monitoring_schema", ensure_monitoring_schema_exists),
         ("system_audit_schema", ensure_system_audit_schema_exists),
         ("deployment_schema", ensure_deployment_schema_exists),
         ("quiz_generator_schema", ensure_quiz_generator_schema_exists),
+        ("supabase_rls_security", ensure_supabase_rls_security_policies_exist),
     ]
 
     for name, func in migrations:

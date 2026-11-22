@@ -27,6 +27,9 @@ import {
   QrCode,
   FileCheck,
   FileSpreadsheet,
+  Database,
+  Server,
+  Archive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +54,8 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { label: 'Live Monitoring', href: '/super-admin/monitoring', icon: Activity },
   { label: 'System Audit & QA', href: '/super-admin/system/audit', icon: ShieldCheck, badge: 'Phase 19' },
   { label: 'Security Center', href: '/super-admin/admins?tab=security', icon: ShieldAlert },
+  { label: 'Backups & Recovery', href: '/super-admin/system/backups', icon: Archive, badge: 'DR' },
+  { label: 'Production Readiness', href: '/super-admin/system/readiness', icon: Server, badge: 'Phase 30' },
   { label: 'Audit Logs', href: '/super-admin/admins?tab=audit', icon: FileText },
   { label: 'Platform Settings', href: '/admin/settings', icon: Settings },
 ];
@@ -75,10 +80,10 @@ export function SuperAdminSidebar({
         isMobileDrawer
           ? 'flex flex-col w-72 bg-surface-base h-full border-r border-surface-border'
           : cn(
-              'hidden lg:flex flex-col border-r border-surface-border bg-surface-base/95 backdrop-blur-xl h-screen sticky top-0 transition-all duration-300 z-30',
-              isCollapsed ? 'w-20' : 'w-64',
-              className
-            )
+            'hidden lg:flex flex-col border-r border-surface-border bg-surface-base/95 backdrop-blur-xl h-screen sticky top-0 transition-all duration-300 z-30',
+            isCollapsed ? 'w-20' : 'w-64',
+            className
+          )
       )}
     >
       {/* Brand Header */}

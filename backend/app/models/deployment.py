@@ -64,3 +64,32 @@ class RestorationTestRecord(Base):
     log_output = Column(Text, nullable=True)
     performed_by = Column(String(128), nullable=False, default="super_admin")
     performed_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class InfrastructureAlertRecord(Base):
+    __tablename__ = "infrastructure_alert_records"
+
+    id = Column(UuidType, primary_key=True, default=uuid.uuid4)
+    alert_type = Column(String(64), nullable=False)
+    severity = Column(String(32), nullable=False, default="warning")  # info, warning, critical
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    affected_service = Column(String(64), nullable=False)
+    suggested_action = Column(Text, nullable=True)
+    status = Column(String(32), nullable=False, default="active")  # active, acknowledged, resolved
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by = Column(String(128), nullable=True)
+
+
+class DisasterRecoveryDrillRecord(Base):
+    __tablename__ = "dr_drill_records"
+
+    id = Column(UuidType, primary_key=True, default=uuid.uuid4)
+    drill_name = Column(String(128), nullable=False)
+    scenario = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, default="passed")  # passed, failed, partial
+    duration_seconds = Column(Integer, nullable=False, default=0)
+    details = Column(Text, nullable=True)
+    conducted_by = Column(String(128), nullable=False, default="super_admin")
+    conducted_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)

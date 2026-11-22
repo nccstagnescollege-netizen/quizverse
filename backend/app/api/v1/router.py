@@ -168,11 +168,21 @@ api_router.include_router(
     tags=["System Audit, Security & Performance Benchmarks"],
 )
 
-# 16. Final Production Deployment, Backup Automation & Launch Operations (Phase 20)
+# 16. Final Production Deployment, Backup Automation & Launch Operations (Phase 20 & 30)
 api_router.include_router(
     deployment.router,
     prefix="/system/deployment",
     tags=["Production Deployment & DR Operations"],
+)
+api_router.include_router(
+    deployment.router,
+    prefix="/system/backups",
+    tags=["Backups & Recovery"],
+)
+api_router.include_router(
+    deployment.router,
+    prefix="/system/readiness",
+    tags=["Production Readiness"],
 )
 
 # 17. Mobile Device Security & Native Examination Mode (Phase 24)
