@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI):
             ensure_system_audit_schema_exists,
             ensure_deployment_schema_exists,
             ensure_quiz_generator_schema_exists,
+            ensure_desktop_security_schema_exists,
         )
         if SessionLocal:
             with SessionLocal() as db:
@@ -59,6 +60,7 @@ async def lifespan(app: FastAPI):
                 ensure_system_audit_schema_exists(db)
                 ensure_deployment_schema_exists(db)
                 ensure_quiz_generator_schema_exists(db)
+                ensure_desktop_security_schema_exists(db)
     except Exception as e:
         logger.warning(f"Super admin bootstrap deferred or skipped: {e}")
 

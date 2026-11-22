@@ -29,6 +29,7 @@ import {
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { BrowserCompatibilityCheck } from '@/components/exam/BrowserCompatibilityCheck';
 import { WatermarkStatusIndicator } from '@/components/exam/WatermarkStatusIndicator';
+import { SEBCompatibilityCheck } from '@/components/desktop-security/SEBCompatibilityCheck';
 
 export default function ExamLandingPage() {
   const params = useParams();
@@ -41,6 +42,8 @@ export default function ExamLandingPage() {
   const [regCodeInput, setRegCodeInput] = useState('');
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [isConcluded, setIsConcluded] = useState(false);
+  const [sebCanProceed, setSebCanProceed] = useState(true);
+  const [sebMode, setSebMode] = useState('standard_browser');
 
   useEffect(() => {
     if (typeof window !== 'undefined' && token) {
@@ -322,6 +325,18 @@ export default function ExamLandingPage() {
 
             {/* Phase 22 & Phase 23: Pre-Examination Browser Compatibility Check */}
             <BrowserCompatibilityCheck token={token} />
+
+            {/* Phase 25: Secure Desktop & Safe Exam Browser (SEB) Compatibility Check */}
+            {details?.quiz_id && (
+              <SEBCompatibilityCheck
+                quizId={details.quiz_id}
+                regCode={candidateResultCode}
+                onValidationComplete={(canProceed, mode) => {
+                  setSebCanProceed(canProceed);
+                  setSebMode(mode);
+                }}
+              />
+            )}
           </div>
 
           {/* Right Column: Candidate Status & Actions */}
@@ -435,13 +450,25 @@ export default function ExamLandingPage() {
 
                 {/* 3. Start Examination (Only when NOT concluded) */}
                 {!isConcluded && details.allowed_actions.includes('start') && (
-                  <button
-                    onClick={handleStartExam}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center cursor-pointer"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Start Examination</span>
-                  </button>
+                  sebCanProceed ? (
+                    <button
+                      onClick={handleStartExam}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Start Examination</span>
+                    </button>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-center space-y-1.5">
+                      <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Safe Exam Browser Required</span>
+                      </div>
+                      <p className="text-[11px] text-foreground/80 leading-relaxed">
+                        Entry is blocked in standard web browsers. Please download the .seb configuration and launch in Safe Exam Browser.
+                      </p>
+                    </div>
+                  )
                 )}
 
                 {/* 4. View Instructions */}

@@ -21,16 +21,41 @@ from backend.app.models.security_audit import AuditLog
 from backend.app.services.auth_service import create_access_token, hash_password
 
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+from backend.app.core.database import Base, get_db
+
+test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=test_engine, expire_on_commit=False
+)
+Base.metadata.create_all(bind=test_engine)
+
+
 @pytest.fixture(scope="module")
 def app_client():
     app = create_application()
+
+    def override_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as client:
         yield client
 
 
 @pytest.fixture(scope="module")
 def db_session():
-    db = SessionLocal()
+    db = TestingSessionLocal()
     try:
         yield db
     finally:

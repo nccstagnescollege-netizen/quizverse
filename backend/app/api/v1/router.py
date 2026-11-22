@@ -23,6 +23,7 @@ from backend.app.api.v1.endpoints import (
     system_audit,
     deployment,
     mobile_exam,
+    desktop_exam,
 )
 
 api_router = APIRouter()
@@ -177,4 +178,12 @@ api_router.include_router(
     prefix="/mobile",
     tags=["Mobile Device Security & Native Examination Mode"],
 )
+
+# 18. Secure Desktop Examination Mode & Safe Exam Browser Integration (Phase 25)
+api_router.include_router(
+    desktop_exam.router,
+    prefix="/desktop-exam",
+    tags=["Secure Desktop Examination Mode & Safe Exam Browser"],
+)
+
 

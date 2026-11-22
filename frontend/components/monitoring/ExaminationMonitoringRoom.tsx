@@ -24,6 +24,8 @@ import {
   FileText,
   UserX,
   Smartphone,
+  Laptop,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   monitoringService,
@@ -483,6 +485,29 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
                               {p.kiosk_mode_active && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                                   Kiosk
+                                </span>
+                              )}
+                              {/* Phase 25 Safe Exam Browser (SEB) Desktop Badges */}
+                              {p.is_seb_verified && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5">
+                                  <ShieldCheck className="w-2.5 h-2.5" />
+                                  <span>SEB Verified {p.seb_version ? `(${p.seb_version})` : ''}</span>
+                                </span>
+                              )}
+                              {p.desktop_mode === 'standard_browser' && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-0.5">
+                                  <Laptop className="w-2.5 h-2.5" />
+                                  <span>Standard Browser</span>
+                                </span>
+                              )}
+                              {p.lab_device_reference && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30 font-mono">
+                                  Lab: {p.lab_device_reference}
+                                </span>
+                              )}
+                              {p.desktop_interruption_count !== undefined && p.desktop_interruption_count > 0 && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+                                  SEB Interrupted ({p.desktop_interruption_count})
                                 </span>
                               )}
                             </div>

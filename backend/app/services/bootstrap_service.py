@@ -863,3 +863,127 @@ def ensure_quiz_generator_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"Quiz generator schema upgrade encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_desktop_security_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema migration ensuring Phase 25 Secure Desktop Examination Mode &
+    Safe Exam Browser (SEB) tables, indexes, and constraints exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # 1. seb_configurations table
+                """
+                CREATE TABLE IF NOT EXISTS seb_configurations (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    version_number INTEGER NOT NULL DEFAULT 1,
+                    config_name VARCHAR(128) NOT NULL DEFAULT 'Default SEB Profile',
+                    config_key VARCHAR(128) NOT NULL,
+                    browser_exam_key VARCHAR(128),
+                    config_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    encrypted_xml TEXT NOT NULL,
+                    config_password_hash VARCHAR(255),
+                    quit_password_hash VARCHAR(255),
+                    status VARCHAR(32) NOT NULL DEFAULT 'published',
+                    is_mandatory BOOLEAN NOT NULL DEFAULT false,
+                    allow_quit BOOLEAN NOT NULL DEFAULT true,
+                    min_seb_version VARCHAR(32) NOT NULL DEFAULT '3.0.0',
+                    allow_reload BOOLEAN NOT NULL DEFAULT false,
+                    enable_url_filter BOOLEAN NOT NULL DEFAULT true,
+                    browser_view_mode INTEGER NOT NULL DEFAULT 1,
+                    created_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    revoked_at TIMESTAMPTZ,
+                    revocation_reason TEXT,
+                    CONSTRAINT uq_quiz_seb_version UNIQUE (quiz_id, version_number)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_seb_configurations_quiz_id ON seb_configurations(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_seb_configurations_config_key ON seb_configurations(config_key);",
+
+                # 2. computer_labs table
+                """
+                CREATE TABLE IF NOT EXISTS computer_labs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE,
+                    campus_name VARCHAR(128) NOT NULL DEFAULT 'Main Campus',
+                    lab_name VARCHAR(128) NOT NULL,
+                    room_number VARCHAR(64),
+                    total_workstations INTEGER NOT NULL DEFAULT 0,
+                    network_subnet VARCHAR(64),
+                    status VARCHAR(32) NOT NULL DEFAULT 'active',
+                    contact_person VARCHAR(128),
+                    notes TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_computer_labs_institution_id ON computer_labs(institution_id);",
+
+                # 3. lab_devices table
+                """
+                CREATE TABLE IF NOT EXISTS lab_devices (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    lab_id UUID NOT NULL REFERENCES computer_labs(id) ON DELETE CASCADE,
+                    device_reference VARCHAR(64) NOT NULL,
+                    os_platform VARCHAR(32) NOT NULL DEFAULT 'windows',
+                    os_version VARCHAR(64),
+                    seb_version VARCHAR(32),
+                    ip_address VARCHAR(64),
+                    mac_address_masked VARCHAR(64),
+                    compatibility_status VARCHAR(32) NOT NULL DEFAULT 'ready',
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    last_verified_at TIMESTAMPTZ,
+                    metadata_info JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_lab_device_reference UNIQUE (lab_id, device_reference)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_lab_devices_lab_id ON lab_devices(lab_id);",
+
+                # 4. desktop_exam_sessions table
+                """
+                CREATE TABLE IF NOT EXISTS desktop_exam_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID NOT NULL UNIQUE REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    seb_config_id UUID REFERENCES seb_configurations(id) ON DELETE SET NULL,
+                    lab_device_id UUID REFERENCES lab_devices(id) ON DELETE SET NULL,
+                    session_mode VARCHAR(32) NOT NULL DEFAULT 'seb_enforced',
+                    is_seb_verified BOOLEAN NOT NULL DEFAULT false,
+                    seb_version VARCHAR(32),
+                    os_platform VARCHAR(32),
+                    config_key_hash VARCHAR(128),
+                    request_hash VARCHAR(128),
+                    status VARCHAR(32) NOT NULL DEFAULT 'active',
+                    interruption_count INTEGER NOT NULL DEFAULT 0,
+                    last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    session_metadata JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_attempt_id ON desktop_exam_sessions(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_student_id ON desktop_exam_sessions(student_id);",
+                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_quiz_id ON desktop_exam_sessions(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_seb_config_id ON desktop_exam_sessions(seb_config_id);",
+                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_lab_device_id ON desktop_exam_sessions(lab_device_id);"
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"Desktop security schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 25 Secure Desktop & SEB schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Desktop security schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+

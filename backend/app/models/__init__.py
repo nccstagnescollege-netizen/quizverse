@@ -135,6 +135,12 @@ from backend.app.models.mobile_security import (
     MobileExamSession,
     MobileInterruptionEvent,
 )
+from backend.app.models.desktop_security import (
+    SEBConfiguration,
+    ComputerLab,
+    LabDevice,
+    DesktopExamSession,
+)
 
 __all__ = [
     "Base",
@@ -253,4 +259,9 @@ __all__ = [
     "DeviceRegistration",
     "MobileExamSession",
     "MobileInterruptionEvent",
+    # Secure Desktop & Safe Exam Browser Integration (Phase 25)
+    "SEBConfiguration",
+    "ComputerLab",
+    "LabDevice",
+    "DesktopExamSession",
 ]

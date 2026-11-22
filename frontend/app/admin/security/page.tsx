@@ -18,6 +18,7 @@ import {
   FileText,
   UserX,
   Filter,
+  Monitor,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -90,6 +91,14 @@ export default function SecurityDashboardPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-cyan-400' : ''}`} />
             <span>Refresh</span>
           </button>
+
+          <Link
+            href="/admin/security/labs"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition border border-surface-border"
+          >
+            <Monitor className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Computer Labs</span>
+          </Link>
 
           <Link
             href="/admin/security/policies"

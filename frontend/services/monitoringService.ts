@@ -133,6 +133,13 @@ export interface ParticipantMonitoringItem {
   kiosk_mode_active?: boolean;
   mobile_interruptions_count?: number;
   root_detected?: boolean;
+  // Phase 25 Desktop Security & Safe Exam Browser Telemetry
+  desktop_mode?: 'seb_enforced' | 'seb_voluntary' | 'standard_browser';
+  is_seb_verified?: boolean;
+  seb_version?: string;
+  os_platform?: string;
+  lab_device_reference?: string;
+  desktop_interruption_count?: number;
 }
 
 export interface AttemptEventItem {

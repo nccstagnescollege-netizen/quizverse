@@ -36,6 +36,8 @@ import {
   ScheduleModal,
   PublishingHistoryModal,
 } from './PublishingModals';
+import { SEBConfigManagerModal } from '@/components/desktop-security/SEBConfigManagerModal';
+import { Shield } from 'lucide-react';
 
 interface QuizManagementDashboardProps {
   basePath: string; // '/admin' or '/super-admin'
@@ -60,6 +62,8 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [historyItems, setHistoryItems] = useState<QuizPublishingHistoryItem[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showSEBModal, setShowSEBModal] = useState(false);
+  const [activeSEBQuiz, setActiveSEBQuiz] = useState<QuizManagementItem | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const fetchQuizzes = useCallback(async () => {
@@ -414,6 +418,18 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
                     </button>
                   )}
 
+                  {/* Safe Exam Browser (SEB) Settings */}
+                  <button
+                    onClick={() => {
+                      setActiveSEBQuiz(quiz);
+                      setShowSEBModal(true);
+                    }}
+                    title="Safe Exam Browser (SEB) Settings"
+                    className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                  >
+                    <Shield className="w-4 h-4" />
+                  </button>
+
                   {/* Analytics Link */}
                   {(quiz.status === 'published' || quiz.status === 'scheduled' || quiz.status === 'archived') && (
                     <Link
@@ -495,6 +511,20 @@ export function QuizManagementDashboard({ basePath, token }: QuizManagementDashb
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
       />
+
+      {/* Safe Exam Browser Configuration Modal */}
+      {activeSEBQuiz && (
+        <SEBConfigManagerModal
+          quizId={activeSEBQuiz.id}
+          quizTitle={activeSEBQuiz.title}
+          adminToken={token}
+          isOpen={showSEBModal}
+          onClose={() => {
+            setShowSEBModal(false);
+            setActiveSEBQuiz(null);
+          }}
+        />
+      )}
     </div>
   );
 }
