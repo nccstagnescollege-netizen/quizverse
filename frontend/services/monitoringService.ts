@@ -140,6 +140,20 @@ export interface ParticipantMonitoringItem {
   os_platform?: string;
   lab_device_reference?: string;
   desktop_interruption_count?: number;
+  // Phase 26 Advanced AI-Assisted Live Proctoring Telemetry
+  proctoring_session_id?: string;
+  camera_status?: string;
+  microphone_status?: string;
+  face_presence_state?: string;
+  head_position_state?: string;
+  lighting_condition?: string;
+  multiple_faces_detected?: boolean;
+  audio_level_state?: string;
+  ai_risk_score?: number;
+  ai_risk_level?: string;
+  ai_classification?: string;
+  is_accommodated?: boolean;
+  last_active_at?: string;
 }
 
 export interface AttemptEventItem {

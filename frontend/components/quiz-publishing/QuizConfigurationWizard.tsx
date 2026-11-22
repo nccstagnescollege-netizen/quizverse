@@ -24,6 +24,10 @@ import {
   Sparkles,
   Smartphone,
   Lock,
+  Camera,
+  Mic,
+  Video,
+  Monitor,
 } from 'lucide-react';
 import {
   quizPublishingService,
@@ -1091,6 +1095,229 @@ export function QuizConfigurationWizard({ quizId, basePath, token }: QuizConfigu
                   />
                   <p className="text-[10px] text-slate-400">
                     iOS 15+ supports UIScreen.capturedDidChangeNotification and ASAM.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Phase 25: Safe Exam Browser (SEB) Secure Desktop Examination */}
+            <div className="space-y-4 pt-4 border-t border-surface-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider">
+                    <Monitor className="w-4 h-4 text-emerald-400" />
+                    <span>Secure Desktop Mode &amp; Safe Exam Browser (SEB)</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Restrict desktop access via Safe Exam Browser configuration keys, quit passwords, and window restrictions.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(config.require_seb ?? false)}
+                    onChange={(e) => updateField('require_seb', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {Boolean(config.require_seb ?? false) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                    <label className="text-xs font-semibold text-white block">
+                      SEB Quit Password
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. SEB-EXIT-PASS"
+                      value={config.seb_quit_password || ''}
+                      onChange={(e) => updateField('seb_quit_password', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Required by candidates or proctors to cleanly exit the SEB kiosk environment.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                    <label className="text-xs font-semibold text-white block">
+                      SEB Configuration Key (BEK / CK)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="SHA256 Configuration Key..."
+                      value={config.seb_config_key || ''}
+                      onChange={(e) => updateField('seb_config_key', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Cryptographic hash ensuring the student has launched the un-tampered .seb config.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Phase 26: Advanced AI-Assisted Live Proctoring */}
+            <div className="space-y-4 pt-4 border-t border-surface-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider">
+                    <Video className="w-4 h-4 text-purple-400" />
+                    <span>Advanced AI-Assisted Live Proctoring</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Privacy-conscious on-device facial presence, secondary person detection, and explainable risk scoring.
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  Phase 26 AI Proctoring
+                </span>
+              </div>
+
+              {/* Ethical AI & Fair Evaluation Advisory */}
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-semibold text-white">Ethical AI Proctoring Boundary &amp; Human-in-the-Loop Safeguard:</span>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    AI proctoring generates probabilistic risk estimates to assist human invigilators. The system <strong>never automatically fails, disqualifies, or penalizes</strong> any candidate based on an AI score. Candidates with pre-approved accessibility accommodations are automatically exempted from anomaly penalties. All video and audio processing is computed on-device with zero facial biometric templates stored.
+                  </p>
+                </div>
+              </div>
+
+              {/* Primary Monitoring Toggles */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  {
+                    field: 'webcam_monitoring_enabled',
+                    title: 'Webcam Video Stream Monitoring',
+                    desc: 'Enables continuous on-device camera framing, face presence, and positioning telemetry.',
+                  },
+                  {
+                    field: 'microphone_monitoring_enabled',
+                    title: 'Microphone Ambient Audio Monitoring',
+                    desc: 'Analyzes root-mean-square audio energy and detects elevated speech levels.',
+                  },
+                  {
+                    field: 'face_presence_detection',
+                    title: 'Face Absence Detection',
+                    desc: 'Flags prolonged candidate absence from the camera viewport during active examination.',
+                  },
+                  {
+                    field: 'multiple_person_detection',
+                    title: 'Multiple-Person Detection',
+                    desc: 'Detects presence of secondary individuals in the candidate’s physical examination space.',
+                  },
+                  {
+                    field: 'head_position_detection',
+                    title: 'Head-Position & Orientation Tracking',
+                    desc: 'Calculates head centroid orientation (facing screen, turned away, or looking down).',
+                  },
+                  {
+                    field: 'audio_anomaly_detection',
+                    title: 'Audio Speech & Voice Anomaly Detection',
+                    desc: 'Flags acoustic bursts and conversations exceeding calibrated ambient thresholds.',
+                  },
+                  {
+                    field: 'proctoring_mandatory',
+                    title: 'Mandatory Proctoring Compliance',
+                    desc: 'Requires verified camera and microphone permissions before the candidate can enter the exam.',
+                  },
+                  {
+                    field: 'proctoring_human_review_required',
+                    title: 'Enforce Human Review Before Action',
+                    desc: 'Mandates formal invigilator confirmation before any incident or disciplinary action is finalized.',
+                  },
+                ].map((item) => (
+                  <label
+                    key={item.field}
+                    className="flex items-start gap-3 p-3.5 rounded-xl bg-surface-elevated border border-surface-border cursor-pointer hover:border-slate-700 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(config[item.field as keyof QuizConfiguration] ?? (item.field === 'proctoring_human_review_required'))}
+                      onChange={(e) => updateField(item.field as keyof QuizConfiguration, e.target.checked)}
+                      className="mt-0.5 rounded border-slate-700 text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-white">{item.title}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{item.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {/* Interval & Threshold Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Telemetry Interval (Sec)
+                  </label>
+                  <input
+                    type="number"
+                    min={3}
+                    max={60}
+                    value={config.monitoring_interval_seconds ?? 8}
+                    onChange={(e) => updateField('monitoring_interval_seconds', parseInt(e.target.value, 10) || 8)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Frequency of on-device frame and audio evaluations (Default: 8s).
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Risk Warning Threshold
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={70}
+                    value={config.proctoring_warning_threshold ?? 40}
+                    onChange={(e) => updateField('proctoring_warning_threshold', parseInt(e.target.value, 10) || 40)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Score at which invigilator receives an advisory warning (Default: 40).
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Critical Review Threshold
+                  </label>
+                  <input
+                    type="number"
+                    min={50}
+                    max={95}
+                    value={config.proctoring_critical_threshold ?? 75}
+                    onChange={(e) => updateField('proctoring_critical_threshold', parseInt(e.target.value, 10) || 75)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Score triggering prominent invigilator alert and priority queue (Default: 75).
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Recording Authorization Policy
+                  </label>
+                  <select
+                    value={config.recording_policy || 'disabled'}
+                    onChange={(e) => updateField('recording_policy', e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="disabled">Disabled (No Video Recording)</option>
+                    <option value="incident_only">Incident Evidence Only (Candidate Consent)</option>
+                    <option value="continuous_consent">Continuous Recording (Explicit Consent)</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400">
+                    Defines policy for media preservation subject to consent and retention.
                   </p>
                 </div>
               </div>

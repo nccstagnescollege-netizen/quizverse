@@ -71,6 +71,23 @@ export interface StudentExamLandingDetails {
   } | null;
   allowed_actions: Array<'register' | 'view_instructions' | 'start' | 'resume' | 'view_result'>;
   session_token?: string | null;
+  proctoring_policy?: {
+    webcam_monitoring_enabled: boolean;
+    microphone_monitoring_enabled: boolean;
+    face_presence_detection: boolean;
+    multiple_person_detection: boolean;
+    head_position_detection: boolean;
+    audio_anomaly_detection: boolean;
+    proctoring_mandatory: boolean;
+    webcam_permission_required: boolean;
+    microphone_permission_required: boolean;
+    monitoring_interval_seconds: number;
+    risk_warning_threshold: number;
+    risk_critical_threshold: number;
+    recording_policy: string;
+    is_accommodated_exempt?: boolean;
+    privacy_disclosure?: string;
+  } | null;
 }
 
 export interface StudentExamInstructions {
@@ -187,6 +204,23 @@ export interface StudentAttemptDetail {
     block_screen_capture_api?: boolean;
     track_screenshot_signals?: boolean;
     track_screen_recording_signals?: boolean;
+  } | null;
+  proctoring_policy?: {
+    webcam_monitoring_enabled: boolean;
+    microphone_monitoring_enabled: boolean;
+    face_presence_detection: boolean;
+    multiple_person_detection: boolean;
+    head_position_detection: boolean;
+    audio_anomaly_detection: boolean;
+    proctoring_mandatory: boolean;
+    webcam_permission_required: boolean;
+    microphone_permission_required: boolean;
+    monitoring_interval_seconds: number;
+    risk_warning_threshold: number;
+    risk_critical_threshold: number;
+    recording_policy: string;
+    is_accommodated_exempt?: boolean;
+    privacy_disclosure?: string;
   } | null;
   monitoring_acknowledged?: boolean;
 }

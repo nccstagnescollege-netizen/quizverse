@@ -458,6 +458,27 @@ class StudentExamService:
             active_attempt_id=active_attempt_id,
             candidate=candidate_info,
             allowed_actions=allowed_actions,
+            proctoring_policy={
+                "webcam_monitoring_enabled": bool(getattr(cfg, "webcam_monitoring_enabled", False)),
+                "microphone_monitoring_enabled": bool(getattr(cfg, "microphone_monitoring_enabled", False)),
+                "face_presence_detection": bool(getattr(cfg, "face_presence_detection", False)),
+                "multiple_person_detection": bool(getattr(cfg, "multiple_person_detection", False)),
+                "head_position_detection": bool(getattr(cfg, "head_position_detection", False)),
+                "audio_anomaly_detection": bool(getattr(cfg, "audio_anomaly_detection", False)),
+                "proctoring_mandatory": bool(getattr(cfg, "proctoring_mandatory", False)),
+                "webcam_permission_required": bool(getattr(cfg, "webcam_permission_required", False)),
+                "microphone_permission_required": bool(getattr(cfg, "microphone_permission_required", False)),
+                "monitoring_interval_seconds": int(getattr(cfg, "monitoring_interval_seconds", 10)),
+                "risk_warning_threshold": int(getattr(cfg, "risk_warning_threshold", 50)),
+                "risk_critical_threshold": int(getattr(cfg, "risk_critical_threshold", 80)),
+                "human_review_required": bool(getattr(cfg, "human_review_required", True)),
+                "recording_enabled": bool(getattr(cfg, "recording_enabled", False)),
+            } if cfg else None,
+            security_policy={
+                "enforce_fullscreen": bool(getattr(cfg, "enforce_fullscreen", False)),
+                "watermark_enabled": bool(getattr(cfg, "watermark_enabled", False)),
+                "require_native_app": bool(getattr(cfg, "require_native_app", False)),
+            } if cfg else None,
         )
 
     @staticmethod
@@ -1032,6 +1053,21 @@ class StudentExamService:
             "mobile_interruption_policy": str(getattr(cfg, "mobile_interruption_policy", "allow_with_event")),
             "allow_device_recovery": bool(getattr(cfg, "allow_device_recovery", True)),
             "block_rooted_devices": bool(getattr(cfg, "block_rooted_devices", False)),
+            # Phase 26 Advanced AI Proctoring Settings
+            "webcam_monitoring_enabled": bool(getattr(cfg, "webcam_monitoring_enabled", False)),
+            "microphone_monitoring_enabled": bool(getattr(cfg, "microphone_monitoring_enabled", False)),
+            "face_presence_detection": bool(getattr(cfg, "face_presence_detection", False)),
+            "multiple_person_detection": bool(getattr(cfg, "multiple_person_detection", False)),
+            "head_position_detection": bool(getattr(cfg, "head_position_detection", False)),
+            "audio_anomaly_detection": bool(getattr(cfg, "audio_anomaly_detection", False)),
+            "proctoring_mandatory": bool(getattr(cfg, "proctoring_mandatory", False)),
+            "webcam_permission_required": bool(getattr(cfg, "webcam_permission_required", False)),
+            "microphone_permission_required": bool(getattr(cfg, "microphone_permission_required", False)),
+            "monitoring_interval_seconds": int(getattr(cfg, "monitoring_interval_seconds", 10)),
+            "risk_warning_threshold": int(getattr(cfg, "risk_warning_threshold", 50)),
+            "risk_critical_threshold": int(getattr(cfg, "risk_critical_threshold", 80)),
+            "human_review_required": bool(getattr(cfg, "human_review_required", True)),
+            "recording_enabled": bool(getattr(cfg, "recording_enabled", False)),
         }
 
         return StudentAttemptDetailResponse(

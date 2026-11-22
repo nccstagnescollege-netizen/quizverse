@@ -111,6 +111,26 @@ class QuizConfigurationBase(BaseModel):
     allow_device_recovery: bool = True
     block_rooted_devices: bool = False
 
+    # Phase 26 - Advanced AI-Assisted Live Proctoring Controls
+    webcam_monitoring_enabled: bool = False
+    microphone_monitoring_enabled: bool = False
+    face_presence_detection: bool = False
+    multiple_person_detection: bool = False
+    head_position_detection: bool = False
+    audio_anomaly_detection: bool = False
+    browser_activity_integration: bool = True
+    mobile_interruption_integration: bool = True
+    seb_security_integration: bool = True
+    proctoring_mandatory: bool = False
+    webcam_permission_required: bool = False
+    microphone_permission_required: bool = False
+    monitoring_interval_seconds: int = 10
+    risk_warning_threshold: int = 50
+    risk_critical_threshold: int = 80
+    human_review_required: bool = True
+    recording_enabled: bool = False
+    recording_retention_days: int = 30
+
 
 class QuizConfigurationResponse(QuizConfigurationBase):
     id: uuid.UUID
@@ -223,6 +243,26 @@ class QuizConfigurationUpdateRequest(BaseModel):
     allow_device_recovery: Optional[bool] = None
     block_rooted_devices: Optional[bool] = None
 
+    # Phase 26 - Advanced AI-Assisted Live Proctoring Controls
+    webcam_monitoring_enabled: Optional[bool] = None
+    microphone_monitoring_enabled: Optional[bool] = None
+    face_presence_detection: Optional[bool] = None
+    multiple_person_detection: Optional[bool] = None
+    head_position_detection: Optional[bool] = None
+    audio_anomaly_detection: Optional[bool] = None
+    browser_activity_integration: Optional[bool] = None
+    mobile_interruption_integration: Optional[bool] = None
+    seb_security_integration: Optional[bool] = None
+    proctoring_mandatory: Optional[bool] = None
+    webcam_permission_required: Optional[bool] = None
+    microphone_permission_required: Optional[bool] = None
+    monitoring_interval_seconds: Optional[int] = None
+    risk_warning_threshold: Optional[int] = None
+    risk_critical_threshold: Optional[int] = None
+    human_review_required: Optional[bool] = None
+    recording_enabled: Optional[bool] = None
+    recording_retention_days: Optional[int] = None
+
 
 # -------------------------------------------------------------
 # Dedicated Subsection Update Schemas
@@ -325,6 +365,26 @@ class QuizSecurityUpdateRequest(BaseModel):
     mobile_interruption_policy: str = "allow_with_event"
     allow_device_recovery: bool = True
     block_rooted_devices: bool = False
+
+    # Phase 26 - Advanced AI-Assisted Live Proctoring Controls
+    webcam_monitoring_enabled: bool = False
+    microphone_monitoring_enabled: bool = False
+    face_presence_detection: bool = False
+    multiple_person_detection: bool = False
+    head_position_detection: bool = False
+    audio_anomaly_detection: bool = False
+    browser_activity_integration: bool = True
+    mobile_interruption_integration: bool = True
+    seb_security_integration: bool = True
+    proctoring_mandatory: bool = False
+    webcam_permission_required: bool = False
+    microphone_permission_required: bool = False
+    monitoring_interval_seconds: int = 10
+    risk_warning_threshold: int = 50
+    risk_critical_threshold: int = 80
+    human_review_required: bool = True
+    recording_enabled: bool = False
+    recording_retention_days: int = 30
 
 
 # -------------------------------------------------------------

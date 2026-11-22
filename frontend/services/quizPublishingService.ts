@@ -99,6 +99,30 @@ export interface QuizConfiguration {
   mobile_interruption_policy?: 'allow_with_event' | 'pause_on_interruption' | 'strict_flag_review';
   allow_device_recovery?: boolean;
   block_rooted_devices?: boolean;
+  // Phase 25 Safe Exam Browser (SEB)
+  require_seb?: boolean;
+  seb_config_key?: string | null;
+  seb_browser_exam_key?: string | null;
+  seb_quit_password?: string | null;
+  seb_allow_reload?: boolean;
+  seb_show_reload_warning?: boolean;
+  seb_show_time?: boolean;
+  seb_enable_browser_window_toolbar?: boolean;
+  // Phase 26 Advanced AI-Assisted Live Proctoring
+  webcam_monitoring_enabled?: boolean;
+  microphone_monitoring_enabled?: boolean;
+  face_presence_detection?: boolean;
+  multiple_person_detection?: boolean;
+  head_position_detection?: boolean;
+  audio_anomaly_detection?: boolean;
+  proctoring_mandatory?: boolean;
+  webcam_permission_required?: boolean;
+  microphone_permission_required?: boolean;
+  monitoring_interval_seconds?: number;
+  proctoring_warning_threshold?: number;
+  proctoring_critical_threshold?: number;
+  proctoring_human_review_required?: boolean;
+  recording_policy?: 'disabled' | 'incident_only' | 'continuous_consent';
   created_at: string;
   updated_at: string;
 }

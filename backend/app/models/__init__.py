@@ -141,6 +141,11 @@ from backend.app.models.desktop_security import (
     LabDevice,
     DesktopExamSession,
 )
+from backend.app.models.proctoring import (
+    ProctoringSession,
+    ProctoringEvent,
+    ProctoringIncidentReview,
+)
 
 __all__ = [
     "Base",
@@ -264,4 +269,8 @@ __all__ = [
     "ComputerLab",
     "LabDevice",
     "DesktopExamSession",
+    # Advanced AI-Assisted Live Proctoring (Phase 26)
+    "ProctoringSession",
+    "ProctoringEvent",
+    "ProctoringIncidentReview",
 ]

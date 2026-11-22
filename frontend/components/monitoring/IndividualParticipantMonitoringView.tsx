@@ -23,7 +23,13 @@ import {
   User,
   Radio,
   ExternalLink,
+  Video,
+  Camera,
+  Mic,
+  Eye,
 } from 'lucide-react';
+import { ProctoringIncidentReviewModal } from './ProctoringIncidentReviewModal';
+import { ProctoringDashboardCandidate } from '@/services/aiProctoringService';
 import {
   monitoringService,
   ParticipantDetailMonitoringResponse,
@@ -51,7 +57,8 @@ export function IndividualParticipantMonitoringView({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'progress' | 'timeline' | 'incidents' | 'extensions'>('progress');
+  const [activeTab, setActiveTab] = useState<'progress' | 'timeline' | 'incidents' | 'extensions' | 'proctoring'>('progress');
+  const [showProctorReviewModal, setShowProctorReviewModal] = useState(false);
 
   // Modals state
   const [showExtendTimeModal, setShowExtendTimeModal] = useState(false);
@@ -480,6 +487,31 @@ export function IndividualParticipantMonitoringView({
           <Clock className="w-4 h-4" />
           <span>Time Extensions ({data.extension_history.length})</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('proctoring')}
+          className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'proctoring'
+              ? 'border-purple-500 text-purple-400'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          <span>AI Proctoring</span>
+          {p.ai_risk_score !== undefined && (
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                p.ai_risk_score >= 70
+                  ? 'bg-rose-500 text-white'
+                  : p.ai_risk_score >= 40
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-emerald-500/20 text-emerald-300'
+              }`}
+            >
+              {Math.round(p.ai_risk_score)}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Tab 1: Question Progress Grid */}
@@ -664,6 +696,111 @@ export function IndividualParticipantMonitoringView({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Tab 5: AI Proctoring Telemetry */}
+      {activeTab === 'proctoring' && (
+        <div className="glass-card rounded-2xl border border-surface-border p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-surface-border">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Video className="w-4 h-4 text-purple-400" />
+                <span>AI Proctoring Biometric &amp; Telemetry Assessment</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Explainable evaluation of live camera posture, face presence, lighting, and ambient audio signals.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowProctorReviewModal(true)}
+              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-600/20 flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Record Proctor Review</span>
+            </button>
+          </div>
+
+          {/* Ethical AI Banner */}
+          <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-800/40 text-xs text-purple-200 flex items-start gap-2.5">
+            <Shield className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed text-[11px]">
+              AI scores are probabilistic and do not constitute proof of cheating. In accordance with examination regulations, all academic decisions must be made by human invigilators after reviewing telemetry and student context.
+            </p>
+          </div>
+
+          {/* Grid of biometric signals */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Camera Feed</span>
+              <span className={`text-sm font-bold capitalize ${p.camera_status === 'granted' || p.camera_status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {p.camera_status || 'Disabled'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Microphone</span>
+              <span className={`text-sm font-bold capitalize ${p.microphone_status === 'granted' || p.microphone_status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {p.microphone_status || 'Disabled'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Face Presence</span>
+              <span className={`text-sm font-bold ${p.face_presence_state === 'PRESENT' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {p.face_presence_state || 'Nominal'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">Ambient Lighting</span>
+              <span className="text-sm font-bold text-slate-200 capitalize">
+                {p.lighting_condition || 'Good'}
+              </span>
+            </div>
+          </div>
+
+          {/* Risk Level & AI Classification */}
+          <div className="p-5 rounded-xl bg-surface-elevated border border-surface-border space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-slate-400">Calculated Suspicion Score</span>
+                <div className="text-2xl font-black font-mono text-white mt-0.5">
+                  {Math.round(p.ai_risk_score ?? 0)} / 100
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-xs font-semibold text-slate-400 block">AI Classification</span>
+                <span className="inline-block mt-0.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {(p.ai_classification || 'NORMAL').replace(/_/g, ' ')}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  (p.ai_risk_score ?? 0) >= 70 ? 'bg-rose-500' : (p.ai_risk_score ?? 0) >= 40 ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+                style={{ width: `${Math.min(100, p.ai_risk_score ?? 0)}%` }}
+              />
+            </div>
+
+            {p.multiple_faces_detected && (
+              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span>Multiple individuals detected in viewport during attempt.</span>
+              </div>
+            )}
+
+            {p.is_accommodated && (
+              <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-medium">
+                Verified Disability / Accommodation exemption active. Anomaly thresholds are capped at zero penalty.
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -909,6 +1046,42 @@ export function IndividualParticipantMonitoringView({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Phase 26: Proctoring Incident Review Modal */}
+      {showProctorReviewModal && (
+        <ProctoringIncidentReviewModal
+          token={token}
+          quizId={quizId}
+          candidate={{
+            session_id: p.proctoring_session_id || p.attempt_id || '',
+            attempt_id: p.attempt_id || '',
+            student_id: p.student_id,
+            student_name: p.full_name,
+            register_number: p.register_number,
+            email: p.email,
+            attempt_status: p.connection_status,
+            camera_status: p.camera_status || 'unknown',
+            microphone_status: p.microphone_status || 'unknown',
+            lighting_condition: p.lighting_condition || 'good',
+            face_presence_state: p.face_presence_state || 'PRESENT',
+            head_position_state: p.head_position_state || 'FACING_SCREEN',
+            multiple_faces_detected: Boolean(p.multiple_faces_detected),
+            audio_level_state: p.audio_level_state || 'NORMAL',
+            ai_risk_score: p.ai_risk_score ?? 0,
+            ai_risk_level: p.ai_risk_level || 'LOW',
+            ai_classification: p.ai_classification || 'NORMAL',
+            review_status: 'PENDING',
+            total_events: p.security_alerts_count,
+            last_heartbeat_at: p.last_active_at || p.last_heartbeat_at || '',
+            is_accommodated: Boolean(p.is_accommodated),
+          }}
+          isOpen={showProctorReviewModal}
+          onClose={() => setShowProctorReviewModal(false)}
+          onReviewed={() => {
+            loadData(true);
+          }}
+        />
       )}
     </div>
   );

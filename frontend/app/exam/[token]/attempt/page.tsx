@@ -44,6 +44,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { DynamicWatermark } from '@/components/exam/DynamicWatermark';
 import { CaptureSignalMonitor } from '@/components/exam/CaptureSignalMonitor';
 import { CaptureCapabilityCheck } from '@/components/exam/CaptureCapabilityCheck';
+import { LiveProctoringMonitor } from '@/components/exam/LiveProctoringMonitor';
 
 export default function ExamAttemptPage() {
   const params = useParams();
@@ -1482,6 +1483,15 @@ export default function ExamAttemptPage() {
             sessionToken={sessionToken}
           />
         </>
+      )}
+
+      {/* Phase 26: Advanced AI-Assisted Live Proctoring Monitor */}
+      {attemptDetail?.attempt_id && attemptDetail.proctoring_policy && (
+        <LiveProctoringMonitor
+          attemptId={attemptDetail.attempt_id}
+          policy={attemptDetail.proctoring_policy as any}
+          isAccommodated={Boolean(attemptDetail.proctoring_policy?.is_accommodated_exempt)}
+        />
       )}
 
       {/* Phase 14: Non-Accusatory Security Reminder Modal */}

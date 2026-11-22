@@ -180,6 +180,31 @@ class ParticipantMonitoringItem(BaseModel):
     capture_signals_count: int = 0
     latest_capture_signal: Optional[str] = None
 
+    # Phase 24 & 25 - Mobile & Desktop Security Badges
+    flag_secure_active: Optional[bool] = False
+    kiosk_mode_active: Optional[bool] = False
+    mobile_interruptions_count: Optional[int] = 0
+    root_detected: Optional[bool] = False
+    is_seb_verified: Optional[bool] = False
+    seb_version: Optional[str] = None
+    desktop_mode: Optional[str] = "standard_browser"
+    lab_device_reference: Optional[str] = None
+    desktop_interruption_count: Optional[int] = 0
+
+    # Phase 26 - Advanced AI Proctoring Fields
+    proctoring_session_id: Optional[uuid.UUID] = None
+    camera_status: Optional[str] = "not_required"
+    microphone_status: Optional[str] = "not_required"
+    face_presence_state: Optional[str] = "detected"
+    head_position_state: Optional[str] = "facing_screen"
+    multiple_faces_detected: bool = False
+    audio_level_state: Optional[str] = "normal"
+    ai_risk_score: float = 0.0
+    ai_risk_level: str = "LOW"
+    ai_classification: str = "NORMAL"
+    proctoring_review_status: str = "NOT_REQUIRED"
+    proctoring_decision: Optional[str] = None
+
 
 class ParticipantMonitoringListResponse(BaseModel):
     total: int

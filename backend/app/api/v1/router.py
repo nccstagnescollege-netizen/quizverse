@@ -24,6 +24,7 @@ from backend.app.api.v1.endpoints import (
     deployment,
     mobile_exam,
     desktop_exam,
+    proctoring,
 )
 
 api_router = APIRouter()
@@ -184,6 +185,13 @@ api_router.include_router(
     desktop_exam.router,
     prefix="/desktop-exam",
     tags=["Secure Desktop Examination Mode & Safe Exam Browser"],
+)
+
+# 19. Advanced AI-Assisted Live Proctoring (Phase 26)
+api_router.include_router(
+    proctoring.router,
+    prefix="/proctoring",
+    tags=["Advanced AI-Assisted Live Proctoring"],
 )
 
 

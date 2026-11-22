@@ -26,7 +26,19 @@ import {
   Smartphone,
   Laptop,
   ShieldCheck,
+  Video,
+  Camera,
+  Mic,
+  Eye,
+  Activity,
 } from 'lucide-react';
+import {
+  aiProctoringService,
+  ProctoringDashboardOverview,
+  ProctoringDashboardCandidate,
+  ProctoringAlert,
+} from '@/services/aiProctoringService';
+import { ProctoringIncidentReviewModal } from './ProctoringIncidentReviewModal';
 import {
   monitoringService,
   ExaminationMonitoringRoomResponse,
@@ -51,8 +63,16 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Tab navigation: 'participants' | 'invigilators' | 'announcements' | 'incidents'
-  const [activeTab, setActiveTab] = useState<'participants' | 'invigilators' | 'announcements' | 'incidents'>('participants');
+  // Tab navigation: 'participants' | 'invigilators' | 'announcements' | 'incidents' | 'proctoring'
+  const [activeTab, setActiveTab] = useState<'participants' | 'invigilators' | 'announcements' | 'incidents' | 'proctoring'>('participants');
+
+  // Proctoring State
+  const [proctoringOverview, setProctoringOverview] = useState<ProctoringDashboardOverview | null>(null);
+  const [proctoringAlerts, setProctoringAlerts] = useState<ProctoringAlert[]>([]);
+  const [proctoringSearch, setProctoringSearch] = useState('');
+  const [proctoringRiskFilter, setProctoringRiskFilter] = useState('ALL');
+  const [selectedCandidateForReview, setSelectedCandidateForReview] = useState<ProctoringDashboardCandidate | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   // Participant Filters
   const [search, setSearch] = useState('');
@@ -90,16 +110,20 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
     else setLoading(true);
     setError(null);
     try {
-      const [roomData, partData, annData, incData] = await Promise.all([
+      const [roomData, partData, annData, incData, proctorOverviewData, proctorAlertsData] = await Promise.all([
         monitoringService.getExaminationRoom(token, quizId),
         monitoringService.listRoomParticipants(token, quizId, search, statusFilter, connectionFilter),
         monitoringService.listAnnouncements(token, quizId),
         monitoringService.listIncidents(token, quizId),
+        aiProctoringService.getDashboard(token, quizId).catch(() => null),
+        aiProctoringService.getAlerts(token, quizId).catch(() => []),
       ]);
       setRoom(roomData);
       setParticipants(partData.items);
       setAnnouncements(annData.items);
       setIncidents(incData.items);
+      if (proctorOverviewData) setProctoringOverview(proctorOverviewData);
+      if (proctorAlertsData) setProctoringAlerts(proctorAlertsData);
     } catch (err: any) {
       setError(err.message || 'Failed to load examination room telemetry');
     } finally {
@@ -367,6 +391,27 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
         >
           <Shield className="w-3.5 h-3.5" />
           Invigilation Team ({room?.invigilators.length || 0})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('proctoring')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            activeTab === 'proctoring'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+              : 'text-slate-400 hover:text-white hover:bg-surface-elevated'
+          }`}
+        >
+          <Video className="w-3.5 h-3.5" />
+          <span>AI Proctoring</span>
+          {proctoringOverview && (proctoringOverview.critical_review_count > 0 || proctoringOverview.unresolved_alerts_count > 0) ? (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white">
+              {proctoringOverview.critical_review_count + proctoringOverview.unresolved_alerts_count}
+            </span>
+          ) : proctoringOverview?.candidates?.length ? (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-purple-500/20 text-purple-300">
+              {proctoringOverview.candidates.length}
+            </span>
+          ) : null}
         </button>
       </div>
 
@@ -760,6 +805,285 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
         </div>
       )}
 
+      {/* Tab 5: Advanced AI-Assisted Live Proctoring */}
+      {activeTab === 'proctoring' && (
+        <div className="space-y-5">
+          {/* Ethical AI & Fairness Framework Advisory */}
+          <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-800/40 text-xs text-purple-200 flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-white text-xs">Human-in-the-Loop Ethical AI Proctoring Guard:</span>
+              <p className="text-[11px] text-purple-300 leading-relaxed">
+                All suspicious event classifications and risk scores are assistive indicators calculated through on-device computer vision and audio signals. The system never automatically penalizes or fails candidates based on AI calculations. Human invigilator confirmation is mandatory before any action is taken.
+              </p>
+            </div>
+          </div>
+
+          {/* Proctoring KPI Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="p-3.5 rounded-2xl bg-surface-card border border-surface-border text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">Monitored</span>
+              <span className="text-xl font-bold text-white">{proctoringOverview?.total_proctored_candidates || 0}</span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-surface-card border border-emerald-500/20 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400 block mb-0.5">Active Stream</span>
+              <span className="text-xl font-bold text-emerald-400">{proctoringOverview?.active_now || 0}</span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-surface-card border border-cyan-500/20 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400 block mb-0.5">Nominal</span>
+              <span className="text-xl font-bold text-cyan-400">{proctoringOverview?.nominal_count || 0}</span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-surface-card border border-amber-500/20 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400 block mb-0.5">Attention</span>
+              <span className="text-xl font-bold text-amber-400">{proctoringOverview?.requires_attention_count || 0}</span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-surface-card border border-rose-500/20 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-400 block mb-0.5">Critical Review</span>
+              <span className={`text-xl font-bold ${(proctoringOverview?.critical_review_count || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                {proctoringOverview?.critical_review_count || 0}
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-surface-card border border-purple-500/20 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-400 block mb-0.5">Pending Alerts</span>
+              <span className={`text-xl font-bold ${(proctoringOverview?.unresolved_alerts_count || 0) > 0 ? 'text-purple-400' : 'text-slate-400'}`}>
+                {proctoringOverview?.unresolved_alerts_count || 0}
+              </span>
+            </div>
+          </div>
+
+          {/* Proctoring Alerts Banner if active */}
+          {proctoringAlerts.filter((a) => !a.acknowledged).length > 0 && (
+            <div className="space-y-2 p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40">
+              <div className="flex items-center justify-between text-xs font-bold text-rose-400">
+                <span className="flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>Unresolved Proctoring Alerts ({proctoringAlerts.filter((a) => !a.acknowledged).length})</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Requires Invigilator Acknowledgement</span>
+              </div>
+              <div className="space-y-2 pt-1">
+                {proctoringAlerts
+                  .filter((a) => !a.acknowledged)
+                  .slice(0, 5)
+                  .map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="p-3 rounded-xl bg-slate-900/80 border border-rose-500/30 flex items-center justify-between text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{alert.student_name}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-500/20 text-rose-300 uppercase">
+                            {alert.alert_type.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300">{alert.message}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await aiProctoringService.acknowledgeAlert(token, alert.id);
+                            loadAllData(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-surface-elevated hover:bg-slate-700 text-slate-300 text-[11px] font-medium border border-surface-border cursor-pointer transition"
+                        >
+                          Acknowledge
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cand = proctoringOverview?.candidates.find((c) => c.session_id === alert.session_id);
+                            if (cand) {
+                              setSelectedCandidateForReview(cand);
+                              setShowReviewModal(true);
+                            }
+                          }}
+                          className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold shadow-md shadow-rose-600/20 cursor-pointer transition"
+                        >
+                          Review Candidate
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filters & Search Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-2xl bg-surface-card border border-surface-border">
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+              <span className="text-[11px] font-medium text-slate-400">Risk Filter:</span>
+              {['ALL', 'CRITICAL_REVIEW', 'POTENTIALLY_SUSPICIOUS', 'REQUIRES_ATTENTION', 'NORMAL'].map((rf) => (
+                <button
+                  key={rf}
+                  onClick={() => setProctoringRiskFilter(rf)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                    proctoringRiskFilter === rf
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-surface-elevated'
+                  }`}
+                >
+                  {rf.replace(/_/g, ' ')}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search candidate or ID..."
+                value={proctoringSearch}
+                onChange={(e) => setProctoringSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl text-xs bg-surface-elevated border border-surface-border text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Candidate Proctoring Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(!proctoringOverview?.candidates || proctoringOverview.candidates.length === 0) ? (
+              <div className="col-span-full p-12 text-center rounded-2xl bg-surface-card border border-surface-border text-slate-400 text-xs">
+                No active proctoring telemetry received for this examination session yet.
+              </div>
+            ) : (
+              proctoringOverview.candidates
+                .filter((cand) => {
+                  if (proctoringRiskFilter !== 'ALL' && cand.ai_classification !== proctoringRiskFilter) {
+                    return false;
+                  }
+                  if (proctoringSearch.trim()) {
+                    const q = proctoringSearch.toLowerCase();
+                    return (
+                      cand.student_name.toLowerCase().includes(q) ||
+                      cand.email.toLowerCase().includes(q) ||
+                      (cand.register_number && cand.register_number.toLowerCase().includes(q))
+                    );
+                  }
+                  return true;
+                })
+                .map((cand) => {
+                  const getRiskStyle = (score: number) => {
+                    if (score >= 70) return { bar: 'bg-rose-500', badge: 'bg-rose-500/15 text-rose-400 border-rose-500/30' };
+                    if (score >= 40) return { bar: 'bg-amber-500', badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30' };
+                    return { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
+                  };
+                  const riskStyle = getRiskStyle(cand.ai_risk_score);
+
+                  return (
+                    <div
+                      key={cand.session_id}
+                      className="p-4 rounded-2xl bg-surface-card border border-surface-border space-y-3 shadow-md hover:border-slate-700 transition"
+                    >
+                      {/* Candidate Header */}
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-0.5">
+                          <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                            <span>{cand.student_name}</span>
+                            {cand.is_accommodated && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                Accommodated
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-400">
+                            {cand.register_number || cand.email}
+                          </div>
+                        </div>
+
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${riskStyle.badge}`}>
+                          {cand.ai_classification.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+
+                      {/* Device & Posture Indicators */}
+                      <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+                        <div className="p-1.5 rounded-lg bg-surface-elevated border border-surface-border">
+                          <span className="text-slate-500 block">Camera</span>
+                          <span className={`font-semibold capitalize ${cand.camera_status === 'granted' || cand.camera_status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {cand.camera_status}
+                          </span>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-surface-elevated border border-surface-border">
+                          <span className="text-slate-500 block">Face</span>
+                          <span className={`font-semibold ${cand.face_presence_state === 'PRESENT' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {cand.face_presence_state}
+                          </span>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-surface-elevated border border-surface-border">
+                          <span className="text-slate-500 block">Audio</span>
+                          <span className={`font-semibold ${cand.audio_level_state === 'NORMAL' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {cand.audio_level_state}
+                          </span>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-surface-elevated border border-surface-border">
+                          <span className="text-slate-500 block">Lighting</span>
+                          <span className="font-semibold text-slate-300 capitalize">
+                            {cand.lighting_condition}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Multiple person alert tag if detected */}
+                      {cand.multiple_faces_detected && (
+                        <div className="px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-[10px] font-semibold text-rose-300 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+                          <span>Multiple persons detected in viewport</span>
+                        </div>
+                      )}
+
+                      {/* AI Risk Score Bar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400">AI Risk Assessment</span>
+                          <span className="font-mono font-bold text-white">{Math.round(cand.ai_risk_score)} / 100</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${riskStyle.bar} transition-all duration-300`}
+                            style={{ width: `${Math.min(100, cand.ai_risk_score)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Human Review Status and Action Button */}
+                      <div className="pt-2 border-t border-surface-border flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">
+                          {cand.reviewer_decision ? (
+                            <span className="text-emerald-400 font-medium capitalize">
+                              Decision: {cand.reviewer_decision.replace(/_/g, ' ')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">Pending Review</span>
+                          )}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCandidateForReview(cand);
+                            setShowReviewModal(true);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-surface-elevated hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-surface-border transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Review Session</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Broadcast Announcement Modal */}
       {showAnnouncementModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -1055,6 +1379,23 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
             </form>
           </div>
         </div>
+      )}
+
+      {/* Phase 26: Proctoring Incident Human Review Modal */}
+      {showReviewModal && selectedCandidateForReview && (
+        <ProctoringIncidentReviewModal
+          token={token}
+          quizId={quizId}
+          candidate={selectedCandidateForReview}
+          isOpen={showReviewModal}
+          onClose={() => {
+            setShowReviewModal(false);
+            setSelectedCandidateForReview(null);
+          }}
+          onReviewed={() => {
+            loadAllData(true);
+          }}
+        />
       )}
     </div>
   );

@@ -31,6 +31,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { BrowserCompatibilityCheck } from '@/components/exam/BrowserCompatibilityCheck';
 import { WatermarkStatusIndicator } from '@/components/exam/WatermarkStatusIndicator';
 import { SEBCompatibilityCheck } from '@/components/desktop-security/SEBCompatibilityCheck';
+import { PreExamProctoringCheck } from '@/components/exam/PreExamProctoringCheck';
 
 export default function ExamLandingPage() {
   const params = useParams();
@@ -45,6 +46,8 @@ export default function ExamLandingPage() {
   const [isConcluded, setIsConcluded] = useState(false);
   const [sebCanProceed, setSebCanProceed] = useState(true);
   const [sebMode, setSebMode] = useState('standard_browser');
+  const [proctoringCheckPassed, setProctoringCheckPassed] = useState(false);
+  const [proctoringCaps, setProctoringCaps] = useState<any>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && token) {
@@ -369,6 +372,20 @@ export default function ExamLandingPage() {
                 }}
               />
             )}
+
+            {/* Phase 26: Pre-Examination Camera & Proctoring Compatibility Check */}
+            {details?.proctoring_policy && (details.proctoring_policy.webcam_monitoring_enabled || details.proctoring_policy.microphone_monitoring_enabled) && (
+              <PreExamProctoringCheck
+                policy={details.proctoring_policy as any}
+                onCompleted={(caps) => {
+                  setProctoringCheckPassed(true);
+                  setProctoringCaps(caps);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem(`qv_proctor_caps_${token}`, JSON.stringify(caps));
+                  }
+                }}
+              />
+            )}
           </div>
 
           {/* Right Column: Candidate Status & Actions */}
@@ -482,15 +499,7 @@ export default function ExamLandingPage() {
 
                 {/* 3. Start Examination (Only when NOT concluded) */}
                 {!isConcluded && details.allowed_actions.includes('start') && (
-                  sebCanProceed ? (
-                    <button
-                      onClick={handleStartExam}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>Start Examination</span>
-                    </button>
-                  ) : (
+                  !sebCanProceed ? (
                     <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-center space-y-1.5">
                       <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400">
                         <Lock className="w-3.5 h-3.5" />
@@ -500,6 +509,26 @@ export default function ExamLandingPage() {
                         Entry is blocked in standard web browsers. Please download the .seb configuration and launch in Safe Exam Browser.
                       </p>
                     </div>
+                  ) : details.proctoring_policy?.proctoring_mandatory &&
+                    (details.proctoring_policy.webcam_monitoring_enabled || details.proctoring_policy.microphone_monitoring_enabled) &&
+                    !proctoringCheckPassed ? (
+                    <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center space-y-1.5">
+                      <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-purple-400">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Camera &amp; Proctoring Verification Required</span>
+                      </div>
+                      <p className="text-[11px] text-foreground/80 leading-relaxed">
+                        Please complete the camera framing and sensor check above to unlock examination entry.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleStartExam}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all text-center cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Start Examination</span>
+                    </button>
                   )
                 )}
 

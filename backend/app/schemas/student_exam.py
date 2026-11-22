@@ -62,6 +62,8 @@ class StudentExamLandingResponse(BaseModel):
     active_attempt_id: Optional[uuid.UUID] = None
     candidate: Optional[Dict[str, Any]] = None
     allowed_actions: List[str] = Field(default_factory=list)
+    proctoring_policy: Optional[Dict[str, Any]] = None
+    security_policy: Optional[Dict[str, Any]] = None
 
 
 class StudentExamInstructionsResponse(BaseModel):

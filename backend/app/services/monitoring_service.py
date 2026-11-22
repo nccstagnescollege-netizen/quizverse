@@ -35,6 +35,7 @@ from backend.app.models.monitoring import (
     MonitoringIntervention,
     ExaminationExtensionHistory,
 )
+from backend.app.models.proctoring import ProctoringSession
 from backend.app.schemas.monitoring import (
     LiveMonitoringOverviewResponse,
     LiveExaminationItem,
@@ -683,6 +684,12 @@ class LiveMonitoringService:
             for w in wm_rows:
                 wm_sessions[w.attempt_id] = w
 
+            # Phase 26 Advanced AI Proctoring Sessions
+            proct_sessions: Dict[uuid.UUID, ProctoringSession] = {}
+            p_rows = db.query(ProctoringSession).filter(ProctoringSession.attempt_id.in_(attempt_ids)).all()
+            for p in p_rows:
+                proct_sessions[p.attempt_id] = p
+
             cap_rows = db.query(
                 CaptureCapabilityReport.attempt_id,
                 CaptureCapabilityReport.detection_tier
@@ -826,6 +833,19 @@ class LiveMonitoringService:
                 capture_capability=capture_tiers.get(att.id, "detection_limited") if att else "detection_limited",
                 capture_signals_count=capture_signal_counts.get(att.id, 0) if att else 0,
                 latest_capture_signal=latest_capture_signals.get(att.id, None) if att else None,
+                # Phase 26 Advanced AI Proctoring Telemetry
+                proctoring_session_id=proct_sessions[att.id].id if (att and att.id in proct_sessions) else None,
+                camera_status=proct_sessions[att.id].camera_status if (att and att.id in proct_sessions) else "not_required",
+                microphone_status=proct_sessions[att.id].microphone_status if (att and att.id in proct_sessions) else "not_required",
+                face_presence_state=proct_sessions[att.id].face_presence_state if (att and att.id in proct_sessions) else "detected",
+                head_position_state=proct_sessions[att.id].head_position_state if (att and att.id in proct_sessions) else "facing_screen",
+                multiple_faces_detected=proct_sessions[att.id].multiple_faces_detected if (att and att.id in proct_sessions) else False,
+                audio_level_state=proct_sessions[att.id].audio_level_state if (att and att.id in proct_sessions) else "normal",
+                ai_risk_score=float(proct_sessions[att.id].ai_risk_score or 0.0) if (att and att.id in proct_sessions) else 0.0,
+                ai_risk_level=proct_sessions[att.id].ai_risk_level if (att and att.id in proct_sessions) else "LOW",
+                ai_classification=proct_sessions[att.id].ai_classification if (att and att.id in proct_sessions) else "NORMAL",
+                proctoring_review_status=proct_sessions[att.id].review_status if (att and att.id in proct_sessions) else "NOT_REQUIRED",
+                proctoring_decision=proct_sessions[att.id].reviewer_decision if (att and att.id in proct_sessions) else None,
             )
 
             # Apply Search Filter
@@ -992,6 +1012,8 @@ class LiveMonitoringService:
 
         st_group = getattr(student.profile, "student_group", None) if student.profile else None
 
+        p_sess = db.query(ProctoringSession).filter(ProctoringSession.attempt_id == attempt.id).first() if attempt else None
+
         participant_item = ParticipantMonitoringItem(
             student_id=student.id,
             attempt_id=attempt.id if attempt else None,
@@ -1025,6 +1047,19 @@ class LiveMonitoringService:
             incident_count=len(incidents_list),
             review_status=incidents_list[0].status if incidents_list else "NONE",
             latest_incident=incidents_list[0].title if incidents_list else None,
+            # Phase 26 Advanced AI Proctoring Telemetry
+            proctoring_session_id=p_sess.id if p_sess else None,
+            camera_status=p_sess.camera_status if p_sess else "not_required",
+            microphone_status=p_sess.microphone_status if p_sess else "not_required",
+            face_presence_state=p_sess.face_presence_state if p_sess else "detected",
+            head_position_state=p_sess.head_position_state if p_sess else "facing_screen",
+            multiple_faces_detected=p_sess.multiple_faces_detected if p_sess else False,
+            audio_level_state=p_sess.audio_level_state if p_sess else "normal",
+            ai_risk_score=float(p_sess.ai_risk_score or 0.0) if p_sess else 0.0,
+            ai_risk_level=p_sess.ai_risk_level if p_sess else "LOW",
+            ai_classification=p_sess.ai_classification if p_sess else "NORMAL",
+            proctoring_review_status=p_sess.review_status if p_sess else "NOT_REQUIRED",
+            proctoring_decision=p_sess.reviewer_decision if p_sess else None,
         )
 
         return ParticipantDetailMonitoringResponse(
