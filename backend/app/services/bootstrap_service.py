@@ -1,5 +1,6 @@
 import uuid
 from typing import Optional, Dict
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
@@ -1035,6 +1036,36 @@ def ensure_quiz_configuration_schema_exists(db: Session) -> None:
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS mobile_interruption_policy VARCHAR(32) NOT NULL DEFAULT 'allow_with_event';",
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS allow_device_recovery BOOLEAN NOT NULL DEFAULT true;",
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS block_rooted_devices BOOLEAN NOT NULL DEFAULT false;",
+
+                # Phase 25 - Secure Desktop & Safe Exam Browser (SEB) Controls
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_seb BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_config_key VARCHAR(128);",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_browser_exam_key VARCHAR(128);",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_quit_password VARCHAR(128);",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_allow_reload BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_show_reload_warning BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_show_time BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_enable_browser_window_toolbar BOOLEAN NOT NULL DEFAULT false;",
+
+                # Phase 26 - Advanced AI-Assisted Live Proctoring Controls
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS webcam_monitoring_enabled BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS microphone_monitoring_enabled BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS face_presence_detection BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS multiple_person_detection BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS head_position_detection BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS audio_anomaly_detection BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS browser_activity_integration BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS mobile_interruption_integration BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS seb_security_integration BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS proctoring_mandatory BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS webcam_permission_required BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS microphone_permission_required BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS monitoring_interval_seconds INTEGER NOT NULL DEFAULT 10;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS risk_warning_threshold INTEGER NOT NULL DEFAULT 50;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS risk_critical_threshold INTEGER NOT NULL DEFAULT 80;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS human_review_required BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS recording_enabled BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS recording_retention_days INTEGER NOT NULL DEFAULT 30;",
             ]
             for stmt in ddl_statements:
                 try:
@@ -1042,7 +1073,7 @@ def ensure_quiz_configuration_schema_exists(db: Session) -> None:
                 except Exception as ex:
                     logger.debug(f"quiz_configurations statement note: {ex}")
             db.commit()
-            logger.info("QuizConfiguration security schema (Phases 22, 23, 24) verified/upgraded successfully.")
+            logger.info("QuizConfiguration security schema (Phases 22, 23, 24, 25, 26) verified/upgraded successfully.")
     except Exception as e:
         logger.warning(f"QuizConfiguration schema upgrade encountered non-fatal error: {e}")
         db.rollback()
@@ -1304,6 +1335,7 @@ def ensure_proctoring_schema_exists(db: Session) -> None:
     Idempotently upgrades quiz_configurations and creates proctoring_sessions,
     proctoring_events, and proctoring_incident_reviews tables.
     """
+    from sqlalchemy import text
     try:
         bind = db.get_bind()
         dialect = bind.dialect.name.lower()
@@ -1342,91 +1374,104 @@ def ensure_proctoring_schema_exists(db: Session) -> None:
                     db.rollback()
 
             # 2. Create proctoring_sessions table
-            db.execute(text(f"""
-                CREATE TABLE IF NOT EXISTS proctoring_sessions (
-                    id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
-                    attempt_id {uuid_type} NOT NULL UNIQUE REFERENCES examination_attempts(id) ON DELETE CASCADE,
-                    quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-                    student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-                    status VARCHAR(32) NOT NULL DEFAULT 'active',
-                    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    ended_at TIMESTAMPTZ,
-                    camera_status VARCHAR(32) NOT NULL DEFAULT 'not_required',
-                    microphone_status VARCHAR(32) NOT NULL DEFAULT 'not_required',
-                    camera_label VARCHAR(128),
-                    microphone_label VARCHAR(128),
-                    lighting_condition VARCHAR(32) NOT NULL DEFAULT 'good',
-                    is_accommodated_exempt BOOLEAN NOT NULL DEFAULT FALSE,
-                    face_presence_state VARCHAR(32) NOT NULL DEFAULT 'detected',
-                    head_position_state VARCHAR(32) NOT NULL DEFAULT 'facing_screen',
-                    multiple_faces_detected BOOLEAN NOT NULL DEFAULT FALSE,
-                    audio_level_state VARCHAR(32) NOT NULL DEFAULT 'normal',
-                    total_face_absent_count INTEGER NOT NULL DEFAULT 0,
-                    total_multiple_face_count INTEGER NOT NULL DEFAULT 0,
-                    total_head_movement_count INTEGER NOT NULL DEFAULT 0,
-                    total_audio_anomaly_count INTEGER NOT NULL DEFAULT 0,
-                    total_proctoring_events INTEGER NOT NULL DEFAULT 0,
-                    ai_risk_score NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
-                    ai_risk_level VARCHAR(16) NOT NULL DEFAULT 'LOW',
-                    ai_classification VARCHAR(32) NOT NULL DEFAULT 'NORMAL',
-                    ai_confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.900,
-                    risk_factors {json_type},
-                    review_status VARCHAR(32) NOT NULL DEFAULT 'NOT_REQUIRED',
-                    reviewer_decision VARCHAR(32),
-                    reviewer_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
-                    reviewer_notes TEXT,
-                    reviewed_at TIMESTAMPTZ,
-                    recording_consent_given BOOLEAN NOT NULL DEFAULT FALSE,
-                    session_metadata {json_type},
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-            """))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_sessions_quiz_id ON proctoring_sessions(quiz_id);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_sessions_student_id ON proctoring_sessions(student_id);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_sessions_risk_level ON proctoring_sessions(ai_risk_level);"))
-            db.commit()
+            try:
+                db.execute(text(f"""
+                    CREATE TABLE IF NOT EXISTS proctoring_sessions (
+                        id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
+                        attempt_id {uuid_type} NOT NULL UNIQUE REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                        quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                        student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                        status VARCHAR(32) NOT NULL DEFAULT 'active',
+                        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        ended_at TIMESTAMPTZ,
+                        camera_status VARCHAR(32) NOT NULL DEFAULT 'not_required',
+                        microphone_status VARCHAR(32) NOT NULL DEFAULT 'not_required',
+                        camera_label VARCHAR(128),
+                        microphone_label VARCHAR(128),
+                        lighting_condition VARCHAR(32) NOT NULL DEFAULT 'good',
+                        is_accommodated_exempt BOOLEAN NOT NULL DEFAULT FALSE,
+                        face_presence_state VARCHAR(32) NOT NULL DEFAULT 'detected',
+                        head_position_state VARCHAR(32) NOT NULL DEFAULT 'facing_screen',
+                        multiple_faces_detected BOOLEAN NOT NULL DEFAULT FALSE,
+                        audio_level_state VARCHAR(32) NOT NULL DEFAULT 'normal',
+                        total_face_absent_count INTEGER NOT NULL DEFAULT 0,
+                        total_multiple_face_count INTEGER NOT NULL DEFAULT 0,
+                        total_head_movement_count INTEGER NOT NULL DEFAULT 0,
+                        total_audio_anomaly_count INTEGER NOT NULL DEFAULT 0,
+                        total_proctoring_events INTEGER NOT NULL DEFAULT 0,
+                        ai_risk_score NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+                        ai_risk_level VARCHAR(16) NOT NULL DEFAULT 'LOW',
+                        ai_classification VARCHAR(32) NOT NULL DEFAULT 'NORMAL',
+                        ai_confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.900,
+                        risk_factors {json_type},
+                        review_status VARCHAR(32) NOT NULL DEFAULT 'NOT_REQUIRED',
+                        reviewer_decision VARCHAR(32),
+                        reviewer_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
+                        reviewer_notes TEXT,
+                        reviewed_at TIMESTAMPTZ,
+                        recording_consent_given BOOLEAN NOT NULL DEFAULT FALSE,
+                        session_metadata {json_type},
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    );
+                """))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_sessions_quiz_id ON proctoring_sessions(quiz_id);"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_sessions_student_id ON proctoring_sessions(student_id);"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_sessions_risk_level ON proctoring_sessions(ai_risk_level);"))
+                db.commit()
+            except Exception as ex:
+                logger.debug(f"proctoring_sessions table creation note: {ex}")
+                db.rollback()
 
             # 3. Create proctoring_events table
-            db.execute(text(f"""
-                CREATE TABLE IF NOT EXISTS proctoring_events (
-                    id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
-                    session_id {uuid_type} NOT NULL REFERENCES proctoring_sessions(id) ON DELETE CASCADE,
-                    attempt_id {uuid_type} NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
-                    quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-                    student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-                    event_type VARCHAR(48) NOT NULL,
-                    severity VARCHAR(16) NOT NULL DEFAULT 'LOW',
-                    confidence_score NUMERIC(4, 3) NOT NULL DEFAULT 0.850,
-                    duration_seconds INTEGER NOT NULL DEFAULT 0,
-                    details {json_type},
-                    is_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
-                    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-            """))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_events_session_id ON proctoring_events(session_id);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_events_event_type ON proctoring_events(event_type);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_events_occurred_at ON proctoring_events(occurred_at);"))
-            db.commit()
+            try:
+                db.execute(text(f"""
+                    CREATE TABLE IF NOT EXISTS proctoring_events (
+                        id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
+                        session_id {uuid_type} NOT NULL REFERENCES proctoring_sessions(id) ON DELETE CASCADE,
+                        attempt_id {uuid_type} NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                        quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                        student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                        event_type VARCHAR(48) NOT NULL,
+                        severity VARCHAR(16) NOT NULL DEFAULT 'LOW',
+                        confidence_score NUMERIC(4, 3) NOT NULL DEFAULT 0.850,
+                        duration_seconds INTEGER NOT NULL DEFAULT 0,
+                        details {json_type},
+                        is_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+                        occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    );
+                """))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_events_session_id ON proctoring_events(session_id);"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_events_event_type ON proctoring_events(event_type);"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_events_occurred_at ON proctoring_events(occurred_at);"))
+                db.commit()
+            except Exception as ex:
+                logger.debug(f"proctoring_events table creation note: {ex}")
+                db.rollback()
 
             # 4. Create proctoring_incident_reviews table
-            db.execute(text(f"""
-                CREATE TABLE IF NOT EXISTS proctoring_incident_reviews (
-                    id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
-                    session_id {uuid_type} NOT NULL REFERENCES proctoring_sessions(id) ON DELETE CASCADE,
-                    reviewer_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
-                    decision VARCHAR(32) NOT NULL,
-                    justification TEXT NOT NULL,
-                    risk_score_at_review NUMERIC(5, 2),
-                    classification_at_review VARCHAR(32),
-                    action_taken VARCHAR(64),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-            """))
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_incident_reviews_session_id ON proctoring_incident_reviews(session_id);"))
-            db.commit()
+            try:
+                db.execute(text(f"""
+                    CREATE TABLE IF NOT EXISTS proctoring_incident_reviews (
+                        id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
+                        session_id {uuid_type} NOT NULL REFERENCES proctoring_sessions(id) ON DELETE CASCADE,
+                        reviewer_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
+                        decision VARCHAR(32) NOT NULL,
+                        justification TEXT NOT NULL,
+                        risk_score_at_review NUMERIC(5, 2),
+                        classification_at_review VARCHAR(32),
+                        action_taken VARCHAR(64),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    );
+                """))
+                db.execute(text("CREATE INDEX IF NOT EXISTS ix_proctoring_incident_reviews_session_id ON proctoring_incident_reviews(session_id);"))
+                db.commit()
+            except Exception as ex:
+                logger.debug(f"proctoring_incident_reviews table creation note: {ex}")
+                db.rollback()
+
             logger.info("Phase 26 AI Proctoring schema verified/upgraded successfully.")
     except Exception as e:
         logger.warning(f"AI Proctoring schema upgrade encountered non-fatal error: {e}")
