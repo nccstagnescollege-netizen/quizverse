@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Optional, Dict
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
@@ -974,7 +974,8 @@ def ensure_desktop_security_schema_exists(db: Session) -> None:
                 "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_student_id ON desktop_exam_sessions(student_id);",
                 "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_quiz_id ON desktop_exam_sessions(quiz_id);",
                 "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_seb_config_id ON desktop_exam_sessions(seb_config_id);",
-                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_lab_device_id ON desktop_exam_sessions(lab_device_id);"
+                "CREATE INDEX IF NOT EXISTS ix_desktop_exam_sessions_lab_device_id ON desktop_exam_sessions(lab_device_id);",
+                "ALTER TABLE browser_compatibility_records ADD COLUMN IF NOT EXISTS is_seb_detected BOOLEAN NOT NULL DEFAULT false;",
             ]
             for stmt in ddl_statements:
                 try:
@@ -986,4 +987,351 @@ def ensure_desktop_security_schema_exists(db: Session) -> None:
     except Exception as e:
         logger.warning(f"Desktop security schema upgrade encountered non-fatal error: {e}")
         db.rollback()
+
+
+def ensure_quiz_configuration_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 22 (Lockdown), Phase 23 (Watermark),
+    and Phase 24 (Mobile Security) columns exist on quiz_configurations in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # Phase 22 - Advanced Browser Lockdown Controls
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS fullscreen_exit_policy VARCHAR(32) NOT NULL DEFAULT 'warning_only';",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS max_focus_loss_count INTEGER NOT NULL DEFAULT 5;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS disable_copy BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS disable_paste BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS disable_context_menu BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS print_restrictions BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS navigation_warning BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS network_interruption_policy VARCHAR(32) NOT NULL DEFAULT 'buffer_and_resume';",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_invigilator_review BOOLEAN NOT NULL DEFAULT true;",
+
+                # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC(3,2) NOT NULL DEFAULT 0.06;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_font_size INTEGER NOT NULL DEFAULT 12;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_rotation_deg INTEGER NOT NULL DEFAULT -25;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_spacing_px INTEGER NOT NULL DEFAULT 140;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_update_interval_sec INTEGER NOT NULL DEFAULT 30;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_mask_student_id BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_show_timestamp BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_show_exam_id BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS watermark_custom_text VARCHAR(255);",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_watermark_validation BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS block_screen_capture_api BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS track_screenshot_signals BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS track_screen_recording_signals BOOLEAN NOT NULL DEFAULT true;",
+
+                # Phase 24 - Mobile Secure Examination Controls
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_native_app BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS android_secure_mode BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS ios_secure_mode BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_kiosk_mode BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS min_android_version INTEGER NOT NULL DEFAULT 26;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS min_ios_version VARCHAR(32) NOT NULL DEFAULT '15.0';",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS mobile_interruption_policy VARCHAR(32) NOT NULL DEFAULT 'allow_with_event';",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS allow_device_recovery BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS block_rooted_devices BOOLEAN NOT NULL DEFAULT false;",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"quiz_configurations statement note: {ex}")
+            db.commit()
+            logger.info("QuizConfiguration security schema (Phases 22, 23, 24) verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"QuizConfiguration schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
+def ensure_browser_lockdown_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 22 browser lockdown tables and columns exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # 1. browser_compatibility_records table
+                """
+                CREATE TABLE IF NOT EXISTS browser_compatibility_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+                    session_id VARCHAR(128),
+                    browser_name VARCHAR(64) NOT NULL,
+                    browser_version VARCHAR(64) NOT NULL,
+                    os_name VARCHAR(64) NOT NULL,
+                    os_version VARCHAR(64) NOT NULL,
+                    device_type VARCHAR(32) NOT NULL DEFAULT 'desktop',
+                    is_secure_context BOOLEAN NOT NULL DEFAULT true,
+                    javascript_enabled BOOLEAN NOT NULL DEFAULT true,
+                    fullscreen_supported BOOLEAN NOT NULL DEFAULT true,
+                    visibility_api_supported BOOLEAN NOT NULL DEFAULT true,
+                    storage_available BOOLEAN NOT NULL DEFAULT true,
+                    screen_width INTEGER NOT NULL DEFAULT 0,
+                    screen_height INTEGER NOT NULL DEFAULT 0,
+                    viewport_width INTEGER NOT NULL DEFAULT 0,
+                    viewport_height INTEGER NOT NULL DEFAULT 0,
+                    network_online BOOLEAN NOT NULL DEFAULT true,
+                    network_downlink NUMERIC(6, 2),
+                    network_rtt INTEGER,
+                    is_seb_detected BOOLEAN NOT NULL DEFAULT false,
+                    checks_summary JSONB,
+                    overall_status VARCHAR(32) NOT NULL DEFAULT 'PASSED',
+                    ip_address VARCHAR(45),
+                    user_agent TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_browser_compatibility_records_attempt_id ON browser_compatibility_records(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_browser_compatibility_records_quiz_id ON browser_compatibility_records(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_browser_compatibility_records_student_id ON browser_compatibility_records(student_id);",
+                "ALTER TABLE browser_compatibility_records ADD COLUMN IF NOT EXISTS is_seb_detected BOOLEAN NOT NULL DEFAULT false;",
+
+                # 2. Phase 22 columns on examination_security_policies
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS fullscreen_exit_policy VARCHAR(32) NOT NULL DEFAULT 'warning_only';",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS max_focus_loss_count INTEGER NOT NULL DEFAULT 5;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS disable_copy BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS disable_paste BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS disable_context_menu BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS print_restrictions BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS navigation_warning BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS network_interruption_policy VARCHAR(32) NOT NULL DEFAULT 'buffer_and_resume';",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS require_invigilator_review BOOLEAN NOT NULL DEFAULT true;",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"browser lockdown statement note: {ex}")
+            db.commit()
+            logger.info("Phase 22 Browser Lockdown schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Browser lockdown schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
+def ensure_watermark_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 23 watermark and capture report tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # 1. watermark_sessions table
+                """
+                CREATE TABLE IF NOT EXISTS watermark_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    watermark_code VARCHAR(32) NOT NULL,
+                    watermark_text VARCHAR(512) NOT NULL,
+                    student_display_name VARCHAR(255) NOT NULL,
+                    student_masked_identifier VARCHAR(128) NOT NULL,
+                    institution_name VARCHAR(255) NOT NULL DEFAULT 'QUIZVERSE',
+                    opacity NUMERIC(3, 2) NOT NULL DEFAULT 0.06,
+                    font_size INTEGER NOT NULL DEFAULT 12,
+                    rotation_deg INTEGER NOT NULL DEFAULT -25,
+                    spacing_px INTEGER NOT NULL DEFAULT 140,
+                    update_interval_sec INTEGER NOT NULL DEFAULT 30,
+                    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    verification_count INTEGER NOT NULL DEFAULT 0,
+                    is_valid BOOLEAN NOT NULL DEFAULT true,
+                    tamper_flag BOOLEAN NOT NULL DEFAULT false,
+                    metadata_json JSONB,
+                    CONSTRAINT uq_watermark_session_attempt UNIQUE (attempt_id),
+                    CONSTRAINT uq_watermark_session_code UNIQUE (watermark_code)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_watermark_sessions_attempt_id ON watermark_sessions(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_watermark_sessions_quiz_id ON watermark_sessions(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_watermark_sessions_student_id ON watermark_sessions(student_id);",
+                "CREATE INDEX IF NOT EXISTS ix_watermark_sessions_watermark_code ON watermark_sessions(watermark_code);",
+
+                # 2. capture_capability_reports table
+                """
+                CREATE TABLE IF NOT EXISTS capture_capability_reports (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    screen_capture_api_supported BOOLEAN NOT NULL DEFAULT false,
+                    screenshot_shortcut_supported BOOLEAN NOT NULL DEFAULT true,
+                    display_media_active BOOLEAN NOT NULL DEFAULT false,
+                    detection_tier VARCHAR(32) NOT NULL DEFAULT 'detection_limited',
+                    browser_vendor VARCHAR(64) NOT NULL DEFAULT 'Unknown',
+                    os_platform VARCHAR(64) NOT NULL DEFAULT 'Unknown',
+                    notes TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_capture_capability_reports_attempt_id ON capture_capability_reports(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_capture_capability_reports_quiz_id ON capture_capability_reports(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_capture_capability_reports_student_id ON capture_capability_reports(student_id);",
+
+                # 3. Phase 23 columns on examination_security_policies
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC(3,2) NOT NULL DEFAULT 0.06;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_font_size INTEGER NOT NULL DEFAULT 12;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_rotation_deg INTEGER NOT NULL DEFAULT -25;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_spacing_px INTEGER NOT NULL DEFAULT 140;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_update_interval_sec INTEGER NOT NULL DEFAULT 30;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_mask_student_id BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_show_timestamp BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_show_exam_id BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS watermark_custom_text VARCHAR(255);",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS require_watermark_validation BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS block_screen_capture_api BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS track_screenshot_signals BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE examination_security_policies ADD COLUMN IF NOT EXISTS track_screen_recording_signals BOOLEAN NOT NULL DEFAULT true;",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"watermark statement note: {ex}")
+            db.commit()
+            logger.info("Phase 23 Watermark & Screen Protection schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Watermark schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
+def ensure_mobile_security_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 24 mobile security tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # 1. device_registrations
+                """
+                CREATE TABLE IF NOT EXISTS device_registrations (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    device_fingerprint VARCHAR(128) NOT NULL,
+                    device_model VARCHAR(128) NOT NULL,
+                    os_platform VARCHAR(32) NOT NULL,
+                    os_version VARCHAR(32) NOT NULL,
+                    app_version VARCHAR(32) NOT NULL,
+                    app_build_number INTEGER NOT NULL DEFAULT 1,
+                    is_trusted BOOLEAN NOT NULL DEFAULT true,
+                    is_blocked BOOLEAN NOT NULL DEFAULT false,
+                    block_reason TEXT,
+                    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_ip_address VARCHAR(64),
+                    device_metadata JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_student_device_fingerprint UNIQUE (student_id, device_fingerprint)
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_device_registrations_student_id ON device_registrations(student_id);",
+                "CREATE INDEX IF NOT EXISTS ix_device_registrations_device_fingerprint ON device_registrations(device_fingerprint);",
+
+                # 2. mobile_exam_sessions
+                """
+                CREATE TABLE IF NOT EXISTS mobile_exam_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id UUID NOT NULL UNIQUE REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    device_id UUID REFERENCES device_registrations(id) ON DELETE SET NULL,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    secure_mode_active BOOLEAN NOT NULL DEFAULT true,
+                    kiosk_mode_active BOOLEAN NOT NULL DEFAULT false,
+                    app_state VARCHAR(32) NOT NULL DEFAULT 'foreground',
+                    last_foreground_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_background_at TIMESTAMPTZ,
+                    interruption_count INTEGER NOT NULL DEFAULT 0,
+                    recovery_count INTEGER NOT NULL DEFAULT 0,
+                    integrity_status VARCHAR(32) NOT NULL DEFAULT 'verified',
+                    root_detected BOOLEAN NOT NULL DEFAULT false,
+                    session_metadata JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_mobile_exam_sessions_attempt_id ON mobile_exam_sessions(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_mobile_exam_sessions_student_id ON mobile_exam_sessions(student_id);",
+                "CREATE INDEX IF NOT EXISTS ix_mobile_exam_sessions_quiz_id ON mobile_exam_sessions(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_mobile_exam_sessions_device_id ON mobile_exam_sessions(device_id);",
+
+                # 3. mobile_interruption_events
+                """
+                CREATE TABLE IF NOT EXISTS mobile_interruption_events (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    mobile_session_id UUID NOT NULL REFERENCES mobile_exam_sessions(id) ON DELETE CASCADE,
+                    attempt_id UUID NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    interruption_type VARCHAR(64) NOT NULL,
+                    severity VARCHAR(16) NOT NULL DEFAULT 'LOW',
+                    duration_ms INTEGER,
+                    details JSONB,
+                    client_timestamp TIMESTAMPTZ,
+                    server_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_mobile_interruption_events_mobile_session_id ON mobile_interruption_events(mobile_session_id);",
+                "CREATE INDEX IF NOT EXISTS ix_mobile_interruption_events_attempt_id ON mobile_interruption_events(attempt_id);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"mobile security statement note: {ex}")
+            db.commit()
+            logger.info("Phase 24 Mobile Security schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Mobile security schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
+def run_all_schema_migrations(db: Session) -> Dict[str, str]:
+    """
+    Executes all idempotent schema upgrades in isolated try-except blocks.
+    Guarantees that a single failing statement never aborts remaining schema upgrades.
+    """
+    results = {}
+    migrations = [
+        ("super_admin", ensure_super_admin_exists),
+        ("quiz_configurations", ensure_quiz_configuration_schema_exists),
+        ("examination_schema", ensure_examination_schema_exists),
+        ("security_schema", ensure_security_schema_exists),
+        ("browser_lockdown", ensure_browser_lockdown_schema_exists),
+        ("watermark_protection", ensure_watermark_schema_exists),
+        ("mobile_security", ensure_mobile_security_schema_exists),
+        ("desktop_security", ensure_desktop_security_schema_exists),
+        ("evaluation_schema", ensure_evaluation_schema_exists),
+        ("analytics_schema", ensure_analytics_reports_schema_exists),
+        ("monitoring_schema", ensure_monitoring_schema_exists),
+        ("system_audit_schema", ensure_system_audit_schema_exists),
+        ("deployment_schema", ensure_deployment_schema_exists),
+        ("quiz_generator_schema", ensure_quiz_generator_schema_exists),
+    ]
+
+    for name, func in migrations:
+        try:
+            func(db)
+            results[name] = "OK"
+        except Exception as e:
+            logger.error(f"Migration [{name}] encountered error: {e}")
+            results[name] = f"ERROR: {e}"
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+    return results
 

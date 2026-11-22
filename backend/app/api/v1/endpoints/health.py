@@ -64,3 +64,36 @@ async def get_health(request: Request) -> HealthResponse:
     )
 
     return HealthResponse(success=True, data=data, meta=meta)
+
+
+@router.get(
+    "/health/migrate",
+    summary="Trigger Idempotent Database Schema Migrations",
+    description="Executes all safe idempotent DDL migrations (ALTER TABLE ADD COLUMN IF NOT EXISTS, CREATE TABLE IF NOT EXISTS) across all phases.",
+)
+@router.post(
+    "/health/migrate",
+    summary="Trigger Idempotent Database Schema Migrations",
+    description="Executes all safe idempotent DDL migrations across all phases.",
+)
+async def run_db_migrations(request: Request):
+    from backend.app.core.database import SessionLocal
+    from backend.app.services.bootstrap_service import run_all_schema_migrations
+
+    if not SessionLocal:
+        return {"success": False, "error": "Database not configured"}
+
+    try:
+        with SessionLocal() as db:
+            results = run_all_schema_migrations(db)
+        return {
+            "success": True,
+            "migrations": results,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": str(exc),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }

@@ -34,35 +34,16 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"🚀 {settings.PROJECT_NAME} v{settings.VERSION} started in {settings.ENVIRONMENT} mode."
     )
-    # Attempt server-side super admin bootstrap if database is accessible
+    # Attempt server-side super admin bootstrap and schema migrations if database is accessible
     try:
         from backend.app.core.database import SessionLocal
-        from backend.app.services.bootstrap_service import (
-            ensure_super_admin_exists,
-            ensure_examination_schema_exists,
-            ensure_security_schema_exists,
-            ensure_evaluation_schema_exists,
-            ensure_analytics_reports_schema_exists,
-            ensure_monitoring_schema_exists,
-            ensure_system_audit_schema_exists,
-            ensure_deployment_schema_exists,
-            ensure_quiz_generator_schema_exists,
-            ensure_desktop_security_schema_exists,
-        )
+        from backend.app.services.bootstrap_service import run_all_schema_migrations
         if SessionLocal:
             with SessionLocal() as db:
-                ensure_super_admin_exists(db)
-                ensure_examination_schema_exists(db)
-                ensure_security_schema_exists(db)
-                ensure_evaluation_schema_exists(db)
-                ensure_analytics_reports_schema_exists(db)
-                ensure_monitoring_schema_exists(db)
-                ensure_system_audit_schema_exists(db)
-                ensure_deployment_schema_exists(db)
-                ensure_quiz_generator_schema_exists(db)
-                ensure_desktop_security_schema_exists(db)
+                migration_summary = run_all_schema_migrations(db)
+                logger.info(f"Database bootstrap & schema migrations completed: {migration_summary}")
     except Exception as e:
-        logger.warning(f"Super admin bootstrap deferred or skipped: {e}")
+        logger.warning(f"Database bootstrap deferred or skipped: {e}")
 
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
@@ -113,6 +94,12 @@ def create_application() -> FastAPI:
     async def health_alias(request: Request):
         from backend.app.api.v1.endpoints.health import get_health
         return await get_health(request)
+
+    @app.get("/health/migrate", tags=["Health"], include_in_schema=False)
+    @app.post("/health/migrate", tags=["Health"], include_in_schema=False)
+    async def migrate_alias(request: Request):
+        from backend.app.api.v1.endpoints.health import run_db_migrations
+        return await run_db_migrations(request)
 
     return app
 
