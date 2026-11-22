@@ -1602,6 +1602,271 @@ def ensure_interruption_schema_exists(db: Session) -> None:
         db.rollback()
 
 
+def ensure_anti_cheating_control_center_schema_exists(db: Session) -> None:
+    """
+    Phase 28 Centralized Anti-Cheating Control Center schema migration.
+    Creates security_policy_templates, security_alert_rules, security_audit_events,
+    and privacy_retention_policies with default templates and privacy disclosures.
+    """
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name
+        uuid_type = "UUID" if dialect_name == "postgresql" else "VARCHAR(36)"
+        json_type = "JSONB" if dialect_name == "postgresql" else "JSON"
+        gen_uuid = "gen_random_uuid()" if dialect_name == "postgresql" else "lower(hex(randomblob(16)))"
+
+        # 1. security_policy_templates table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS security_policy_templates (
+                    id {uuid_type} PRIMARY KEY DEFAULT {gen_uuid},
+                    template_name VARCHAR(128) NOT NULL,
+                    code VARCHAR(64) NOT NULL UNIQUE,
+                    description TEXT,
+                    is_system_template BOOLEAN NOT NULL DEFAULT true,
+                    created_by_admin_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
+                    configuration_payload {json_type} NOT NULL,
+                    required_capabilities {json_type},
+                    platform_limitations {json_type},
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_sec_templates_code ON security_policy_templates(code);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"security_policy_templates table note: {ex}")
+            db.rollback()
+
+        # 2. security_alert_rules table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS security_alert_rules (
+                    id {uuid_type} PRIMARY KEY DEFAULT {gen_uuid},
+                    name VARCHAR(128) NOT NULL,
+                    quiz_id {uuid_type} REFERENCES quizzes(id) ON DELETE CASCADE,
+                    event_category VARCHAR(64) NOT NULL DEFAULT 'all',
+                    min_severity INTEGER NOT NULL DEFAULT 2,
+                    notification_channels {json_type} NOT NULL,
+                    deduplication_window_seconds INTEGER NOT NULL DEFAULT 300,
+                    rate_limit_per_hour INTEGER NOT NULL DEFAULT 20,
+                    escalation_delay_seconds INTEGER NOT NULL DEFAULT 600,
+                    is_enabled BOOLEAN NOT NULL DEFAULT true,
+                    created_by_admin_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_sec_alert_rules_quiz ON security_alert_rules(quiz_id);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"security_alert_rules table note: {ex}")
+            db.rollback()
+
+        # 3. security_audit_events table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS security_audit_events (
+                    id {uuid_type} PRIMARY KEY DEFAULT {gen_uuid},
+                    actor_id {uuid_type},
+                    actor_role VARCHAR(32) NOT NULL DEFAULT 'system',
+                    actor_name VARCHAR(128) NOT NULL DEFAULT 'System',
+                    action VARCHAR(64) NOT NULL,
+                    target_type VARCHAR(64) NOT NULL,
+                    target_id VARCHAR(128),
+                    reason TEXT,
+                    request_ip VARCHAR(45),
+                    user_agent TEXT,
+                    correlation_id VARCHAR(64),
+                    outcome VARCHAR(32) NOT NULL DEFAULT 'SUCCESS',
+                    details {json_type},
+                    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_sec_audit_action ON security_audit_events(action);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_sec_audit_target ON security_audit_events(target_type, target_id);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_sec_audit_timestamp ON security_audit_events(timestamp);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"security_audit_events table note: {ex}")
+            db.rollback()
+
+        # 4. privacy_retention_policies table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS privacy_retention_policies (
+                    id {uuid_type} PRIMARY KEY DEFAULT {gen_uuid},
+                    data_category VARCHAR(64) NOT NULL UNIQUE,
+                    retention_days INTEGER NOT NULL DEFAULT 90,
+                    purpose_of_collection TEXT NOT NULL,
+                    anonymization_procedure TEXT,
+                    requires_explicit_consent BOOLEAN NOT NULL DEFAULT true,
+                    is_locked BOOLEAN NOT NULL DEFAULT false,
+                    updated_by_admin_id {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_privacy_retention_cat ON privacy_retention_policies(data_category);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"privacy_retention_policies table note: {ex}")
+            db.rollback()
+
+        # 5. Seed default Privacy Retention Policies if missing
+        import json
+        default_retention = [
+            ("proctoring_telemetry", 90, "AI face presence, head orientation, and acoustic speech signals for candidate dispute investigation.", "Biometric embeddings and raw facial landmarks purged; only aggregated risk category retained.", True),
+            ("incident_logs", 180, "Official record of candidate security and interruption occurrences for academic board review.", "Candidate identifiers masked after semester conclusion.", False),
+            ("device_preparation", 30, "Station pre-flight battery, network latency, and OS compatibility verification logs.", "Purged completely 30 days post-examination.", True),
+            ("security_audit_events", 365, "Immutable, tamper-evident audit history of all invigilator decisions and administrative actions.", "Retained for institutional accreditation compliance.", False),
+            ("webcam_snapshots", 30, "Low-resolution anomaly verification frames captured during candidate verification.", "Automatically deleted upon final examination publication.", True),
+        ]
+        for cat, days, purpose, anon, consent in default_retention:
+            try:
+                row = db.execute(text("SELECT id FROM privacy_retention_policies WHERE data_category = :cat"), {"cat": cat}).fetchone()
+                if not row:
+                    db.execute(text("""
+                        INSERT INTO privacy_retention_policies (data_category, retention_days, purpose_of_collection, anonymization_procedure, requires_explicit_consent, is_locked)
+                        VALUES (:cat, :days, :purpose, :anon, :consent, false)
+                    """), {"cat": cat, "days": days, "purpose": purpose, "anon": anon, "consent": consent})
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+
+        # 6. Seed the 7 Standard Security Policy Templates if missing
+        system_templates = [
+            {
+                "code": "standard",
+                "name": "Standard Examination",
+                "desc": "Foundational security: watermark overlay, copy/paste tracking, and basic network drop buffering.",
+                "payload": {
+                    "enforce_fullscreen": False, "watermark_enabled": True, "watermark_opacity": 0.05,
+                    "disable_copy": False, "disable_paste": False, "disable_context_menu": True,
+                    "max_tab_switches": 5, "require_native_app": False, "require_seb": False,
+                    "webcam_monitoring_enabled": False, "microphone_monitoring_enabled": False,
+                    "interruption_handling_policy": "continue_with_warning",
+                },
+                "caps": ["Standard desktop or mobile browser", "HTML5 canvas for watermark"],
+                "limits": ["No OS screenshot blocking", "No camera proctoring", "No telephony shielding"],
+            },
+            {
+                "code": "browser_lockdown",
+                "name": "Enhanced Browser Security",
+                "desc": "Full-screen enforcement, copy/paste suppression, context-menu blocking, tab-switch tracking, and print restrictions.",
+                "payload": {
+                    "enforce_fullscreen": True, "watermark_enabled": True, "watermark_opacity": 0.08,
+                    "disable_copy": True, "disable_paste": True, "disable_context_menu": True,
+                    "max_tab_switches": 3, "require_native_app": False, "require_seb": False,
+                    "webcam_monitoring_enabled": False, "microphone_monitoring_enabled": False,
+                    "interruption_handling_policy": "pause_local",
+                },
+                "caps": ["Desktop Chrome, Edge, Safari, Firefox", "Fullscreen API support"],
+                "limits": ["Cannot block OS Alt+Tab completely", "Cannot intercept OS-level screen capture shortcuts"],
+            },
+            {
+                "code": "secure_lab",
+                "name": "Secure Computer Lab",
+                "desc": "Optimized for institutional workstation labs with fixed IP boundaries, browser lockdown, and fast heartbeat audits.",
+                "payload": {
+                    "enforce_fullscreen": True, "watermark_enabled": True, "watermark_opacity": 0.10,
+                    "disable_copy": True, "disable_paste": True, "disable_context_menu": True,
+                    "max_tab_switches": 2, "require_native_app": False, "require_seb": False,
+                    "webcam_monitoring_enabled": False, "microphone_monitoring_enabled": False,
+                    "interruption_handling_policy": "pause_pending_review",
+                },
+                "caps": ["Institution-managed workstation PCs", "Static IP subnet verification"],
+                "limits": ["Dependent on institutional network configuration"],
+            },
+            {
+                "code": "seb_required",
+                "name": "Safe Exam Browser Required",
+                "desc": "Mandatory Safe Exam Browser (SEB) desktop kiosk: cryptographic Config Key & Browser Exam Key verification, OS locked down.",
+                "payload": {
+                    "enforce_fullscreen": True, "watermark_enabled": True, "watermark_opacity": 0.08,
+                    "disable_copy": True, "disable_paste": True, "disable_context_menu": True,
+                    "max_tab_switches": 1, "require_native_app": False, "require_seb": True,
+                    "webcam_monitoring_enabled": False, "microphone_monitoring_enabled": False,
+                    "interruption_handling_policy": "strict_terminate",
+                },
+                "caps": ["Windows 10/11 or macOS with Safe Exam Browser 3.x+ installed"],
+                "limits": ["Not available on mobile devices (Android/iOS phones) without dedicated SEB mobile configuration"],
+            },
+            {
+                "code": "android_secure",
+                "name": "Android Secure Examination",
+                "desc": "Dedicated mobile security: native lock-task kiosk mode, FLAG_SECURE screenshot prevention, and root/jailbreak detection.",
+                "payload": {
+                    "enforce_fullscreen": True, "watermark_enabled": True, "watermark_opacity": 0.08,
+                    "disable_copy": True, "disable_paste": True, "disable_context_menu": True,
+                    "max_tab_switches": 2, "require_native_app": True, "android_secure_mode": True,
+                    "block_rooted_devices": True, "require_seb": False,
+                    "webcam_monitoring_enabled": False, "microphone_monitoring_enabled": False,
+                    "interruption_handling_policy": "pause_local", "allow_call_recovery": True, "call_grace_seconds": 60,
+                },
+                "caps": ["Android 8.0+ with QUIZVERSE Native Secure App", "Hardware-backed keystore"],
+                "limits": ["Hardware power-button shutoff cannot be blocked", "Carrier emergency broadcasts bypass kiosk"],
+            },
+            {
+                "code": "ai_proctoring",
+                "name": "AI-Assisted Proctoring",
+                "desc": "On-device camera & microphone monitoring: continuous face presence, multi-person detection, head orientation, and speech anomaly classification.",
+                "payload": {
+                    "enforce_fullscreen": True, "watermark_enabled": True, "watermark_opacity": 0.07,
+                    "disable_copy": True, "disable_paste": True, "disable_context_menu": True,
+                    "max_tab_switches": 3, "require_native_app": False, "require_seb": False,
+                    "webcam_monitoring_enabled": True, "microphone_monitoring_enabled": True,
+                    "face_presence_detection": True, "multiple_person_detection": True,
+                    "head_position_detection": True, "audio_anomaly_detection": True,
+                    "proctoring_mandatory": True, "proctoring_human_review_required": True,
+                    "interruption_handling_policy": "pause_local",
+                },
+                "caps": ["Working HD webcam (min 640x480)", "Working microphone", "Sufficient ambient lighting (>150 lux)"],
+                "limits": ["AI risk scores are probabilistic and require human invigilator review", "Subject to room lighting fluctuations"],
+            },
+            {
+                "code": "high_security",
+                "name": "High-Security Examination",
+                "desc": "Maximum institutional defense: Browser Lockdown + Dynamic Watermarking + AI Proctoring + Zero-tolerance interruption policy.",
+                "payload": {
+                    "enforce_fullscreen": True, "watermark_enabled": True, "watermark_opacity": 0.12,
+                    "disable_copy": True, "disable_paste": True, "disable_context_menu": True,
+                    "max_tab_switches": 1, "require_native_app": False, "require_seb": False,
+                    "webcam_monitoring_enabled": True, "microphone_monitoring_enabled": True,
+                    "face_presence_detection": True, "multiple_person_detection": True,
+                    "head_position_detection": True, "audio_anomaly_detection": True,
+                    "proctoring_mandatory": True, "proctoring_human_review_required": True,
+                    "interruption_handling_policy": "strict_terminate", "require_device_prep_acknowledgment": True,
+                },
+                "caps": ["Modern desktop workstation or certified laptop", "Webcam & microphone with explicit student consent"],
+                "limits": ["Does not prevent unauthorized secondary devices outside camera viewport or external cameras"],
+            },
+        ]
+
+        for tmpl in system_templates:
+            try:
+                row = db.execute(text("SELECT id FROM security_policy_templates WHERE code = :code"), {"code": tmpl["code"]}).fetchone()
+                if not row:
+                    db.execute(text("""
+                        INSERT INTO security_policy_templates (template_name, code, description, is_system_template, configuration_payload, required_capabilities, platform_limitations)
+                        VALUES (:name, :code, :desc, true, :payload, :caps, :limits)
+                    """), {
+                        "name": tmpl["name"],
+                        "code": tmpl["code"],
+                        "desc": tmpl["desc"],
+                        "payload": json.dumps(tmpl["payload"]),
+                        "caps": json.dumps(tmpl["caps"]),
+                        "limits": json.dumps(tmpl["limits"]),
+                    })
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+
+        logger.info("Phase 28 Anti-Cheating Control Center schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Anti-cheating control center schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
 def run_all_schema_migrations(db: Session) -> Dict[str, str]:
     """
     Executes all idempotent schema upgrades in isolated try-except blocks.
@@ -1619,6 +1884,7 @@ def run_all_schema_migrations(db: Session) -> Dict[str, str]:
         ("desktop_security", ensure_desktop_security_schema_exists),
         ("proctoring_schema", ensure_proctoring_schema_exists),
         ("interruption_schema", ensure_interruption_schema_exists),
+        ("control_center_schema", ensure_anti_cheating_control_center_schema_exists),
         ("evaluation_schema", ensure_evaluation_schema_exists),
         ("analytics_schema", ensure_analytics_reports_schema_exists),
         ("monitoring_schema", ensure_monitoring_schema_exists),

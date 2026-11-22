@@ -151,6 +151,12 @@ from backend.app.models.interruption import (
     DevicePreparationLog,
     InterruptionRecoverySession,
 )
+from backend.app.models.control_center import (
+    SecurityPolicyTemplate,
+    SecurityAlertRule,
+    SecurityAuditEvent,
+    PrivacyRetentionPolicy,
+)
 
 __all__ = [
     "Base",
@@ -282,4 +288,9 @@ __all__ = [
     "IncidentTimelineEvent",
     "DevicePreparationLog",
     "InterruptionRecoverySession",
+    # Anti-Cheating Control Center (Phase 28)
+    "SecurityPolicyTemplate",
+    "SecurityAlertRule",
+    "SecurityAuditEvent",
+    "PrivacyRetentionPolicy",
 ]

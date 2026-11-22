@@ -26,6 +26,7 @@ from backend.app.api.v1.endpoints import (
     desktop_exam,
     proctoring,
     interruption,
+    control_center,
 )
 
 api_router = APIRouter()
@@ -201,5 +202,13 @@ api_router.include_router(
     prefix="/interruption",
     tags=["Calls, Notifications, Interruptions & Incident Management"],
 )
+
+# 21. Centralized Anti-Cheating Control Center (Phase 28)
+api_router.include_router(
+    control_center.router,
+    prefix="/security-center",
+    tags=["Centralized Anti-Cheating Control Center"],
+)
+
 
 

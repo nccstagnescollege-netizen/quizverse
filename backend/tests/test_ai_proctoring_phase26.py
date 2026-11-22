@@ -41,6 +41,14 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="module")
 def setup_db():
+    import backend.app.models
+    for table in Base.metadata.tables.values():
+        for col in table.columns:
+            if col.server_default is not None:
+                sd_str = str(col.server_default.arg).lower()
+                if "gen_random_uuid" in sd_str or "uuid_generate" in sd_str or "now()" in sd_str:
+                    col.server_default = None
+
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     now = datetime.now(timezone.utc)

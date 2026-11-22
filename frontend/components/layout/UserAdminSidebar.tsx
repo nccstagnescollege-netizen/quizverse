@@ -154,15 +154,9 @@ export function UserAdminSidebar({
         authorized: hasPermission('examination.monitor') || true,
       },
       {
-        label: 'Security & Anti-Cheating',
+        label: 'Anti-Cheating Center',
         href: '/admin/security',
-        icon: ShieldAlert,
-        authorized: true,
-      },
-      {
-        label: 'Security Alerts',
-        href: '/admin/security/alerts',
-        icon: ShieldAlert,
+        icon: ShieldCheck,
         authorized: true,
       },
       {
