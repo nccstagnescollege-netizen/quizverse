@@ -923,6 +923,150 @@ class QuestionBankService:
         )
         return question
 
+    # --- Bulk Review Workflow ---
+
+    @classmethod
+    def bulk_review_action(
+        cls,
+        db: Session,
+        admin: Admin,
+        question_ids: List[uuid.UUID],
+        action: str,
+        comments: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes bulk workflow operations ('submit', 'approve', 'reject', 'resubmit')
+        on a list of questions.
+        Enforces permissions, academic hierarchy scoping, rejection reason requirements,
+        and user-admin self-approval rules per question.
+        Returns detailed summary of successful and failed items.
+        """
+        action = action.lower().strip()
+        if action not in ("submit", "approve", "reject", "resubmit"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported bulk action '{action}'. Must be submit, approve, reject, or resubmit.",
+            )
+
+        if action == "reject" and (not comments or not comments.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Rejection requires providing constructive review comments.",
+            )
+
+        required_perm = "question.approve" if action == "approve" else "question.review"
+        if not admin.is_super_admin:
+            perms = get_admin_effective_permissions(db, admin)
+            if required_perm not in perms and "*" not in perms:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Permission denied: Missing '{required_perm}' for bulk action '{action}'.",
+                )
+
+        # De-duplicate IDs while preserving order
+        seen = set()
+        unique_ids = [qid for qid in question_ids if not (qid in seen or seen.add(qid))]
+
+        # Fetch questions
+        questions = db.query(Question).filter(Question.id.in_(unique_ids)).all()
+        q_map = {q.id: q for q in questions}
+
+        successful_ids: List[str] = []
+        failed_items: List[Dict[str, str]] = []
+
+        now = datetime.now(timezone.utc)
+
+        for qid in unique_ids:
+            question = q_map.get(qid)
+            if not question:
+                failed_items.append({"id": str(qid), "error": "Question not found."})
+                continue
+
+            # Scope & permission enforcement per question
+            try:
+                cls.enforce_question_permission_and_scope(db, admin, question, required_perm, is_write_op=True)
+            except HTTPException as e:
+                failed_items.append({"id": str(qid), "error": str(e.detail)})
+                continue
+            except Exception as e:
+                failed_items.append({"id": str(qid), "error": f"Scoping check failed: {str(e)}"})
+                continue
+
+            if action == "approve":
+                if not admin.is_super_admin and question.created_by == admin.id:
+                    failed_items.append({
+                        "id": str(qid),
+                        "error": "Review policy violation: You cannot approve your own question.",
+                    })
+                    continue
+
+                question.status = "approved"
+                question.approved_by = admin.id
+                question.approved_at = now
+                question.rejection_reason = None
+
+                db.add(QuestionReview(
+                    id=uuid.uuid4(),
+                    question_id=question.id,
+                    reviewer_id=admin.id,
+                    action="approved",
+                    comments=comments,
+                ))
+                log_audit_event(
+                    db=db,
+                    admin_id=admin.id,
+                    action="question.approve",
+                    entity_type="question",
+                    entity_id=str(question.id),
+                    details={"approved_by": str(admin.id), "bulk": True},
+                )
+                successful_ids.append(str(qid))
+
+            elif action in ("submit", "resubmit"):
+                question.status = "pending_review"
+                review_action = "resubmitted" if action == "resubmit" else "submitted"
+                db.add(QuestionReview(
+                    id=uuid.uuid4(),
+                    question_id=question.id,
+                    reviewer_id=admin.id,
+                    action=review_action,
+                    comments=comments,
+                ))
+                successful_ids.append(str(qid))
+
+            elif action == "reject":
+                question.status = "draft"
+                question.rejection_reason = comments.strip() if comments else "Rejected in bulk review"
+                db.add(QuestionReview(
+                    id=uuid.uuid4(),
+                    question_id=question.id,
+                    reviewer_id=admin.id,
+                    action="rejected",
+                    comments=question.rejection_reason,
+                ))
+                log_audit_event(
+                    db=db,
+                    admin_id=admin.id,
+                    action="question.reject",
+                    entity_type="question",
+                    entity_id=str(question.id),
+                    details={"reason": question.rejection_reason, "bulk": True},
+                )
+                successful_ids.append(str(qid))
+
+        if successful_ids:
+            db.commit()
+
+        return {
+            "total_requested": len(unique_ids),
+            "successful_count": len(successful_ids),
+            "failed_count": len(failed_items),
+            "action": action,
+            "successful_ids": successful_ids,
+            "failed_items": failed_items,
+            "message": f"Bulk {action} completed: {len(successful_ids)} succeeded, {len(failed_items)} failed.",
+        }
+
     # --- Tags ---
 
     @classmethod

@@ -53,7 +53,7 @@ function ExamResultContent() {
       const session = studentExamService.getSession(token);
       const urlCode = searchParams?.get('reg_code') || searchParams?.get('registration_code');
       const storedCode = typeof window !== 'undefined' ? localStorage.getItem(`exam_reg_code_${token}`) : null;
-      const targetCode = explicitCode || urlCode || session.registrationCode || storedCode || (token?.toUpperCase().startsWith('REG-') ? token : null);
+      const targetCode = explicitCode || urlCode || session.registrationCode || storedCode;
 
       let data: StudentResultDetail | null = null;
 
@@ -229,25 +229,23 @@ function ExamResultContent() {
         <div className="w-full glass-card rounded-3xl border border-surface-border p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
         {/* Accent top gradient strip */}
         <div
-          className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${
-            result.is_released
-              ? result.is_passed
-                ? 'from-emerald-500 via-teal-500 to-cyan-500'
-                : 'from-rose-500 via-amber-500 to-orange-500'
-              : 'from-primary-500 via-purple-500 to-blue-500'
-          }`}
+          className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${result.is_released
+            ? result.is_passed
+              ? 'from-emerald-500 via-teal-500 to-cyan-500'
+              : 'from-rose-500 via-amber-500 to-orange-500'
+            : 'from-primary-500 via-purple-500 to-blue-500'
+            }`}
         />
 
         {/* Status Icon */}
         <div className="flex items-center justify-center pt-2">
           <div
-            className={`w-16 h-16 rounded-2xl flex items-center justify-center border ${
-              result.is_released
-                ? result.is_passed
-                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400'
-                : 'bg-primary-500/15 border-primary-500/30 text-primary-600 dark:text-primary-400'
-            }`}
+            className={`w-16 h-16 rounded-2xl flex items-center justify-center border ${result.is_released
+              ? result.is_passed
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                : 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400'
+              : 'bg-primary-500/15 border-primary-500/30 text-primary-600 dark:text-primary-400'
+              }`}
           >
             {result.is_released ? (
               result.is_passed ? (
@@ -291,11 +289,10 @@ function ExamResultContent() {
                 </span>
                 <span className="text-muted-foreground">•</span>
                 <span
-                  className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                    result.is_passed
-                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                      : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
-                  }`}
+                  className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${result.is_passed
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                    : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                    }`}
                 >
                   {result.is_passed ? 'Passed' : 'Needs Improvement'}
                 </span>
@@ -361,9 +358,8 @@ function ExamResultContent() {
 
           <Link
             href="/exam"
-            className={`${
-              result.is_released ? 'w-1/2' : 'w-full'
-            } flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all text-center cursor-pointer`}
+            className={`${result.is_released ? 'w-1/2' : 'w-full'
+              } flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-md shadow-primary-500/20 transition-all text-center cursor-pointer`}
           >
             <span>Finish &amp; Exit</span>
           </Link>

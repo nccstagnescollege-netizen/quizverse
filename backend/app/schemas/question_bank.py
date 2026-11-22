@@ -402,3 +402,21 @@ class QuestionSummaryStats(BaseModel):
     easy_count: int
     medium_count: int
     hard_count: int
+
+
+# --- Bulk Question Workflow ---
+
+class BulkQuestionActionRequest(BaseModel):
+    question_ids: List[uuid.UUID] = Field(..., min_length=1, max_length=500, description="List of question UUIDs to process")
+    action: str = Field(..., pattern="^(submit|approve|reject|resubmit)$", description="Bulk action: submit, approve, reject, resubmit")
+    comments: Optional[str] = Field(None, max_length=2000, description="Review feedback or rejection rationale")
+
+
+class BulkQuestionActionResult(BaseModel):
+    total_requested: int
+    successful_count: int
+    failed_count: int
+    action: str
+    successful_ids: List[str]
+    failed_items: List[Dict[str, str]]
+    message: str

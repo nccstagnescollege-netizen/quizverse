@@ -51,6 +51,16 @@ export interface QuestionVersion {
   created_at: string;
 }
 
+export interface BulkQuestionActionResult {
+  total_requested: number;
+  successful_count: number;
+  failed_count: number;
+  action: string;
+  successful_ids: string[];
+  failed_items: Array<{ id: string; error: string }>;
+  message: string;
+}
+
 export interface ShortAnswerConfig {
   accepted_answers: string[];
   case_sensitive?: boolean;
@@ -358,6 +368,46 @@ export const questionBankService = {
         body: JSON.stringify({ comments }),
       }
     ),
+
+  // Bulk Review Workflow
+  bulkWorkflowAction: (
+    questionIds: string[],
+    action: 'submit' | 'approve' | 'reject' | 'resubmit',
+    comments?: string,
+    token?: string
+  ) =>
+    fetchWithAuth<BulkQuestionActionResult>('/questions/bulk-workflow', token, {
+      method: 'POST',
+      body: JSON.stringify({
+        question_ids: questionIds,
+        action,
+        comments,
+      }),
+    }),
+
+  bulkSubmitForReview: (questionIds: string[], comments?: string, token?: string) =>
+    fetchWithAuth<BulkQuestionActionResult>('/questions/bulk-submit', token, {
+      method: 'POST',
+      body: JSON.stringify({ question_ids: questionIds, action: 'submit', comments }),
+    }),
+
+  bulkApproveQuestions: (questionIds: string[], comments?: string, token?: string) =>
+    fetchWithAuth<BulkQuestionActionResult>('/questions/bulk-approve', token, {
+      method: 'POST',
+      body: JSON.stringify({ question_ids: questionIds, action: 'approve', comments }),
+    }),
+
+  bulkRejectQuestions: (questionIds: string[], comments: string, token?: string) =>
+    fetchWithAuth<BulkQuestionActionResult>('/questions/bulk-reject', token, {
+      method: 'POST',
+      body: JSON.stringify({ question_ids: questionIds, action: 'reject', comments }),
+    }),
+
+  bulkResubmitQuestions: (questionIds: string[], comments?: string, token?: string) =>
+    fetchWithAuth<BulkQuestionActionResult>('/questions/bulk-resubmit', token, {
+      method: 'POST',
+      body: JSON.stringify({ question_ids: questionIds, action: 'resubmit', comments }),
+    }),
 
   // Version History
   getVersionHistory: async (id: string, token: string): Promise<{ success: boolean; data: QuestionVersion[] }> => {

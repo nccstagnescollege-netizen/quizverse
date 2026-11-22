@@ -6,7 +6,7 @@ import { LayoutGrid, Table as TableIcon } from 'lucide-react';
 
 export interface TableColumn<T> {
   key: string;
-  header: string;
+  header: React.ReactNode;
   render?: (row: T) => React.ReactNode;
   className?: string;
   hideOnMobile?: boolean;

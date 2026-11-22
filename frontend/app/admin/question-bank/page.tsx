@@ -22,6 +22,9 @@ import {
   History,
   AlertTriangle,
   X,
+  XCircle,
+  Send,
+  RotateCcw,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +43,7 @@ import {
 import { QuestionCard } from '@/components/question-bank/QuestionCard';
 import { QuestionPreviewModal } from '@/components/question-bank/QuestionPreviewModal';
 import { QuestionReviewModal } from '@/components/question-bank/QuestionReviewModal';
+import { BulkQuestionReviewModal } from '@/components/question-bank/BulkQuestionReviewModal';
 import { QuestionVersionHistoryModal } from '@/components/question-bank/QuestionVersionHistoryModal';
 
 export default function UserAdminQuestionBankPage() {
@@ -52,6 +56,7 @@ export default function UserAdminQuestionBankPage() {
   const canDelete = hasPermission('question.delete');
   const canArchive = hasPermission('question.archive');
   const canReview = hasPermission('question.review') || hasPermission('question.approve');
+  const canApprove = hasPermission('question.approve');
   const canViewAnswer = hasPermission('question.answer.view');
 
   // Data States
@@ -86,12 +91,35 @@ export default function UserAdminQuestionBankPage() {
     }
   }, [toastMessage]);
 
-  // Modals State
+  // Modals & Bulk Selection State
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
+  const [bulkModalAction, setBulkModalAction] = useState<'submit' | 'approve' | 'reject' | 'resubmit' | null>(null);
   const [previewQuestionId, setPreviewQuestionId] = useState<string | null>(null);
   const [reviewQuestion, setReviewQuestion] = useState<QuestionListItem | null>(null);
   const [historyQuestionId, setHistoryQuestionId] = useState<string | null>(null);
   const [questionToDelete, setQuestionToDelete] = useState<QuestionListItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const toggleSelectQuestion = (q: QuestionListItem) => {
+    setSelectedQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(q.id)) {
+        next.delete(q.id);
+      } else {
+        next.add(q.id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    const visibleIds = (Array.isArray(questions) ? questions : []).map((q) => q.id);
+    setSelectedQuestionIds(new Set(visibleIds));
+  };
+
+  const deselectAll = () => {
+    setSelectedQuestionIds(new Set());
+  };
 
   // Asynchronous Question & Stats Fetcher (non-blocking)
   const fetchData = useCallback(
@@ -212,6 +240,48 @@ export default function UserAdminQuestionBankPage() {
   }
 
   const tableColumns: TableColumn<QuestionListItem>[] = [
+    {
+      key: 'select',
+      header: (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={
+              questions.length > 0 &&
+              questions.every((q) => selectedQuestionIds.has(q.id))
+            }
+            ref={(el) => {
+              if (el) {
+                const someSelected = questions.some((q) => selectedQuestionIds.has(q.id));
+                const allSelected = questions.length > 0 && questions.every((q) => selectedQuestionIds.has(q.id));
+                el.indeterminate = someSelected && !allSelected;
+              }
+            }}
+            onChange={(e) => {
+              if (e.target.checked) {
+                selectAllVisible();
+              } else {
+                deselectAll();
+              }
+            }}
+            className="w-4 h-4 rounded border-slate-700 bg-slate-900/80 text-primary-600 focus:ring-primary-500/30 cursor-pointer"
+            title="Select All Visible Questions"
+          />
+        </div>
+      ),
+      className: 'w-10 text-center',
+      render: (q) => (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={selectedQuestionIds.has(q.id)}
+            onChange={() => toggleSelectQuestion(q)}
+            className="w-4 h-4 rounded border-slate-700 bg-slate-900/80 text-primary-600 focus:ring-primary-500/30 cursor-pointer"
+            title={`Select ${q.title || 'Question'}`}
+          />
+        </div>
+      ),
+    },
     {
       key: 'title',
       header: 'Question',
@@ -567,6 +637,8 @@ export default function UserAdminQuestionBankPage() {
               canEdit={canEdit}
               canDelete={canDelete}
               canReview={canReview}
+              isSelected={selectedQuestionIds.has(q.id)}
+              onToggleSelect={toggleSelectQuestion}
             />
           )}
         />
@@ -587,9 +659,110 @@ export default function UserAdminQuestionBankPage() {
               canEdit={canEdit}
               canDelete={canDelete}
               canReview={canReview}
+              isSelected={selectedQuestionIds.has(q.id)}
+              onToggleSelect={toggleSelectQuestion}
             />
           ))}
         </div>
+      )}
+
+      {/* Floating Bulk Action Bar */}
+      {selectedQuestionIds.size > 0 && (
+        <div className="fixed bottom-6 inset-x-0 z-40 flex justify-center px-4 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="flex flex-wrap items-center gap-3 px-5 py-3 rounded-2xl bg-surface-base/95 backdrop-blur-md border border-primary-500/40 shadow-2xl shadow-black/60 max-w-4xl text-xs">
+            <div className="flex items-center gap-2 pr-3 border-r border-surface-border">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-500/20 text-primary-300 font-bold text-xs">
+                {selectedQuestionIds.size}
+              </span>
+              <span className="font-semibold text-white">Selected</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {canReview && (
+                <button
+                  type="button"
+                  onClick={() => setBulkModalAction('submit')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium shadow-sm transition-all"
+                  title="Submit selected questions for review"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Submit</span>
+                </button>
+              )}
+              {canReview && (
+                <button
+                  type="button"
+                  onClick={() => setBulkModalAction('resubmit')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium shadow-sm transition-all"
+                  title="Re-Submit selected questions for evaluation"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Re-Submit</span>
+                </button>
+              )}
+              {canApprove && (
+                <button
+                  type="button"
+                  onClick={() => setBulkModalAction('approve')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm transition-all"
+                  title="Approve selected questions"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Approve</span>
+                </button>
+              )}
+              {canReview && (
+                <button
+                  type="button"
+                  onClick={() => setBulkModalAction('reject')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-sm transition-all"
+                  title="Reject selected questions back to draft"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Reject</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto pl-2">
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                className="text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                Select All ({questions.length})
+              </button>
+              <span className="text-slate-600">•</span>
+              <button
+                type="button"
+                onClick={deselectAll}
+                className="text-slate-400 hover:text-rose-400 transition-colors"
+              >
+                Deselect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Review Workflow Modal */}
+      {bulkModalAction && (
+        <BulkQuestionReviewModal
+          questionIds={Array.from(selectedQuestionIds)}
+          questions={questions}
+          initialAction={bulkModalAction}
+          isOpen={!!bulkModalAction}
+          onClose={() => setBulkModalAction(null)}
+          onSuccess={(res) => {
+            fetchData(false);
+            if (res.failed_count === 0) {
+              setSelectedQuestionIds(new Set());
+            }
+          }}
+          token={token || ''}
+          canApprove={canApprove}
+          canReview={canReview}
+        />
       )}
 
       {/* Preview Modal */}

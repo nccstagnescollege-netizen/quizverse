@@ -27,6 +27,8 @@ from backend.app.schemas.question_bank import (
     QuestionAttachmentResponse,
     QuestionVersionResponse,
     QuestionReviewCreate,
+    BulkQuestionActionRequest,
+    BulkQuestionActionResult,
 )
 from backend.app.models.question_bank import QuestionOption
 
@@ -152,6 +154,101 @@ def create_question(
         "message": "Question created successfully.",
         "data": {"id": question.id, "title": question.title, "status": question.status},
     }
+
+
+# ==============================================================================
+# 4. BULK QUESTION WORKFLOW (SUBMIT, APPROVE, REJECT, RESUBMIT)
+# ==============================================================================
+
+@router.post("/bulk-workflow", response_model=BulkQuestionActionResult)
+def bulk_workflow_action(
+    payload: BulkQuestionActionRequest,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Executes bulk review operations (submit, approve, reject, resubmit)
+    across multiple questions with fine-grained scoping and RBAC enforcement.
+    """
+    return QuestionBankService.bulk_review_action(
+        db=db,
+        admin=admin,
+        question_ids=payload.question_ids,
+        action=payload.action,
+        comments=payload.comments,
+    )
+
+
+@router.post("/bulk-submit", response_model=BulkQuestionActionResult)
+def bulk_submit_questions(
+    payload: BulkQuestionActionRequest,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Bulk submits selected questions for review.
+    """
+    return QuestionBankService.bulk_review_action(
+        db=db,
+        admin=admin,
+        question_ids=payload.question_ids,
+        action="submit",
+        comments=payload.comments,
+    )
+
+
+@router.post("/bulk-approve", response_model=BulkQuestionActionResult)
+def bulk_approve_questions(
+    payload: BulkQuestionActionRequest,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Bulk approves selected questions.
+    """
+    return QuestionBankService.bulk_review_action(
+        db=db,
+        admin=admin,
+        question_ids=payload.question_ids,
+        action="approve",
+        comments=payload.comments,
+    )
+
+
+@router.post("/bulk-reject", response_model=BulkQuestionActionResult)
+def bulk_reject_questions(
+    payload: BulkQuestionActionRequest,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Bulk rejects selected questions, returning them to draft with review feedback.
+    """
+    return QuestionBankService.bulk_review_action(
+        db=db,
+        admin=admin,
+        question_ids=payload.question_ids,
+        action="reject",
+        comments=payload.comments,
+    )
+
+
+@router.post("/bulk-resubmit", response_model=BulkQuestionActionResult)
+def bulk_resubmit_questions(
+    payload: BulkQuestionActionRequest,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Bulk re-submits previously rejected or modified questions for formal review.
+    """
+    return QuestionBankService.bulk_review_action(
+        db=db,
+        admin=admin,
+        question_ids=payload.question_ids,
+        action="resubmit",
+        comments=payload.comments,
+    )
 
 
 @router.get("/{question_id}", response_model=dict)

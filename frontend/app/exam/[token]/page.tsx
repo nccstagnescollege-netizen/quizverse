@@ -158,8 +158,8 @@ export default function ExamLandingPage() {
             {isDemoPlaceholder
               ? 'The path /exam/demo-test was a demonstration placeholder. Please enter your official invitation token or launch the live published exam.'
               : isRegCode
-              ? `We could not find an active examination matching code "${token}". It may have expired or not yet been published by your administrator.`
-              : error}
+                ? `We could not find an active examination matching code "${token}". It may have expired or not yet been published by your administrator.`
+                : error}
           </p>
 
           <div className="flex flex-col gap-2 pt-2">
@@ -203,7 +203,7 @@ export default function ExamLandingPage() {
   };
 
   const statusInfo = STATUS_CONFIG[details.availability_status] || STATUS_CONFIG.unavailable;
-  const candidateResultCode = regCodeInput.trim() || details?.candidate?.registration_code || (token?.toUpperCase().startsWith('REG-') ? token : '');
+  const candidateResultCode = regCodeInput.trim() || details?.candidate?.registration_code || '';
 
   return (
     <div className="min-h-screen bg-surface-base text-foreground py-10 px-4 sm:px-6">
@@ -354,9 +354,8 @@ export default function ExamLandingPage() {
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-surface-border/40">
                     <span className="text-muted-foreground">Enrollment Status</span>
                     <span
-                      className={`font-semibold capitalize ${
-                        details.participant_status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-                      }`}
+                      className={`font-semibold capitalize ${details.participant_status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                        }`}
                     >
                       {details.participant_status?.replace('_', ' ')}
                     </span>
