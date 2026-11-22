@@ -211,3 +211,112 @@ class ExaminationExtensionHistory(Base):
     quiz = relationship("Quiz")
     attempt = relationship("ExaminationAttempt")
     extender = relationship("Admin")
+
+
+# ---------------------------------------------------------------------------
+# Phase 31: Real-Time Live Examination Proctoring, Webcam & Audio Models
+# ---------------------------------------------------------------------------
+class MediaExaminationRoom(Base):
+    __tablename__ = "media_examination_rooms"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    audio_broadcast_allowed = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    recording_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    recording_policy_disclosed = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    max_participants = Column(Integer, nullable=False, default=100, server_default=text("100"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
+
+    # Relationships
+    quiz = relationship("Quiz")
+    sessions = relationship("MediaParticipantSession", back_populates="room", cascade="all, delete-orphan")
+
+
+class MediaParticipantSession(Base):
+    __tablename__ = "media_participant_sessions"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    room_id = Column(Uuid, ForeignKey("media_examination_rooms.id", ondelete="CASCADE"), nullable=False, index=True)
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_id = Column(Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=True, index=True)
+    admin_id = Column(Uuid, ForeignKey("admins.id", ondelete="CASCADE"), nullable=True, index=True)
+    attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="SET NULL"), nullable=True, index=True)
+    session_token = Column(String(128), nullable=False, index=True)
+    peer_id = Column(String(128), nullable=False, index=True)
+    role = Column(String(32), nullable=False, default="student", server_default=text("'student'"))  # student, invigilator, admin
+    
+    # Status categories matching Section 8
+    camera_status = Column(String(32), nullable=False, default="Connected", server_default=text("'Connected'"))
+    # 'Initializing', 'Connected', 'Disconnected', 'Permission denied', 'Device unavailable', 'Stream interrupted', 'Recovery pending'
+    
+    microphone_status = Column(String(32), nullable=False, default="Connected", server_default=text("'Connected'"))
+    # 'Initializing', 'Connected', 'Disconnected', 'Permission denied', 'Device unavailable', 'Stream interrupted', 'Recovery pending'
+    
+    stream_status = Column(String(32), nullable=False, default="LIVE", server_default=text("'LIVE'"))
+    # 'OFFLINE', 'LIVE', 'RECONNECTING', 'INTERRUPTED'
+    
+    audio_level = Column(String(32), nullable=False, default="no_input", server_default=text("'no_input'"))
+    # 'no_input', 'low_input', 'input_detected'
+    
+    network_quality = Column(String(32), nullable=False, default="GOOD", server_default=text("'GOOD'"))
+    # 'EXCELLENT', 'GOOD', 'POOR', 'CRITICAL'
+    
+    device_info = Column(JSONType, nullable=True)  # browser, os, devices, resolutions
+    is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    is_pinned = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    is_audio_listened = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
+
+    # Relationships
+    room = relationship("MediaExaminationRoom", back_populates="sessions")
+    quiz = relationship("Quiz")
+    candidate = relationship("Student")
+    attempt = relationship("ExaminationAttempt")
+    events = relationship("MediaDeviceStatusEvent", back_populates="session", cascade="all, delete-orphan")
+
+
+class MediaDeviceStatusEvent(Base):
+    __tablename__ = "media_device_status_events"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    session_id = Column(Uuid, ForeignKey("media_participant_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="SET NULL"), nullable=True, index=True)
+    event_type = Column(String(64), nullable=False, index=True)
+    # CAMERA_DISCONNECTED, MICROPHONE_DISCONNECTED, PERMISSION_REVOKED, TRACK_ENDED, STREAM_RECOVERED, AUDIO_LEVEL_CHANGE, NETWORK_DEGRADED
+    previous_status = Column(String(32), nullable=True)
+    new_status = Column(String(32), nullable=False)
+    details = Column(JSONType, nullable=True)
+    severity = Column(String(32), nullable=False, default="info", server_default=text("'info'"))  # info, warning, critical
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+
+    # Relationships
+    session = relationship("MediaParticipantSession", back_populates="events")
+    quiz = relationship("Quiz")
+    attempt = relationship("ExaminationAttempt")
+
+
+class StudentMonitoringConsent(Base):
+    __tablename__ = "student_monitoring_consents"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="SET NULL"), nullable=True, index=True)
+    consent_version = Column(String(32), nullable=False, default="v1.0", server_default=text("'v1.0'"))
+    webcam_acknowledged = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    microphone_acknowledged = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    recording_acknowledged = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(512), nullable=True)
+    consented_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+
+    # Relationships
+    quiz = relationship("Quiz")
+    student = relationship("Student")
+    attempt = relationship("ExaminationAttempt")
+

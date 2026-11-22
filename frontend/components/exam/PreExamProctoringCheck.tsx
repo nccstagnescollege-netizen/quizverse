@@ -242,8 +242,12 @@ export function PreExamProctoringCheck({ policy, onCompleted, onCancel }: PreExa
               <Video className="w-4 h-4 text-cyan-400" />
               <span>Camera Video Stream &amp; Lighting Check</span>
             </span>
-            <span className="text-[11px] font-mono text-slate-400">
-              {cameraLabel || (cameraStatus === 'granted' ? 'Connected' : 'Pending Access')}
+            <span className="text-[11px] font-mono font-bold">
+              {cameraStatus === 'granted' ? (
+                <span className="text-emerald-400">CAMERA STATUS: READY</span>
+              ) : (
+                <span className="text-slate-400">{cameraLabel || 'Pending Access'}</span>
+              )}
             </span>
           </div>
 
@@ -350,8 +354,12 @@ export function PreExamProctoringCheck({ policy, onCompleted, onCancel }: PreExa
               <Mic className="w-4 h-4 text-emerald-400" />
               <span>Microphone Audio Monitor</span>
             </span>
-            <span className="font-mono text-slate-400">
-              {microphoneLabel || (microphoneStatus === 'granted' ? 'Connected' : 'Pending Access')}
+            <span className="font-mono text-[11px] font-bold">
+              {microphoneStatus === 'granted' ? (
+                <span className="text-emerald-400">MICROPHONE STATUS: READY</span>
+              ) : (
+                <span className="text-slate-400">{microphoneLabel || 'Pending Access'}</span>
+              )}
             </span>
           </div>
 

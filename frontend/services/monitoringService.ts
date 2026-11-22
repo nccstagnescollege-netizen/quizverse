@@ -598,6 +598,215 @@ class MonitoringService {
     }
     return res.json();
   }
+
+  // -------------------------------------------------------------------------
+  // Phase 31: Real-Time Live Examination Proctoring, Webcam & Audio Methods
+  // -------------------------------------------------------------------------
+  async getMediaFeed(token: string, quizId: string): Promise<MediaFeedResponse> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/media-feed`, {
+      headers: this.getHeaders(token),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch live media feed');
+    }
+    return res.json();
+  }
+
+  async initMediaSession(
+    token: string,
+    quizId: string,
+    payload: {
+      peer_id: string;
+      role: string;
+      attempt_id?: string;
+      device_info?: Record<string, any>;
+      camera_status?: string;
+      microphone_status?: string;
+    },
+  ): Promise<MediaSessionInitResponse> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/media-session`, {
+      method: 'POST',
+      headers: this.getHeaders(token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to initialize media session');
+    }
+    return res.json();
+  }
+
+  async sendWebRTCSignals(
+    sessionToken: string,
+    signals: WebRTCSignalMessage[],
+  ): Promise<WebRTCSignalResponse> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/webrtc/signal`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        session_token: sessionToken,
+        signals,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'WebRTC signaling failed');
+    }
+    return res.json();
+  }
+
+  async reportMediaEvent(
+    sessionToken: string,
+    payload: {
+      event_type: string;
+      new_status: string;
+      previous_status?: string;
+      details?: Record<string, any>;
+      severity?: string;
+    },
+  ): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/media-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Media-Session-Token': sessionToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to report media event');
+    }
+    return res.json();
+  }
+
+  async recordConsent(
+    token: string,
+    quizId: string,
+    payload: {
+      attempt_id?: string;
+      consent_version?: string;
+      webcam_acknowledged?: boolean;
+      microphone_acknowledged?: boolean;
+      recording_acknowledged?: boolean;
+    },
+  ): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/consent`, {
+      method: 'POST',
+      headers: this.getHeaders(token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to record monitoring consent');
+    }
+    return res.json();
+  }
+
+  async setAudioListeningTarget(
+    token: string,
+    quizId: string,
+    studentId: string,
+    listen: boolean = true,
+  ): Promise<{ success: boolean; target_student_id: string; is_audio_listened: boolean; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/listen-audio`, {
+      method: 'POST',
+      headers: this.getHeaders(token),
+      body: JSON.stringify({
+        student_id: studentId,
+        listen,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update audio listening target');
+    }
+    return res.json();
+  }
+
+  async sendTwoWayCommunication(
+    token: string,
+    quizId: string,
+    payload: {
+      student_id: string;
+      comm_type: string;
+      message: string;
+    },
+  ): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/two-way-communication`, {
+      method: 'POST',
+      headers: this.getHeaders(token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to send communication');
+    }
+    return res.json();
+  }
+}
+
+// Phase 31 Types
+export interface MediaParticipantSessionItem {
+  id: string;
+  room_id: string;
+  quiz_id: string;
+  candidate_id?: string;
+  candidate_name?: string;
+  candidate_email?: string;
+  attempt_id?: string;
+  session_token: string;
+  peer_id: string;
+  role: string;
+  camera_status: string;
+  microphone_status: string;
+  stream_status: string;
+  audio_level: string;
+  network_quality: string;
+  device_info?: Record<string, any>;
+  is_active: boolean;
+  is_pinned: boolean;
+  is_audio_listened: boolean;
+  last_heartbeat_at: string;
+  created_at: string;
+}
+
+export interface MediaFeedResponse {
+  quiz_id: string;
+  room_id: string;
+  recording_enabled: boolean;
+  total_active_participants: number;
+  connected_cameras: number;
+  connected_microphones: number;
+  active_audio_listening_student_id?: string | null;
+  participants: MediaParticipantSessionItem[];
+}
+
+export interface MediaSessionInitResponse {
+  room_id: string;
+  session_id: string;
+  session_token: string;
+  peer_id: string;
+  recording_enabled: boolean;
+  audio_broadcast_allowed: boolean;
+}
+
+export interface WebRTCSignalMessage {
+  type: string;
+  sender_peer_id: string;
+  target_peer_id?: string;
+  sdp?: string;
+  candidate?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface WebRTCSignalResponse {
+  success: boolean;
+  delivered_count: number;
+  signals: WebRTCSignalMessage[];
 }
 
 export const monitoringService = new MonitoringService();

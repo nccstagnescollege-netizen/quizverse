@@ -40,6 +40,7 @@ import {
 } from '@/services/aiProctoringService';
 import { ProctoringIncidentReviewModal } from './ProctoringIncidentReviewModal';
 import { IncidentManagementCenter } from './IncidentManagementCenter';
+import { LiveWebRTCGrid } from './LiveWebRTCGrid';
 import {
   monitoringService,
   ExaminationMonitoringRoomResponse,
@@ -64,8 +65,8 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Tab navigation: 'participants' | 'invigilators' | 'announcements' | 'incidents' | 'proctoring'
-  const [activeTab, setActiveTab] = useState<'participants' | 'invigilators' | 'announcements' | 'incidents' | 'proctoring'>('participants');
+  // Tab navigation: 'live_proctoring' | 'participants' | 'invigilators' | 'announcements' | 'incidents' | 'proctoring'
+  const [activeTab, setActiveTab] = useState<'live_proctoring' | 'participants' | 'invigilators' | 'announcements' | 'incidents' | 'proctoring'>('live_proctoring');
 
   // Proctoring State
   const [proctoringOverview, setProctoringOverview] = useState<ProctoringDashboardOverview | null>(null);
@@ -347,6 +348,18 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
       {/* Tabs Toolbar */}
       <div className="flex items-center gap-2 border-b border-surface-border pb-2 overflow-x-auto">
         <button
+          onClick={() => setActiveTab('live_proctoring')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            activeTab === 'live_proctoring'
+              ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/25'
+              : 'text-slate-400 hover:text-white hover:bg-surface-elevated'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5 animate-pulse text-white" />
+          <span>Live Video & Audio Grid</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('participants')}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${
             activeTab === 'participants'
@@ -415,6 +428,11 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
           ) : null}
         </button>
       </div>
+
+      {/* Tab 0: Phase 31 Live WebRTC Video & Audio Proctoring Grid */}
+      {activeTab === 'live_proctoring' && (
+        <LiveWebRTCGrid token={token} quizId={quizId} />
+      )}
 
       {/* Tab 1: Live Candidates Table */}
       {activeTab === 'participants' && (

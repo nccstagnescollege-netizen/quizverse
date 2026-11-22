@@ -1,12 +1,14 @@
 import uuid
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, Query, Path, status
+from fastapi import APIRouter, Depends, Query, Path, status, Header, Request, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.services.rbac_service import get_current_admin
 from backend.app.models.auth_rbac import Admin
 from backend.app.services.monitoring_service import LiveMonitoringService
+from backend.app.services.live_media_monitoring_service import LiveMediaMonitoringService
+from backend.app.services.student_exam_service import StudentExamService
 from backend.app.schemas.monitoring import (
     LiveMonitoringOverviewResponse,
     LiveExaminationsListResponse,
@@ -30,6 +32,18 @@ from backend.app.schemas.monitoring import (
     TerminateAttemptRequest,
     CancelExaminationRequest,
     MonitoringInterventionResponse,
+    MediaFeedResponse,
+    MediaSessionInitRequest,
+    MediaSessionInitResponse,
+    WebRTCSignalExchangeRequest,
+    WebRTCSignalResponse,
+    MediaDeviceEventCreateRequest,
+    MediaDeviceEventResponse,
+    StudentMonitoringConsentRequest,
+    StudentMonitoringConsentResponse,
+    ListenAudioRequest,
+    TwoWayCommunicationRequest,
+    TwoWayCommunicationResponse,
 )
 
 router = APIRouter()
@@ -375,3 +389,212 @@ def cancel_examination(
         quiz_id=quiz_id,
         reason=req.reason,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 31: Real-Time Live Examination Proctoring, Webcam & Microphone Monitoring
+# ---------------------------------------------------------------------------
+@router.get("/examinations/{quiz_id}/media-feed", response_model=MediaFeedResponse)
+def get_live_media_feed(
+    quiz_id: uuid.UUID = Path(...),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Returns live telemetry of all connected student webcam and microphone streams
+    for the specified examination room. Includes active audio listening indicators.
+    """
+    return LiveMediaMonitoringService.get_live_media_feed(db=db, quiz_id=quiz_id, admin=admin)
+
+
+@router.post("/examinations/{quiz_id}/media-session", response_model=MediaSessionInitResponse)
+def initialize_media_session(
+    quiz_id: uuid.UUID = Path(...),
+    req: MediaSessionInitRequest = ...,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    x_exam_session_token: Optional[str] = Header(None),
+):
+    """
+    Initializes an authenticated WebRTC media session for a candidate or invigilator.
+    Authenticates via candidate session token or administrator bearer token.
+    """
+    candidate_id = None
+    admin_id = None
+    attempt_id = req.attempt_id
+
+    # Try student verification first
+    raw_token = None
+    if authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split("Bearer ", 1)[1].strip()
+    elif x_exam_session_token:
+        raw_token = x_exam_session_token.strip()
+
+    if raw_token:
+        try:
+            cand_sess = StudentExamService.verify_session_token(raw_token)
+            candidate_id = uuid.UUID(str(cand_sess["student_id"])) if "student_id" in cand_sess else None
+            if "attempt_id" in cand_sess:
+                attempt_id = uuid.UUID(str(cand_sess["attempt_id"]))
+        except Exception:
+            # Check if it is an admin token
+            try:
+                from backend.app.services.auth_service import verify_access_token
+                token_data = verify_access_token(raw_token)
+                admin_id = uuid.UUID(token_data.sub)
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required for media session initialization."
+                )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication credentials."
+        )
+
+    res = LiveMediaMonitoringService.initialize_media_session(
+        db=db,
+        quiz_id=quiz_id,
+        peer_id=req.peer_id,
+        role=req.role,
+        candidate_id=candidate_id,
+        admin_id=admin_id,
+        attempt_id=attempt_id,
+        device_info=req.device_info,
+        camera_status=req.camera_status,
+        microphone_status=req.microphone_status,
+    )
+    return res
+
+
+@router.post("/webrtc/signal", response_model=WebRTCSignalResponse)
+def exchange_webrtc_signals(
+    req: WebRTCSignalExchangeRequest = ...,
+    db: Session = Depends(get_db),
+):
+    """
+    Lightweight, high-speed WebRTC signaling bridge:
+    Transfers SDP offers, answers, and ICE candidates between candidate and invigilator peers.
+    """
+    return LiveMediaMonitoringService.exchange_webrtc_signals(
+        db=db,
+        session_token=req.session_token,
+        incoming_signals=req.signals,
+    )
+
+
+@router.post("/media-events", response_model=MediaDeviceEventResponse)
+def report_media_device_event(
+    req: MediaDeviceEventCreateRequest = ...,
+    x_media_session_token: Optional[str] = Header(None),
+    session_token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Reports hardware device events (camera/microphone disconnected, permission revoked, track ended).
+    Updates stream status and triggers non-punitive invigilator alert if disconnected.
+    """
+    token = x_media_session_token or session_token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing media session token."
+        )
+
+    return LiveMediaMonitoringService.report_device_event(
+        db=db,
+        session_token=token,
+        event_type=req.event_type,
+        new_status=req.new_status,
+        previous_status=req.previous_status,
+        details=req.details,
+        severity=req.severity,
+    )
+
+
+@router.post("/examinations/{quiz_id}/consent", response_model=StudentMonitoringConsentResponse)
+def record_student_consent(
+    quiz_id: uuid.UUID = Path(...),
+    req: StudentMonitoringConsentRequest = ...,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    x_exam_session_token: Optional[str] = Header(None),
+):
+    """
+    Stores student acknowledgment and consent for webcam & microphone monitoring before exam room entry.
+    """
+    raw_token = None
+    if authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split("Bearer ", 1)[1].strip()
+    elif x_exam_session_token:
+        raw_token = x_exam_session_token.strip()
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to record proctoring consent."
+        )
+
+    cand_sess = StudentExamService.verify_session_token(raw_token)
+    student_id = uuid.UUID(str(cand_sess["student_id"]))
+    attempt_id = req.attempt_id or (uuid.UUID(str(cand_sess["attempt_id"])) if "attempt_id" in cand_sess else None)
+
+    client_ip = request.client.host if request and request.client else "127.0.0.1"
+    user_agent = request.headers.get("user-agent", "Browser") if request else "Browser"
+
+    return LiveMediaMonitoringService.record_student_consent(
+        db=db,
+        quiz_id=quiz_id,
+        student_id=student_id,
+        attempt_id=attempt_id,
+        consent_version=req.consent_version,
+        webcam_acknowledged=req.webcam_acknowledged,
+        microphone_acknowledged=req.microphone_acknowledged,
+        recording_acknowledged=req.recording_acknowledged,
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+
+
+@router.post("/examinations/{quiz_id}/listen-audio")
+def set_audio_listening_target(
+    quiz_id: uuid.UUID = Path(...),
+    req: ListenAudioRequest = ...,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Individual Student Audio Listening Control:
+    Activates audio monitoring ONLY for the selected student's microphone feed.
+    Strictly mutes/clears all other candidate feeds to avoid simultaneous audio playback.
+    """
+    return LiveMediaMonitoringService.set_audio_listening_target(
+        db=db,
+        quiz_id=quiz_id,
+        admin=admin,
+        student_id=req.student_id,
+        listen=req.listen,
+    )
+
+
+@router.post("/examinations/{quiz_id}/two-way-communication", response_model=TwoWayCommunicationResponse)
+def send_two_way_communication(
+    quiz_id: uuid.UUID = Path(...),
+    req: TwoWayCommunicationRequest = ...,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin),
+):
+    """
+    Sends an authorized invigilator instruction, warning, or device verification request to an individual student.
+    """
+    return LiveMediaMonitoringService.send_two_way_communication(
+        db=db,
+        quiz_id=quiz_id,
+        admin=admin,
+        student_id=req.student_id,
+        comm_type=req.comm_type,
+        message=req.message,
+    )
+

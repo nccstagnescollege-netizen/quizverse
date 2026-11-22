@@ -32,6 +32,7 @@ import { BrowserCompatibilityCheck } from '@/components/exam/BrowserCompatibilit
 import { WatermarkStatusIndicator } from '@/components/exam/WatermarkStatusIndicator';
 import { SEBCompatibilityCheck } from '@/components/desktop-security/SEBCompatibilityCheck';
 import { PreExamProctoringCheck } from '@/components/exam/PreExamProctoringCheck';
+import { DeviceReadinessVerification } from '@/components/exam/DeviceReadinessVerification';
 import { DevicePreparationCheck } from '@/components/exam/DevicePreparationCheck';
 
 export default function ExamLandingPage() {
@@ -385,6 +386,18 @@ export default function ExamLandingPage() {
                   if (typeof window !== 'undefined') {
                     localStorage.setItem(`qv_proctor_caps_${token}`, JSON.stringify(caps));
                   }
+                }}
+              />
+            )}
+
+            {/* Phase 31: Mandatory Real-Time Device Readiness Verification */}
+            {details?.proctoring_policy && (details.proctoring_policy.webcam_monitoring_enabled || details.proctoring_policy.microphone_monitoring_enabled) && details?.quiz_id && (
+              <DeviceReadinessVerification
+                quizId={details.quiz_id}
+                attemptId={(details as any)?.attempt_id}
+                studentToken={token}
+                onVerificationComplete={(mediaStream, devInfo) => {
+                  setProctoringCheckPassed(true);
                 }}
               />
             )}

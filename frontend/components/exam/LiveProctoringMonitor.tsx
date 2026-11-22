@@ -24,6 +24,7 @@ import {
   FrameAnalysisResult,
   AudioAnalysisResult,
 } from '@/services/aiProctoringService';
+import { monitoringService } from '@/services/monitoringService';
 
 interface LiveProctoringMonitorProps {
   attemptId: string;
@@ -112,10 +113,30 @@ export function LiveProctoringMonitor({
         setStream(media);
 
         if (media.getVideoTracks().length > 0) {
+          const vTrack = media.getVideoTracks()[0];
           setCameraActive(true);
+          vTrack.onended = () => {
+            setCameraActive(false);
+          };
+          vTrack.onmute = () => {
+            setCameraActive(false);
+          };
+          vTrack.onunmute = () => {
+            setCameraActive(true);
+          };
         }
         if (media.getAudioTracks().length > 0) {
+          const aTrack = media.getAudioTracks()[0];
           setMicActive(true);
+          aTrack.onended = () => {
+            setMicActive(false);
+          };
+          aTrack.onmute = () => {
+            setMicActive(false);
+          };
+          aTrack.onunmute = () => {
+            setMicActive(true);
+          };
           try {
             const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
             const audioCtx = new AudioCtx();

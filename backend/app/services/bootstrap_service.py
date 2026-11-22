@@ -655,6 +655,91 @@ def ensure_monitoring_schema_exists(db: Session) -> None:
                 );
                 """,
                 "CREATE INDEX IF NOT EXISTS ix_examination_extension_history_quiz_id ON examination_extension_history(quiz_id);",
+
+                # 10. Phase 31: Media Examination Rooms
+                """
+                CREATE TABLE IF NOT EXISTS media_examination_rooms (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL UNIQUE REFERENCES quizzes(id) ON DELETE CASCADE,
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    audio_broadcast_allowed BOOLEAN NOT NULL DEFAULT false,
+                    recording_enabled BOOLEAN NOT NULL DEFAULT false,
+                    recording_policy_disclosed BOOLEAN NOT NULL DEFAULT true,
+                    max_participants INTEGER NOT NULL DEFAULT 100,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_media_examination_rooms_quiz_id ON media_examination_rooms(quiz_id);",
+
+                # 11. Phase 31: Media Participant Sessions
+                """
+                CREATE TABLE IF NOT EXISTS media_participant_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    room_id UUID NOT NULL REFERENCES media_examination_rooms(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    candidate_id UUID REFERENCES students(id) ON DELETE CASCADE,
+                    admin_id UUID REFERENCES admins(id) ON DELETE CASCADE,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    session_token VARCHAR(128) NOT NULL,
+                    peer_id VARCHAR(128) NOT NULL,
+                    role VARCHAR(32) NOT NULL DEFAULT 'student',
+                    camera_status VARCHAR(32) NOT NULL DEFAULT 'Connected',
+                    microphone_status VARCHAR(32) NOT NULL DEFAULT 'Connected',
+                    stream_status VARCHAR(32) NOT NULL DEFAULT 'LIVE',
+                    audio_level VARCHAR(32) NOT NULL DEFAULT 'no_input',
+                    network_quality VARCHAR(32) NOT NULL DEFAULT 'GOOD',
+                    device_info JSONB,
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    is_pinned BOOLEAN NOT NULL DEFAULT false,
+                    is_audio_listened BOOLEAN NOT NULL DEFAULT false,
+                    last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_media_participant_sessions_room_id ON media_participant_sessions(room_id);",
+                "CREATE INDEX IF NOT EXISTS ix_media_participant_sessions_quiz_id ON media_participant_sessions(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_media_participant_sessions_candidate_id ON media_participant_sessions(candidate_id);",
+                "CREATE INDEX IF NOT EXISTS ix_media_participant_sessions_session_token ON media_participant_sessions(session_token);",
+                "CREATE INDEX IF NOT EXISTS ix_media_participant_sessions_peer_id ON media_participant_sessions(peer_id);",
+
+                # 12. Phase 31: Media Device Status Events
+                """
+                CREATE TABLE IF NOT EXISTS media_device_status_events (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    session_id UUID NOT NULL REFERENCES media_participant_sessions(id) ON DELETE CASCADE,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    previous_status VARCHAR(32),
+                    new_status VARCHAR(32) NOT NULL,
+                    details JSONB,
+                    severity VARCHAR(32) NOT NULL DEFAULT 'info',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_media_device_status_events_session_id ON media_device_status_events(session_id);",
+                "CREATE INDEX IF NOT EXISTS ix_media_device_status_events_quiz_id ON media_device_status_events(quiz_id);",
+
+                # 13. Phase 31: Student Monitoring Consents
+                """
+                CREATE TABLE IF NOT EXISTS student_monitoring_consents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    attempt_id UUID REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    consent_version VARCHAR(32) NOT NULL DEFAULT 'v1.0',
+                    webcam_acknowledged BOOLEAN NOT NULL DEFAULT true,
+                    microphone_acknowledged BOOLEAN NOT NULL DEFAULT true,
+                    recording_acknowledged BOOLEAN NOT NULL DEFAULT false,
+                    ip_address VARCHAR(45),
+                    user_agent VARCHAR(512),
+                    consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_student_monitoring_consents_quiz_id ON student_monitoring_consents(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_student_monitoring_consents_student_id ON student_monitoring_consents(student_id);",
             ]
             for stmt in ddl_statements:
                 try:
@@ -1932,6 +2017,10 @@ def ensure_supabase_rls_security_policies_exist(db: Session) -> None:
         "restoration_test_records",
         "infrastructure_alert_records",
         "dr_drill_records",
+        "media_examination_rooms",
+        "media_participant_sessions",
+        "media_device_status_events",
+        "student_monitoring_consents",
     ]
 
     for tbl in protected_tables:
