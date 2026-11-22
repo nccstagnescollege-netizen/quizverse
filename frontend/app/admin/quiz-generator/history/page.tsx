@@ -120,7 +120,7 @@ export default function AdminGenerationHistoryPage() {
           </Link>
           {row.saved_quiz_id && (
             <Link
-              href={`/admin/quizzes/${row.saved_quiz_id}`}
+              href={`/admin/quiz/${row.saved_quiz_id}`}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium transition-colors"
               title="View authoritative Quiz draft"
             >

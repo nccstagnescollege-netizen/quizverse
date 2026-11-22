@@ -10,6 +10,18 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/admin/quizzes/:path*',
+        destination: '/admin/quiz/:path*',
+      },
+      {
+        source: '/super-admin/quizzes/:path*',
+        destination: '/super-admin/quiz/:path*',
+      },
+    ];
+  },
   async headers() {
     return [
       {

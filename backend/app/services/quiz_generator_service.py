@@ -947,7 +947,7 @@ def save_generation_as_draft(
 
     logger.info(f"Saved generated quiz paper [{new_quiz.id}] with {len(items)} questions as draft by [{admin.email}]")
 
-    base_path = "/super-admin/quizzes" if admin.is_super_admin else "/admin/quizzes"
+    base_path = "/super-admin/quiz" if admin.is_super_admin else "/admin/quiz"
     return SaveAsDraftResponse(
         quiz_id=new_quiz.id,
         title=new_quiz.title,
