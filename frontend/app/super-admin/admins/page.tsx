@@ -98,6 +98,11 @@ export default function SuperAdminAdminsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null);
+  const [platformPermissions, setPlatformPermissions] = useState<{ id: string; permission_name: string; description?: string }[]>([]);
+  const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
+  const [permSearchQuery, setPermSearchQuery] = useState('');
+  const [isLoadingPerms, setIsLoadingPerms] = useState(false);
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
 
   // Form states for creating User Admin
   const [newName, setNewName] = useState('');
@@ -367,6 +372,109 @@ export default function SuperAdminAdminsPage() {
     }
   };
 
+  const openPermissionsModal = async (admin: AdminUser) => {
+    setSelectedAdmin(admin);
+    setSelectedPerms(new Set(admin.permissions || []));
+    setPermSearchQuery('');
+    setIsPermissionsModalOpen(true);
+    setIsLoadingPerms(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/admin-management/permissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPlatformPermissions(data);
+      } else {
+        const fallback = (admin.permissions || []).map((p) => ({
+          id: p,
+          permission_name: p,
+          description: `Platform permission: ${p}`,
+        }));
+        setPlatformPermissions(fallback);
+      }
+    } catch {
+      const fallback = (admin.permissions || []).map((p) => ({
+        id: p,
+        permission_name: p,
+        description: `Platform permission: ${p}`,
+      }));
+      setPlatformPermissions(fallback);
+    } finally {
+      setIsLoadingPerms(false);
+    }
+  };
+
+  const handleTogglePermission = (permName: string) => {
+    if (selectedAdmin?.is_super_admin) return;
+    setSelectedPerms((prev) => {
+      const next = new Set(prev);
+      if (next.has(permName)) {
+        next.delete(permName);
+      } else {
+        next.add(permName);
+      }
+      return next;
+    });
+  };
+
+  const handleGrantAllPerms = () => {
+    if (selectedAdmin?.is_super_admin) return;
+    setSelectedPerms(new Set(platformPermissions.map((p) => p.permission_name)));
+  };
+
+  const handleRevokeAllPerms = () => {
+    if (selectedAdmin?.is_super_admin) return;
+    setSelectedPerms(new Set());
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedAdmin || !token) return;
+    if (selectedAdmin.is_super_admin) {
+      setIsPermissionsModalOpen(false);
+      return;
+    }
+    setIsSavingPerms(true);
+    try {
+      const overrides = platformPermissions.map((p) => ({
+        permission_name: p.permission_name,
+        is_granted: selectedPerms.has(p.permission_name),
+      }));
+
+      const res = await fetch(`${API_BASE}/admin-management/admins/${selectedAdmin.id}/permissions`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ overrides }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || err.message || 'Failed to update permissions.');
+      }
+
+      const updatedAdmin = await res.json();
+      setAdmins((prev) =>
+        prev.map((a) => (a.id === selectedAdmin.id ? { ...a, permissions: updatedAdmin.permissions } : a))
+      );
+      setToastMessage({
+        type: 'success',
+        text: `Permissions successfully updated for ${selectedAdmin.full_name}.`,
+      });
+      setIsPermissionsModalOpen(false);
+    } catch (err: any) {
+      setToastMessage({
+        type: 'error',
+        text: err.message || 'Failed to save permissions.',
+      });
+    } finally {
+      setIsSavingPerms(false);
+    }
+  };
+
   const filteredAdmins = admins.filter((admin) => {
     const matchesSearch =
       admin.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -487,12 +595,9 @@ export default function SuperAdminAdminsPage() {
           )}
 
           <button
-            onClick={() => {
-              setSelectedAdmin(admin);
-              setIsPermissionsModalOpen(true);
-            }}
+            onClick={() => openPermissionsModal(admin)}
             className="p-1 rounded-lg hover:bg-surface-highlight text-slate-400 hover:text-purple-300 transition-colors"
-            title="Inspect permissions & overrides"
+            title="Configure Granular RBAC Permissions"
           >
             <SlidersHorizontal className="w-4 h-4" />
           </button>
@@ -712,49 +817,164 @@ export default function SuperAdminAdminsPage() {
         </div>
       )}
 
-      {/* Permissions Inspection Modal */}
+      {/* Interactive Granular RBAC Permissions Configuration Modal */}
       {isPermissionsModalOpen && selectedAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <SlidersHorizontal className="w-5 h-5 text-purple-400" />
-                RBAC Permissions: {selectedAdmin.full_name}
-              </h3>
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col p-4 sm:p-6 rounded-2xl bg-surface-card border border-surface-border shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-surface-border pb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center font-bold">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    RBAC Permissions: {selectedAdmin.full_name}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {selectedAdmin.email} &bull; {selectedAdmin.is_super_admin ? 'Super Administrator (Full Wildcard Access)' : 'Operational User Admin'}
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setIsPermissionsModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white text-xl p-1"
               >
                 &times;
               </button>
             </div>
 
-            <div className="text-xs text-slate-400">
-              Resolved permissions based on role assignments and explicit database overrides.
-            </div>
+            {selectedAdmin.is_super_admin ? (
+              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-slate-300 space-y-2">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <span>Unrestricted Platform Access</span>
+                </div>
+                <p className="text-slate-400 leading-relaxed">
+                  Super Administrator accounts possess unrestricted platform access (<code>*</code>) across all system modules,
+                  APIs, and tenant databases. Individual permissions cannot be restricted for Super Admins.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Search & Bulk Control Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search permissions (e.g. academic, quiz, question)..."
+                      value={permSearchQuery}
+                      onChange={(e) => setPermSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-surface-base border border-surface-border text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGrantAllPerms}
+                      className="px-2.5 py-1.5 rounded-lg border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      Grant All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRevokeAllPerms}
+                      className="px-2.5 py-1.5 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      Revoke All
+                    </button>
+                  </div>
+                </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-1.5 p-3 rounded-xl bg-surface-base border border-surface-border">
-              {selectedAdmin.permissions.map((p) => (
-                <div
-                  key={p}
-                  className="flex items-center justify-between p-2 rounded-lg bg-surface-card border border-surface-border text-xs"
-                >
-                  <span className="font-mono text-purple-300">{p}</span>
-                  <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Granted
+                {/* Counter Pill */}
+                <div className="flex items-center justify-between text-xs text-slate-400 px-1 shrink-0">
+                  <span>Click any permission to toggle between <strong>Granted</strong> and <strong>Revoked</strong>.</span>
+                  <span className="font-mono text-[11px] text-purple-300">
+                    Granted: {selectedPerms.size} / {platformPermissions.length}
                   </span>
                 </div>
-              ))}
-            </div>
 
-            <div className="flex justify-end pt-2">
+                {/* Permissions Grid */}
+                <div className="flex-1 overflow-y-auto max-h-80 space-y-1.5 p-2 rounded-xl bg-surface-base border border-surface-border pr-1">
+                  {isLoadingPerms ? (
+                    <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
+                      <span>Loading available platform permissions...</span>
+                    </div>
+                  ) : (
+                    platformPermissions
+                      .filter(
+                        (p) =>
+                          p.permission_name.toLowerCase().includes(permSearchQuery.toLowerCase()) ||
+                          (p.description && p.description.toLowerCase().includes(permSearchQuery.toLowerCase()))
+                      )
+                      .map((p) => {
+                        const isGranted = selectedPerms.has(p.permission_name);
+                        return (
+                          <div
+                            key={p.permission_name}
+                            onClick={() => handleTogglePermission(p.permission_name)}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                              isGranted
+                                ? 'bg-purple-950/20 border-purple-500/40 hover:bg-purple-950/30'
+                                : 'bg-surface-card border-surface-border hover:bg-surface-highlight opacity-70'
+                            }`}
+                          >
+                            <div className="space-y-0.5 min-w-0 pr-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-semibold text-white">
+                                  {p.permission_name}
+                                </span>
+                              </div>
+                              {p.description && (
+                                <p className="text-[11px] text-slate-400 truncate">
+                                  {p.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-2">
+                              {isGranted ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Granted
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                                  <XCircle className="w-3 h-3" />
+                                  Revoked
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-surface-border shrink-0">
               <button
+                type="button"
                 onClick={() => setIsPermissionsModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-surface-highlight hover:bg-surface-border text-slate-300 text-xs font-medium cursor-pointer"
               >
-                Close Inspector
+                Cancel
               </button>
+              {!selectedAdmin.is_super_admin && (
+                <button
+                  type="button"
+                  onClick={handleSavePermissions}
+                  disabled={isSavingPerms}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-glow-purple disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  {isSavingPerms && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSavingPerms ? 'Saving Changes...' : 'Save Permission Overrides'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
