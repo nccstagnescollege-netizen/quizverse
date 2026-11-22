@@ -16,9 +16,16 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
-        # Attach headers
+        # Attach correlation & timing headers
         response.headers["x-request-id"] = request_id
         response.headers["x-process-time-ms"] = str(duration_ms)
+
+        # Attach defense-in-depth security headers (Phase 29 Hardening)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()"
 
         # Structured log
         logger.info(

@@ -773,6 +773,12 @@ class AntiCheatingControlCenterService:
         """
         AntiCheatingControlCenterService.verify_quiz_access(db, admin, req.quiz_id)
 
+        if not req.reason or not req.reason.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An explicit reason must be provided for security audit logging.",
+            )
+
         attempt = db.query(ExaminationAttempt).filter(ExaminationAttempt.id == req.attempt_id).first()
         if not attempt:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Examination attempt not found.")

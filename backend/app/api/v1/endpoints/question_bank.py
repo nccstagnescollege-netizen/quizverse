@@ -724,14 +724,41 @@ def upload_attachment(
     """
     Uploads a new attachment file for the given question.
     """
+    # 1. Read and validate content size
     content = file.file.read()
     file_size = len(content)
-    file_name = file.filename or "attachment"
+
+    # Enforce 10MB maximum file size limit
+    MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
+    if file_size > MAX_ATTACHMENT_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds maximum allowed upload size of {MAX_ATTACHMENT_SIZE_BYTES // (1024 * 1024)} MB.",
+        )
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+
+    # 2. Path Traversal & Extension Validation
+    raw_name = Path(file.filename or "attachment").name  # Strip path traversal separators
+    ext = Path(raw_name).suffix.lower()
+    allowed_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".svg"}
+    if ext not in allowed_exts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File extension '{ext}' is not permitted. Allowed: {', '.join(sorted(allowed_exts))}",
+        )
+
+    # Sanitize base filename (alphanumeric, dash, underscore, dot)
+    sanitized_name = "".join(c for c in raw_name if c.isalnum() or c in ("-", "_", ".")) or f"attachment{ext}"
     file_type = file.content_type or "application/octet-stream"
 
     uploads_dir = Path("uploads/questions")
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    stored_name = f"{uuid.uuid4().hex}_{file_name}"
+    stored_name = f"{uuid.uuid4().hex}_{sanitized_name}"
     file_path = str(uploads_dir / stored_name)
     with open(file_path, "wb") as f:
         f.write(content)
@@ -740,7 +767,7 @@ def upload_attachment(
         db=db,
         admin=admin,
         question_id=question_id,
-        file_name=file_name,
+        file_name=sanitized_name,
         file_path=file_path,
         file_type=file_type,
         file_size_bytes=file_size,
