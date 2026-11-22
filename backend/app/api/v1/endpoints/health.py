@@ -32,17 +32,11 @@ async def get_health(request: Request) -> HealthResponse:
         db_status = "connected" if is_connected else "disconnected"
 
     # Assess Redis connectivity
-    redis_status = "unconfigured"
-    if settings.REDIS_URL:
-        try:
-            import redis
-            r = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=2)
-            if r.ping():
-                redis_status = "connected"
-            else:
-                redis_status = "disconnected"
-        except Exception:
-            redis_status = "disconnected"
+    if not settings.REDIS_URL:
+        redis_status = "unconfigured"
+    else:
+        from backend.app.core.redis import check_redis_connection
+        redis_status = "connected" if check_redis_connection() else "disconnected"
 
     features = ServiceFeatures(
         auth=bool(settings.SUPABASE_URL and settings.SUPABASE_KEY),
