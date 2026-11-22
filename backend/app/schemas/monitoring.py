@@ -281,21 +281,21 @@ class AnnouncementAcknowledgementRequest(BaseModel):
 # Incident Management Schemas
 # ---------------------------------------------------------------------------
 class ExaminationIncidentCreateRequest(BaseModel):
-    quiz_id: uuid.UUID
+    quiz_id: Optional[uuid.UUID] = None
     student_id: Optional[uuid.UUID] = None
     attempt_id: Optional[uuid.UUID] = None
     category: str = Field(
-        ...,
+        default="other",
         description="network_issue, synchronization_failure, access_problem, session_conflict, content_problem, timing_problem, security_concern, student_support, other"
     )
     severity: str = Field(default="medium", description="low, medium, high, critical")
-    title: str = Field(..., min_length=3, max_length=255)
-    description: str = Field(..., min_length=5)
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(default="", description="Incident details")
     assigned_to: Optional[uuid.UUID] = None
 
 
 class IncidentNoteCreateRequest(BaseModel):
-    note: str = Field(..., min_length=2)
+    note: str = Field(..., min_length=1)
 
 
 class IncidentNoteResponse(BaseModel):
@@ -354,20 +354,22 @@ class ExtendTimeRequest(BaseModel):
     minutes: int = Field(..., ge=1, le=180, description="Minutes to extend the official examination deadline")
     target_type: str = Field(default="all", description="all, selected_student")
     student_id: Optional[uuid.UUID] = None
-    reason: str = Field(..., min_length=5, description="Audit reason for time extension")
+    reason: str = Field(default="Proctor extension", min_length=1, description="Audit reason for time extension")
 
 
 class TerminateAttemptRequest(BaseModel):
-    attempt_id: uuid.UUID
-    reason: str = Field(..., min_length=5, description="Mandatory reason for manual attempt termination")
+    attempt_id: Optional[uuid.UUID] = None
+    student_id: Optional[uuid.UUID] = None
+    reason: str = Field(default="Administrative termination", min_length=1, description="Mandatory reason for manual attempt termination")
 
 
 class CancelExaminationRequest(BaseModel):
-    reason: str = Field(..., min_length=5, description="Mandatory justification for emergency examination cancellation")
+    reason: str = Field(default="Administrative cancellation", min_length=1, description="Mandatory justification for emergency examination cancellation")
 
 
 class RevokeSessionRequest(BaseModel):
     attempt_id: uuid.UUID
+    reason: str = Field(default="Session revocation", min_length=1, description="Mandatory justification for session revocation")
     reason: str = Field(..., min_length=5, description="Mandatory justification for session revocation")
 
 

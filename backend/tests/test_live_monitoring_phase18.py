@@ -640,6 +640,49 @@ def test_emergency_terminate_attempt(client, setup_db):
     assert att2.submission_reason == "ADMIN_TERMINATED"
 
 
+def test_create_incident_without_quiz_id_in_body(client, setup_db):
+    owner = setup_db["user_admin_owner"]
+    quiz = setup_db["quiz"]
+    token = make_token(owner)
+
+    # Calling without quiz_id in the json body (only in URL path)
+    inc_payload = {
+        "title": "Unresponsive Client Tab",
+        "category": "other",
+        "severity": "medium",
+    }
+    res = client.post(
+        f"/api/v1/monitoring/examinations/{quiz.id}/incidents",
+        json=inc_payload,
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert res.status_code == 201
+    data = res.json()
+    assert data["quiz_id"] == str(quiz.id)
+    assert data["title"] == "Unresponsive Client Tab"
+
+
+def test_emergency_terminate_attempt_by_student_id(client, setup_db):
+    super_adm = setup_db["super_admin"]
+    quiz = setup_db["quiz"]
+    st1 = setup_db["st1"]
+    token = make_token(super_adm)
+
+    # Calling with student_id instead of attempt_id, and short reason
+    term_payload = {
+        "student_id": str(st1.id),
+        "reason": "Alt",
+    }
+    res = client.post(
+        f"/api/v1/monitoring/examinations/{quiz.id}/terminate-attempt",
+        json=term_payload,
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["action_type"] == "TERMINATE_ATTEMPT"
+
+
 def test_unified_alert_center(client, setup_db):
     super_adm = setup_db["super_admin"]
     alert1 = setup_db["alert1"]

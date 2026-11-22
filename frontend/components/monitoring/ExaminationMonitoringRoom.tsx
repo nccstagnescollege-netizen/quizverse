@@ -180,12 +180,15 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
   // Submit incident
   const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!incTitle.trim() || !incDesc.trim()) return;
+    if (!incTitle.trim()) {
+      alert('Please provide an incident title');
+      return;
+    }
     setSubmittingInc(true);
     try {
       await monitoringService.createIncident(token, quizId, {
         title: incTitle.trim(),
-        description: incDesc.trim(),
+        description: incDesc.trim() || incTitle.trim(),
         category: incCategory,
         severity: incSeverity,
       });

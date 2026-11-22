@@ -439,7 +439,7 @@ class MonitoringService {
       category: string;
       severity?: string;
       title: string;
-      description: string;
+      description?: string;
       student_id?: string;
       attempt_id?: string;
       assigned_to?: string;
@@ -448,7 +448,11 @@ class MonitoringService {
     const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/incidents`, {
       method: 'POST',
       headers: this.getHeaders(token),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        quiz_id: quizId,
+        ...payload,
+        description: payload.description || payload.title || 'Incident reported',
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -551,12 +555,15 @@ class MonitoringService {
   async terminateAttempt(
     token: string,
     quizId: string,
-    payload: { attempt_id: string; reason: string },
+    payload: { attempt_id?: string; student_id?: string; reason?: string },
   ): Promise<MonitoringInterventionResponse> {
     const res = await fetch(`${API_BASE_URL}/monitoring/examinations/${quizId}/terminate-attempt`, {
       method: 'POST',
       headers: this.getHeaders(token),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        reason: payload.reason?.trim() || 'Terminated by examination proctor',
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

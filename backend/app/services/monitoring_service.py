@@ -1693,18 +1693,34 @@ class LiveMonitoringService:
         db: Session,
         admin: Admin,
         quiz_id: uuid.UUID,
-        attempt_id: uuid.UUID,
-        reason: str,
+        attempt_id: Optional[uuid.UUID] = None,
+        student_id: Optional[uuid.UUID] = None,
+        reason: str = "Administrative termination",
     ) -> MonitoringInterventionResponse:
         LiveMonitoringService.check_intervention_permission(db, admin, quiz_id)
 
-        attempt = db.query(ExaminationAttempt).filter(
-            ExaminationAttempt.id == attempt_id,
-            ExaminationAttempt.quiz_id == quiz_id,
-        ).first()
+        attempt = None
+        if attempt_id:
+            attempt = db.query(ExaminationAttempt).filter(
+                ExaminationAttempt.id == attempt_id,
+                ExaminationAttempt.quiz_id == quiz_id,
+            ).first()
+
+        if not attempt and student_id:
+            # Query active attempt first, or most recent attempt for student
+            attempt = db.query(ExaminationAttempt).filter(
+                ExaminationAttempt.quiz_id == quiz_id,
+                ExaminationAttempt.student_id == student_id,
+                ExaminationAttempt.status.in_(["in_progress", "submitted", "ready"])
+            ).order_by(desc(ExaminationAttempt.created_at)).first()
+            if not attempt:
+                attempt = db.query(ExaminationAttempt).filter(
+                    ExaminationAttempt.quiz_id == quiz_id,
+                    ExaminationAttempt.student_id == student_id,
+                ).order_by(desc(ExaminationAttempt.created_at)).first()
 
         if not attempt:
-            raise HTTPException(status_code=404, detail="Attempt not found")
+            raise HTTPException(status_code=404, detail="No active attempt found to terminate")
 
         prev_status = attempt.status
         now = datetime.now(timezone.utc)
@@ -1733,7 +1749,7 @@ class LiveMonitoringService:
             action_type="TERMINATE_ATTEMPT",
             performed_by=admin.id,
             target_type="attempt",
-            target_id=str(attempt_id),
+            target_id=str(attempt.id),
             reason=reason.strip(),
             previous_state={"status": prev_status},
             new_state={"status": "terminated", "submission_reason": "ADMIN_TERMINATED"},

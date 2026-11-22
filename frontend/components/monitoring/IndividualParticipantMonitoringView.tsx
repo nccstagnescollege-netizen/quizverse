@@ -124,12 +124,19 @@ export function IndividualParticipantMonitoringView({
 
   const handleTerminateAttempt = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!terminateReason.trim() || !data?.participant.attempt_id) return;
+    const reason = terminateReason.trim() || 'Terminated by examination proctor';
+    const targetAttemptId = data?.participant?.attempt_id;
+    const targetStudentId = data?.participant?.student_id || participantId;
+    if (!targetAttemptId && !targetStudentId) {
+      alert('No candidate or attempt reference found to terminate.');
+      return;
+    }
     try {
       setTerminateSubmitting(true);
       await monitoringService.terminateAttempt(token, quizId, {
-        attempt_id: data.participant.attempt_id,
-        reason: terminateReason.trim(),
+        attempt_id: targetAttemptId || undefined,
+        student_id: targetStudentId || undefined,
+        reason: reason,
       });
       setShowTerminateModal(false);
       setTerminateReason('');
@@ -145,16 +152,19 @@ export function IndividualParticipantMonitoringView({
 
   const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!incidentTitle.trim() || !incidentDescription.trim()) return;
+    if (!incidentTitle.trim()) {
+      alert('Please provide an incident title');
+      return;
+    }
     try {
       setIncidentSubmitting(true);
       await monitoringService.createIncident(token, quizId, {
         title: incidentTitle.trim(),
-        description: incidentDescription.trim(),
+        description: incidentDescription.trim() || incidentTitle.trim(),
         category: incidentCategory,
         severity: incidentSeverity,
-        student_id: data?.participant.student_id,
-        attempt_id: data?.participant.attempt_id,
+        student_id: data?.participant?.student_id || participantId,
+        attempt_id: data?.participant?.attempt_id || undefined,
       });
       setShowIncidentModal(false);
       setIncidentTitle('');

@@ -234,14 +234,16 @@ def create_incident(
     db: Session = Depends(get_db),
     admin: Admin = Depends(get_current_admin),
 ):
+    target_quiz_id = req.quiz_id or quiz_id
+    desc = req.description if (req.description and req.description.strip()) else req.title
     return LiveMonitoringService.create_incident(
         db=db,
         admin=admin,
-        quiz_id=quiz_id,
+        quiz_id=target_quiz_id,
         title=req.title,
-        description=req.description,
-        category=req.category,
-        severity=req.severity,
+        description=desc,
+        category=req.category or "other",
+        severity=req.severity or "medium",
         student_id=req.student_id,
         attempt_id=req.attempt_id,
         assigned_to=req.assigned_to,
@@ -355,7 +357,8 @@ def terminate_attempt(
         admin=admin,
         quiz_id=quiz_id,
         attempt_id=req.attempt_id,
-        reason=req.reason,
+        student_id=req.student_id,
+        reason=req.reason or "Administrative termination",
     )
 
 
