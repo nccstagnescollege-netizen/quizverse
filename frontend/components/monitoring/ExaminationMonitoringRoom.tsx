@@ -23,6 +23,7 @@ import {
   X,
   FileText,
   UserX,
+  Smartphone,
 } from 'lucide-react';
 import {
   monitoringService,
@@ -461,6 +462,29 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
                                   {p.watermark_code}
                                 </span>
                               )}
+                              {/* Phase 24 Native Mobile Security Badges */}
+                              {p.device_platform === 'android' && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5">
+                                  <Smartphone className="w-2.5 h-2.5" />
+                                  <span>Android {p.native_app_version ? `v${p.native_app_version}` : ''}</span>
+                                </span>
+                              )}
+                              {p.device_platform === 'ios' && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 flex items-center gap-0.5">
+                                  <Smartphone className="w-2.5 h-2.5" />
+                                  <span>iOS {p.native_app_version ? `v${p.native_app_version}` : ''}</span>
+                                </span>
+                              )}
+                              {p.flag_secure_active && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono">
+                                  FLAG_SECURE
+                                </span>
+                              )}
+                              {p.kiosk_mode_active && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                                  Kiosk
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -521,6 +545,17 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
                               {(p.capture_signals_count ?? 0) > 0 && (
                                 <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
                                   {p.capture_signals_count} Capture Signal{(p.capture_signals_count ?? 0) > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {/* Phase 24 Mobile Interruptions & Root Signals */}
+                              {(p.mobile_interruptions_count ?? 0) > 0 && (
+                                <span className="text-[9px] font-bold text-orange-300 bg-orange-500/15 px-1.5 py-0.2 rounded border border-orange-500/30">
+                                  {p.mobile_interruptions_count} Mobile Interruption{(p.mobile_interruptions_count ?? 0) > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {p.root_detected && (
+                                <span className="text-[9px] font-bold text-rose-400 bg-rose-500/20 px-1.5 py-0.2 rounded border border-rose-500/40">
+                                  Root Signal
                                 </span>
                               )}
                             </div>

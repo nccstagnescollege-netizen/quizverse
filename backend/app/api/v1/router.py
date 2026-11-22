@@ -22,6 +22,7 @@ from backend.app.api.v1.endpoints import (
     monitoring,
     system_audit,
     deployment,
+    mobile_exam,
 )
 
 api_router = APIRouter()
@@ -168,5 +169,12 @@ api_router.include_router(
     deployment.router,
     prefix="/system/deployment",
     tags=["Production Deployment & DR Operations"],
+)
+
+# 17. Mobile Device Security & Native Examination Mode (Phase 24)
+api_router.include_router(
+    mobile_exam.router,
+    prefix="/mobile",
+    tags=["Mobile Device Security & Native Examination Mode"],
 )
 

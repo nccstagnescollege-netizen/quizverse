@@ -100,6 +100,17 @@ class QuizConfigurationBase(BaseModel):
     track_screenshot_signals: bool = True
     track_screen_recording_signals: bool = True
 
+    # Phase 24 - Mobile Device Security & Native Examination Controls
+    require_native_app: bool = False
+    android_secure_mode: bool = True
+    ios_secure_mode: bool = True
+    require_kiosk_mode: bool = False
+    min_android_version: int = 26
+    min_ios_version: str = "15.0"
+    mobile_interruption_policy: str = "allow_with_event"
+    allow_device_recovery: bool = True
+    block_rooted_devices: bool = False
+
 
 class QuizConfigurationResponse(QuizConfigurationBase):
     id: uuid.UUID
@@ -201,6 +212,17 @@ class QuizConfigurationUpdateRequest(BaseModel):
     track_screenshot_signals: Optional[bool] = None
     track_screen_recording_signals: Optional[bool] = None
 
+    # Phase 24 - Mobile Device Security & Native Examination Controls
+    require_native_app: Optional[bool] = None
+    android_secure_mode: Optional[bool] = None
+    ios_secure_mode: Optional[bool] = None
+    require_kiosk_mode: Optional[bool] = None
+    min_android_version: Optional[int] = None
+    min_ios_version: Optional[str] = None
+    mobile_interruption_policy: Optional[str] = None
+    allow_device_recovery: Optional[bool] = None
+    block_rooted_devices: Optional[bool] = None
+
 
 # -------------------------------------------------------------
 # Dedicated Subsection Update Schemas
@@ -292,6 +314,17 @@ class QuizSecurityUpdateRequest(BaseModel):
     block_screen_capture_api: bool = True
     track_screenshot_signals: bool = True
     track_screen_recording_signals: bool = True
+
+    # Phase 24 - Mobile Device Security & Native Examination Controls
+    require_native_app: bool = False
+    android_secure_mode: bool = True
+    ios_secure_mode: bool = True
+    require_kiosk_mode: bool = False
+    min_android_version: int = 26
+    min_ios_version: str = "15.0"
+    mobile_interruption_policy: str = "allow_with_event"
+    allow_device_recovery: bool = True
+    block_rooted_devices: bool = False
 
 
 # -------------------------------------------------------------

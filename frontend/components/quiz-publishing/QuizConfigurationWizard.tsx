@@ -22,6 +22,8 @@ import {
   ArrowLeft,
   ExternalLink,
   Sparkles,
+  Smartphone,
+  Lock,
 } from 'lucide-react';
 import {
   quizPublishingService,
@@ -954,6 +956,144 @@ export function QuizConfigurationWizard({ quizId, basePath, token }: QuizConfigu
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Phase 24: Mobile Device Security & Native Examination Mode */}
+            <div className="space-y-4 pt-4 border-t border-surface-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider">
+                    <Smartphone className="w-4 h-4 text-cyan-400" />
+                    <span>Mobile Device Security &amp; Native Secure Exam Mode</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Hardware window security flags (FLAG_SECURE), iOS screen-recording detection, and Lock Task / Guided Access kiosk controls.
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  Phase 24 Native
+                </span>
+              </div>
+
+              {/* Technical Limitation Advisory */}
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-semibold text-white">Mobile Security Boundary &amp; Fairness Notice:</span>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Native applications enforce hardware screenshot and recording blocking (<code className="text-cyan-300">FLAG_SECURE</code>), app defocus tracking, and kiosk lock modes. Personal (BYOD) devices cannot be locked into kiosk mode without candidate consent unless provisioned via institutional Device Owner (MDM). No native software can prevent capture via external cameras or second devices.
+                  </p>
+                </div>
+              </div>
+
+              {/* Native Mobile Feature Toggles */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  {
+                    field: 'require_native_app',
+                    title: 'Require Native Mobile Application',
+                    desc: 'Prohibit mobile web browsers and require candidates taking this exam on mobile devices to use the native app.',
+                  },
+                  {
+                    field: 'android_secure_mode',
+                    title: 'Android FLAG_SECURE Protection',
+                    desc: 'Enforce hardware window security to block OS screenshots, screen mirroring, and screen recorders on Android.',
+                  },
+                  {
+                    field: 'ios_secure_mode',
+                    title: 'iOS Screen Capture & Privacy Blanking',
+                    desc: 'Detect AirPlay/Control Center screen recording and mask app switcher task previews with a privacy blanket.',
+                  },
+                  {
+                    field: 'require_kiosk_mode',
+                    title: 'Enforce Kiosk / Lock Task Mode',
+                    desc: 'Require Android Lock Task Mode (App Pinning) or iOS Guided Access during the active examination.',
+                  },
+                  {
+                    field: 'block_rooted_devices',
+                    title: 'Block Rooted & Jailbroken Devices',
+                    desc: 'Reject devices exhibiting su binaries, test-keys, or modified OS environments from starting the examination.',
+                  },
+                  {
+                    field: 'allow_device_recovery',
+                    title: 'Allow Single-Device Session Recovery',
+                    desc: 'Safely restore saved answers and resume an active exam on the same registered device after phone calls or app relaunch.',
+                  },
+                ].map((item) => (
+                  <label
+                    key={item.field}
+                    className="flex items-start gap-3 p-3.5 rounded-xl bg-surface-elevated border border-surface-border cursor-pointer hover:border-slate-700 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(config[item.field as keyof QuizConfiguration] ?? (item.field === 'android_secure_mode' || item.field === 'ios_secure_mode' || item.field === 'allow_device_recovery'))}
+                      onChange={(e) => updateField(item.field as keyof QuizConfiguration, e.target.checked)}
+                      className="mt-0.5 rounded border-slate-700 text-cyan-600 focus:ring-cyan-500 w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-white">{item.title}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{item.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {/* Mobile Policies & Version Thresholds */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                {/* Mobile Interruption Policy */}
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Mobile Interruption Policy
+                  </label>
+                  <select
+                    value={config.mobile_interruption_policy || 'allow_with_event'}
+                    onChange={(e) => updateField('mobile_interruption_policy', e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="allow_with_event">Allow &amp; Log Telemetry (Zero Disqualification)</option>
+                    <option value="pause_on_interruption">Pause Exam Pending Candidate Return</option>
+                    <option value="strict_flag_review">Flag Attempt for Proctor Security Audit</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400">
+                    Defines automated server response to incoming phone calls or background switches.
+                  </p>
+                </div>
+
+                {/* Minimum Android API Level */}
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Min Android API Version
+                  </label>
+                  <input
+                    type="number"
+                    min={21}
+                    max={35}
+                    value={config.min_android_version ?? 26}
+                    onChange={(e) => updateField('min_android_version', parseInt(e.target.value, 10) || 26)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    API 26 (Android 8.0 Oreo) is recommended for modern window security.
+                  </p>
+                </div>
+
+                {/* Minimum iOS Version */}
+                <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                  <label className="text-xs font-semibold text-white block">
+                    Min iOS Version
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="15.0"
+                    value={config.min_ios_version || '15.0'}
+                    onChange={(e) => updateField('min_ios_version', e.target.value || '15.0')}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    iOS 15+ supports UIScreen.capturedDidChangeNotification and ASAM.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}

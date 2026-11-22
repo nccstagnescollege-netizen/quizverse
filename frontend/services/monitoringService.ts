@@ -125,6 +125,14 @@ export interface ParticipantMonitoringItem {
   capture_capability?: string;
   capture_signals_count?: number;
   latest_capture_signal?: string;
+  // Phase 24 Mobile Security Telemetry
+  device_platform?: 'android' | 'ios' | 'web';
+  device_model?: string;
+  native_app_version?: string;
+  flag_secure_active?: boolean;
+  kiosk_mode_active?: boolean;
+  mobile_interruptions_count?: number;
+  root_detected?: boolean;
 }
 
 export interface AttemptEventItem {

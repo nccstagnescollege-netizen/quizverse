@@ -89,6 +89,16 @@ export interface QuizConfiguration {
   block_screen_capture_api?: boolean;
   track_screenshot_signals?: boolean;
   track_screen_recording_signals?: boolean;
+  // Phase 24 Mobile Device Security & Native Examination Mode
+  require_native_app?: boolean;
+  android_secure_mode?: boolean;
+  ios_secure_mode?: boolean;
+  require_kiosk_mode?: boolean;
+  min_android_version?: number;
+  min_ios_version?: string;
+  mobile_interruption_policy?: 'allow_with_event' | 'pause_on_interruption' | 'strict_flag_review';
+  allow_device_recovery?: boolean;
+  block_rooted_devices?: boolean;
   created_at: string;
   updated_at: string;
 }

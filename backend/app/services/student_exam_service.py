@@ -1022,6 +1022,16 @@ class StudentExamService:
             "block_screen_capture_api": bool(getattr(cfg, "block_screen_capture_api", getattr(sec_policy, "block_screen_capture_api", True))),
             "track_screenshot_signals": bool(getattr(cfg, "track_screenshot_signals", getattr(sec_policy, "track_screenshot_signals", True))),
             "track_screen_recording_signals": bool(getattr(cfg, "track_screen_recording_signals", getattr(sec_policy, "track_screen_recording_signals", True))),
+            # Phase 24 Mobile Security Settings
+            "require_native_app": bool(getattr(cfg, "require_native_app", False)),
+            "android_secure_mode": bool(getattr(cfg, "android_secure_mode", True)),
+            "ios_secure_mode": bool(getattr(cfg, "ios_secure_mode", True)),
+            "require_kiosk_mode": bool(getattr(cfg, "require_kiosk_mode", False)),
+            "min_android_version": int(getattr(cfg, "min_android_version", 26)),
+            "min_ios_version": str(getattr(cfg, "min_ios_version", "15.0")),
+            "mobile_interruption_policy": str(getattr(cfg, "mobile_interruption_policy", "allow_with_event")),
+            "allow_device_recovery": bool(getattr(cfg, "allow_device_recovery", True)),
+            "block_rooted_devices": bool(getattr(cfg, "block_rooted_devices", False)),
         }
 
         return StudentAttemptDetailResponse(

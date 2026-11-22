@@ -342,6 +342,17 @@ class QuizConfiguration(Base):
     track_screenshot_signals = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     track_screen_recording_signals = Column(Boolean, nullable=False, default=True, server_default=text("true"))
 
+    # 8. Mobile Secure Examination Controls (Phase 24)
+    require_native_app = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    android_secure_mode = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    ios_secure_mode = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    require_kiosk_mode = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    min_android_version = Column(Integer, nullable=False, default=26, server_default=text("26"))
+    min_ios_version = Column(String(32), nullable=False, default="15.0", server_default=text("'15.0'"))
+    mobile_interruption_policy = Column(String(32), nullable=False, default="allow_with_event", server_default=text("'allow_with_event'"))  # allow_with_event, pause_and_review, strict_flag
+    allow_device_recovery = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    block_rooted_devices = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
 

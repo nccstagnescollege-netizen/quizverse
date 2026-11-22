@@ -130,6 +130,11 @@ from backend.app.models.deployment import (
     SystemBackupRecord,
     RestorationTestRecord,
 )
+from backend.app.models.mobile_security import (
+    DeviceRegistration,
+    MobileExamSession,
+    MobileInterruptionEvent,
+)
 
 __all__ = [
     "Base",
@@ -244,4 +249,8 @@ __all__ = [
     # Production Deployment & Backups (Phase 20)
     "SystemBackupRecord",
     "RestorationTestRecord",
+    # Mobile Device Security & Native Examination (Phase 24)
+    "DeviceRegistration",
+    "MobileExamSession",
+    "MobileInterruptionEvent",
 ]

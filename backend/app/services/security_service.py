@@ -632,9 +632,15 @@ class SecurityService:
                 score += 3.0
             elif name in ["PRINT_ATTEMPT", "NAVIGATION_ATTEMPT", "PRINT_RESTRICTION_TRIGGERED"]:
                 score += 6.0
-            elif name == "SCREENSHOT_SIGNAL_DETECTED":
+            elif name in ["SCREENSHOT_SIGNAL_DETECTED", "SCREENSHOT_SIGNAL", "SCREENSHOT_ATTEMPT"]:
                 score += 8.0
-            elif name == "SCREEN_RECORDING_SIGNAL_DETECTED":
+            elif name in ["SCREEN_RECORDING_SIGNAL_DETECTED", "SCREEN_RECORDING_SIGNAL"]:
+                score += 15.0
+            elif name in ["APP_INTERRUPTION", "NATIVE_APP_BACKGROUND"]:
+                score += 5.0
+            elif name in ["ROOT_RISK_SIGNAL", "ROOT_DETECTED"]:
+                score += 25.0
+            elif name in ["KIOSK_MODE_STATUS_CHANGED", "KIOSK_VIOLATION"]:
                 score += 15.0
             elif name == "CAPTURE_API_ACTIVITY":
                 score += 10.0

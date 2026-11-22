@@ -206,6 +206,16 @@ def update_quiz_security_settings(
         block_screen_capture_api=payload.block_screen_capture_api,
         track_screenshot_signals=payload.track_screenshot_signals,
         track_screen_recording_signals=payload.track_screen_recording_signals,
+        # Phase 24 - Mobile Device Security & Native Examination Controls
+        require_native_app=payload.require_native_app,
+        android_secure_mode=payload.android_secure_mode,
+        ios_secure_mode=payload.ios_secure_mode,
+        require_kiosk_mode=payload.require_kiosk_mode,
+        min_android_version=payload.min_android_version,
+        min_ios_version=payload.min_ios_version,
+        mobile_interruption_policy=payload.mobile_interruption_policy,
+        allow_device_recovery=payload.allow_device_recovery,
+        block_rooted_devices=payload.block_rooted_devices,
     )
     return pub_service.update_quiz_configuration(db, quiz_id, patch_req, admin)
 
