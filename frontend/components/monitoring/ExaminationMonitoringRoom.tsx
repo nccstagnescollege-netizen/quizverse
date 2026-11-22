@@ -39,6 +39,7 @@ import {
   ProctoringAlert,
 } from '@/services/aiProctoringService';
 import { ProctoringIncidentReviewModal } from './ProctoringIncidentReviewModal';
+import { IncidentManagementCenter } from './IncidentManagementCenter';
 import {
   monitoringService,
   ExaminationMonitoringRoomResponse,
@@ -741,67 +742,25 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
         </div>
       )}
 
-      {/* Tab 4: Incidents */}
+      {/* Tab 4: Incidents & Centralized Interruption Management */}
       {activeTab === 'incidents' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-white">Examination Incidents & Support Tickets</h2>
+            <div>
+              <h2 className="text-sm font-bold text-white">Examination Incidents & Interruption Management</h2>
+              <p className="text-xs text-slate-400">
+                Audit mobile calls, app switching, desktop focus loss, network interruptions, and invigilator actions.
+              </p>
+            </div>
             <button
               onClick={() => setShowCreateIncidentModal(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-colors flex items-center gap-1.5 shadow-lg shadow-rose-600/20"
             >
               <Plus className="w-3.5 h-3.5" /> File Incident Report
             </button>
           </div>
 
-          <div className="space-y-3">
-            {incidents.length === 0 ? (
-              <div className="p-8 rounded-2xl bg-surface-card border border-surface-border text-center text-slate-400 text-xs">
-                No incidents reported. All examination stations running smoothly.
-              </div>
-            ) : (
-              incidents.map((inc) => (
-                <div key={inc.id} className="p-4 rounded-2xl bg-surface-card border border-surface-border space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-cyan-400 font-semibold">{inc.incident_code}</span>
-                      <span
-                        className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                          inc.severity === 'critical'
-                            ? 'bg-rose-600 text-white'
-                            : inc.severity === 'high'
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {inc.severity}
-                      </span>
-                      <span className="text-xs font-bold text-white">{inc.title}</span>
-                    </div>
-                    <span
-                      className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
-                        inc.status === 'RESOLVED' || inc.status === 'CLOSED'
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                      }`}
-                    >
-                      {inc.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300">{inc.description}</p>
-                  {inc.resolution_notes && (
-                    <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300">
-                      Resolution: {inc.resolution_notes}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
-                    <span>Category: {inc.category.replace('_', ' ')}</span>
-                    <span>Reported by: {inc.reported_by_name || 'Invigilator'}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <IncidentManagementCenter quizId={quizId} adminToken={token} />
         </div>
       )}
 

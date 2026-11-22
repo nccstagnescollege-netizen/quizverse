@@ -25,6 +25,7 @@ from backend.app.api.v1.endpoints import (
     mobile_exam,
     desktop_exam,
     proctoring,
+    interruption,
 )
 
 api_router = APIRouter()
@@ -192,6 +193,13 @@ api_router.include_router(
     proctoring.router,
     prefix="/proctoring",
     tags=["Advanced AI-Assisted Live Proctoring"],
+)
+
+# 20. Calls, Notifications, Interruptions & Incident Management (Phase 27)
+api_router.include_router(
+    interruption.router,
+    prefix="/interruption",
+    tags=["Calls, Notifications, Interruptions & Incident Management"],
 )
 
 

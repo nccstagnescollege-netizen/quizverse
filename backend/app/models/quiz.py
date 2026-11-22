@@ -373,6 +373,15 @@ class QuizConfiguration(Base):
     recording_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     recording_retention_days = Column(Integer, nullable=False, default=30, server_default=text("30"))
 
+    # 10. Examination Interruption & Incident Management Policies (Phase 27)
+    interruption_handling_policy = Column(String(32), nullable=False, default="continue_with_warning", server_default=text("'continue_with_warning'"))  # continue, continue_with_warning, pause_local, pause_pending_review, strict_terminate
+    allow_call_recovery = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    max_call_interruptions = Column(Integer, nullable=False, default=3, server_default=text("3"))
+    call_grace_seconds = Column(Integer, nullable=False, default=60, server_default=text("60"))
+    require_device_prep_acknowledgment = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    auto_pause_on_disconnect = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    revalidation_code_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
 

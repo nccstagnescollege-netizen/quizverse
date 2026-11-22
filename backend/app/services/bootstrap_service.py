@@ -1066,6 +1066,14 @@ def ensure_quiz_configuration_schema_exists(db: Session) -> None:
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS human_review_required BOOLEAN NOT NULL DEFAULT true;",
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS recording_enabled BOOLEAN NOT NULL DEFAULT false;",
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS recording_retention_days INTEGER NOT NULL DEFAULT 30;",
+                # Phase 27 - Examination Interruption & Incident Management Policies
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS interruption_handling_policy VARCHAR(32) NOT NULL DEFAULT 'continue_with_warning';",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS allow_call_recovery BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS max_call_interruptions INTEGER NOT NULL DEFAULT 3;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS call_grace_seconds INTEGER NOT NULL DEFAULT 60;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_device_prep_acknowledgment BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS auto_pause_on_disconnect BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS revalidation_code_required BOOLEAN NOT NULL DEFAULT false;",
             ]
             for stmt in ddl_statements:
                 try:
@@ -1478,6 +1486,122 @@ def ensure_proctoring_schema_exists(db: Session) -> None:
         db.rollback()
 
 
+def ensure_interruption_schema_exists(db: Session) -> None:
+    """
+    Phase 27: Calls, Notifications, Interruptions & Incident Management Schema Migration.
+    Idempotently upgrades examination_incidents and creates incident_timeline_events,
+    device_preparation_logs, and interruption_recovery_sessions tables and indexes.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        is_postgres = bind.dialect.name == "postgresql"
+        uuid_type = "UUID" if is_postgres else "VARCHAR(36)"
+        json_type = "JSONB" if is_postgres else "TEXT"
+
+        # 1. Upgrade examination_incidents with Phase 27 columns
+        inc_cols = [
+            "ALTER TABLE examination_incidents ADD COLUMN IF NOT EXISTS severity_level INTEGER NOT NULL DEFAULT 2;",
+            "ALTER TABLE examination_incidents ADD COLUMN IF NOT EXISTS event_source VARCHAR(32) NOT NULL DEFAULT 'CLIENT_REPORTED';",
+            "ALTER TABLE examination_incidents ADD COLUMN IF NOT EXISTS recovery_state VARCHAR(32) NOT NULL DEFAULT 'ACTIVE_INTERRUPTED';",
+            "ALTER TABLE examination_incidents ADD COLUMN IF NOT EXISTS duration_seconds INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE examination_incidents ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(128);",
+            f"ALTER TABLE examination_incidents ADD COLUMN IF NOT EXISTS interruption_metadata {json_type};",
+            "CREATE INDEX IF NOT EXISTS ix_examination_incidents_severity_level ON examination_incidents(severity_level);",
+            "CREATE INDEX IF NOT EXISTS ix_examination_incidents_idempotency_key ON examination_incidents(idempotency_key);",
+        ]
+        for stmt in inc_cols:
+            try:
+                db.execute(text(stmt))
+            except Exception as ex:
+                logger.debug(f"examination_incidents statement note: {ex}")
+        db.commit()
+
+        # 2. Create incident_timeline_events table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS incident_timeline_events (
+                    id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    attempt_id {uuid_type} NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    incident_id {uuid_type} REFERENCES examination_incidents(id) ON DELETE SET NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    event_source VARCHAR(32) NOT NULL DEFAULT 'CLIENT_REPORTED',
+                    severity_level INTEGER NOT NULL DEFAULT 1,
+                    duration_seconds INTEGER NOT NULL DEFAULT 0,
+                    details {json_type},
+                    client_timestamp TIMESTAMPTZ,
+                    server_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    idempotency_key VARCHAR(128)
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_timeline_quiz_id ON incident_timeline_events(quiz_id);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_timeline_attempt_id ON incident_timeline_events(attempt_id);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_timeline_event_type ON incident_timeline_events(event_type);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_timeline_attempt_server_time ON incident_timeline_events(attempt_id, server_timestamp);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_timeline_idempotency ON incident_timeline_events(idempotency_key);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"incident_timeline_events table creation note: {ex}")
+            db.rollback()
+
+        # 3. Create device_preparation_logs table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS device_preparation_logs (
+                    id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
+                    quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    attempt_id {uuid_type} REFERENCES examination_attempts(id) ON DELETE SET NULL,
+                    battery_level INTEGER,
+                    is_charging BOOLEAN,
+                    network_type VARCHAR(32),
+                    dnd_acknowledged BOOLEAN NOT NULL DEFAULT true,
+                    notifications_muted_acknowledged BOOLEAN NOT NULL DEFAULT true,
+                    os_platform VARCHAR(32) NOT NULL,
+                    device_info {json_type},
+                    acknowledged_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_device_prep_quiz_id ON device_preparation_logs(quiz_id);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_device_prep_student_id ON device_preparation_logs(student_id);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"device_preparation_logs table creation note: {ex}")
+            db.rollback()
+
+        # 4. Create interruption_recovery_sessions table
+        try:
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS interruption_recovery_sessions (
+                    id {uuid_type} PRIMARY KEY DEFAULT gen_random_uuid(),
+                    attempt_id {uuid_type} NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    quiz_id {uuid_type} NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id {uuid_type} NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    recovery_token VARCHAR(128) NOT NULL UNIQUE,
+                    recovery_status VARCHAR(32) NOT NULL DEFAULT 'RESUMED',
+                    interruption_reason VARCHAR(64) NOT NULL,
+                    answers_synced_count INTEGER NOT NULL DEFAULT 0,
+                    server_remaining_seconds INTEGER NOT NULL DEFAULT 0,
+                    approved_by {uuid_type} REFERENCES admins(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    resolved_at TIMESTAMPTZ
+                );
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_recovery_sessions_attempt_id ON interruption_recovery_sessions(attempt_id);"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_recovery_sessions_token ON interruption_recovery_sessions(recovery_token);"))
+            db.commit()
+        except Exception as ex:
+            logger.debug(f"interruption_recovery_sessions table creation note: {ex}")
+            db.rollback()
+
+        logger.info("Phase 27 Interruption and Incident Management schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Interruption schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
 def run_all_schema_migrations(db: Session) -> Dict[str, str]:
     """
     Executes all idempotent schema upgrades in isolated try-except blocks.
@@ -1494,6 +1618,7 @@ def run_all_schema_migrations(db: Session) -> Dict[str, str]:
         ("mobile_security", ensure_mobile_security_schema_exists),
         ("desktop_security", ensure_desktop_security_schema_exists),
         ("proctoring_schema", ensure_proctoring_schema_exists),
+        ("interruption_schema", ensure_interruption_schema_exists),
         ("evaluation_schema", ensure_evaluation_schema_exists),
         ("analytics_schema", ensure_analytics_reports_schema_exists),
         ("monitoring_schema", ensure_monitoring_schema_exists),

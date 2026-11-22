@@ -108,6 +108,12 @@ class ExaminationIncident(Base):
     attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="SET NULL"), nullable=True, index=True)
     category = Column(String(64), nullable=False, index=True)  # network_issue, synchronization_failure, access_problem, session_conflict, content_problem, timing_problem, security_concern, student_support, other
     severity = Column(String(32), nullable=False, default="medium", server_default=text("'medium'"), index=True)  # low, medium, high, critical
+    severity_level = Column(Integer, nullable=False, default=2, server_default=text("2"), index=True)  # 0: Info, 1: Minor, 2: Warning, 3: Serious, 4: Critical
+    event_source = Column(String(32), nullable=False, default="CLIENT_REPORTED", server_default=text("'CLIENT_REPORTED'"))  # CLIENT_REPORTED, SERVER_VERIFIED, INVIGILATOR_REPORTED
+    recovery_state = Column(String(32), nullable=False, default="ACTIVE_INTERRUPTED", server_default=text("'ACTIVE_INTERRUPTED'"))  # ACTIVE_INTERRUPTED, RECOVERED, REQUIRES_REVALIDATION, PENDING_REVIEW, TERMINATED
+    duration_seconds = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    idempotency_key = Column(String(128), nullable=True, index=True)
+    interruption_metadata = Column(JSONType, nullable=True)
     status = Column(String(32), nullable=False, default="OPEN", server_default=text("'OPEN'"), index=True)  # OPEN, ASSIGNED, UNDER_INVESTIGATION, WAITING_FOR_RESPONSE, RESOLVED, CLOSED
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
@@ -125,6 +131,7 @@ class ExaminationIncident(Base):
     reporter = relationship("Admin", foreign_keys=[reported_by])
     assignee = relationship("Admin", foreign_keys=[assigned_to])
     notes = relationship("IncidentNote", back_populates="incident", cascade="all, delete-orphan", order_by="IncidentNote.created_at")
+    timeline_events = relationship("IncidentTimelineEvent", back_populates="incident")
 
 
 class IncidentNote(Base):

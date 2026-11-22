@@ -45,6 +45,8 @@ import { DynamicWatermark } from '@/components/exam/DynamicWatermark';
 import { CaptureSignalMonitor } from '@/components/exam/CaptureSignalMonitor';
 import { CaptureCapabilityCheck } from '@/components/exam/CaptureCapabilityCheck';
 import { LiveProctoringMonitor } from '@/components/exam/LiveProctoringMonitor';
+import { interruptionService } from '@/services/interruptionService';
+import { InterruptionRecoveryModal, InterruptionType } from '@/components/exam/InterruptionRecoveryModal';
 
 export default function ExamAttemptPage() {
   const params = useParams();
@@ -93,6 +95,12 @@ export default function ExamAttemptPage() {
   const [isExamPaused, setIsExamPaused] = useState<boolean>(false);
   const [showFullscreenModal, setShowFullscreenModal] = useState<boolean>(false);
   const lastFocusLossTimestampRef = useRef<number>(0);
+
+  // Phase 27 Interruption & Incident Management State
+  const [interruptionModalOpen, setInterruptionModalOpen] = useState<boolean>(false);
+  const [interruptionType, setInterruptionType] = useState<InterruptionType>('network_offline');
+  const [interruptionMessage, setInterruptionMessage] = useState<string | undefined>(undefined);
+  const [queuedAnswersCount, setQueuedAnswersCount] = useState<number>(0);
 
   // 0. Guard against accessing concluded examinations
   useEffect(() => {
@@ -193,36 +201,68 @@ export default function ExamAttemptPage() {
       if (pendingAnswersRaw) {
         const answersMap = JSON.parse(pendingAnswersRaw);
         const entries = Object.entries(answersMap);
-        for (const [qid, ansData] of entries) {
-          await studentExamService.saveAttemptAnswer(attId, sessToken, {
+        if (entries.length > 0) {
+          const syncList = entries.map(([qid, ansData]: [string, any]) => ({
             quiz_question_id: qid,
-            selected_option_ids: (ansData as any).selected_option_ids || [],
-            text_response: (ansData as any).text_response || '',
-            is_flagged_for_review: (ansData as any).is_flagged_for_review || false,
-            time_spent_seconds: 5,
-          });
+            selected_option_ids: ansData.selected_option_ids || [],
+            text_response: ansData.text_response || '',
+            time_spent_seconds: ansData.time_spent_seconds || 5,
+            client_timestamp: new Date().toISOString(),
+            idempotency_key: `ans_${attId}_${qid}_${Date.now()}`,
+          }));
+
+          // Batch idempotent sync
+          if (attemptDetail?.quiz_id) {
+            await interruptionService.syncPendingAnswers(sessToken, {
+              attempt_id: attId,
+              quiz_id: attemptDetail.quiz_id,
+              answers: syncList,
+            });
+          }
         }
         localStorage.removeItem(`qv_pending_answers_${attId}`);
+        setQueuedAnswersCount(0);
       }
     } catch {}
-  }, []);
+  }, [attemptDetail?.quiz_id]);
 
   // 2. Network connectivity listeners
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setSyncStatus('saved');
+      setInterruptionModalOpen(false);
       if (attemptDetail && sessionToken) {
         flushOfflineQueues(attemptDetail.attempt_id, sessionToken);
         sendSecurityEvent('NETWORK', 'NETWORK_RECONNECTED');
+        interruptionService.recordInterruptionEvent(sessionToken, {
+          attempt_id: attemptDetail.attempt_id,
+          quiz_id: attemptDetail.quiz_id || attemptDetail.attempt_id,
+          event_type: 'NETWORK_ONLINE',
+          severity_level: 0,
+          idempotency_key: `net_on_${attemptDetail.attempt_id}_${Date.now()}`,
+        }).catch(() => {});
       }
     };
     const handleOffline = () => {
       setIsOnline(false);
       setSyncStatus('offline');
+      setInterruptionType('network_offline');
+      setInterruptionModalOpen(true);
+      try {
+        const pending = JSON.parse(localStorage.getItem(`qv_pending_answers_${attemptDetail?.attempt_id}`) || '{}');
+        setQueuedAnswersCount(Object.keys(pending).length);
+      } catch {}
       setSecurityWarning('Network Disconnected: Your answers are saved locally on this device and will sync automatically when reconnected.');
       if (attemptDetail && sessionToken) {
         sendSecurityEvent('NETWORK', 'NETWORK_DISCONNECTED');
+        interruptionService.recordInterruptionEvent(sessionToken, {
+          attempt_id: attemptDetail.attempt_id,
+          quiz_id: attemptDetail.quiz_id || attemptDetail.attempt_id,
+          event_type: 'NETWORK_OFFLINE',
+          severity_level: 1,
+          idempotency_key: `net_off_${attemptDetail.attempt_id}_${Date.now()}`,
+        }).catch(() => {});
       }
     };
 
@@ -294,6 +334,37 @@ export default function ExamAttemptPage() {
     }
   };
 
+  // Phase 27: Interruption Session Recovery & Offline Synchronization Handler
+  const handleSyncAndResumeFromInterruption = async () => {
+    if (!attemptDetail || !sessionToken) return;
+    try {
+      const recoveryRes = await interruptionService.recoverSession(sessionToken, {
+        attempt_id: attemptDetail.attempt_id,
+        quiz_id: attemptDetail.quiz_id || attemptDetail.attempt_id,
+        reason: interruptionType.toUpperCase(),
+        offline_answers_count: queuedAnswersCount,
+      });
+
+      if (recoveryRes.recovery_status === 'EXPIRED') {
+        router.replace(`/exam/${token}/result`);
+        return;
+      }
+
+      if (recoveryRes.server_remaining_seconds !== undefined) {
+        setRemainingSeconds(recoveryRes.server_remaining_seconds);
+      }
+
+      await flushOfflineQueues(attemptDetail.attempt_id, sessionToken);
+      setQueuedAnswersCount(0);
+      setIsExamPaused(false);
+      setInterruptionModalOpen(false);
+    } catch (err) {
+      console.error('Failed to resume from interruption', err);
+      setInterruptionModalOpen(false);
+      setIsExamPaused(false);
+    }
+  };
+
   // 2c. Phase 22 Browser Event Listeners
   useEffect(() => {
     if (!attemptDetail || !sessionToken) return;
@@ -329,6 +400,32 @@ export default function ExamAttemptPage() {
       });
 
       sendSecurityEvent('FOCUS_LOSS', source === 'blur' ? 'WINDOW_FOCUS_LOST' : 'TAB_HIDDEN', undefined, { source });
+
+      // Phase 27: Centralized Interruption Event Reporting
+      const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      const evType = isMobile ? 'APP_BACKGROUND' : 'TAB_SWITCH';
+      interruptionService.recordInterruptionEvent(sessionToken, {
+        attempt_id: attemptDetail.attempt_id,
+        quiz_id: attemptDetail.quiz_id || attemptDetail.attempt_id,
+        event_type: evType,
+        severity_level: 2,
+        idempotency_key: `evt_${attemptDetail.attempt_id}_${evType}_${now}`,
+        details: {
+          source,
+          platform: isMobile ? 'mobile' : 'desktop',
+          switch_count: tabSwitchCount + 1,
+        },
+      }).then((res) => {
+        if (res.action_required === 'EXAM_PAUSED') {
+          setIsExamPaused(true);
+          setInterruptionType(isMobile ? 'app_switched' : 'focus_lost');
+          setInterruptionModalOpen(true);
+        } else if (res.action_required === 'REVALIDATION_REQUIRED') {
+          setIsExamPaused(true);
+          setInterruptionType('revalidation_required');
+          setInterruptionModalOpen(true);
+        }
+      }).catch(() => {});
     };
 
     const handleFocusGained = (source: string) => {
@@ -1598,6 +1695,25 @@ export default function ExamAttemptPage() {
           </div>
         </div>
       )}
+      {/* Phase 27: Interruption & Session Recovery Interface */}
+      <InterruptionRecoveryModal
+        isOpen={interruptionModalOpen}
+        type={interruptionType}
+        queuedAnswersCount={queuedAnswersCount}
+        serverRemainingSeconds={remainingSeconds}
+        onSyncAndResume={handleSyncAndResumeFromInterruption}
+        onRequestAssistance={() => {
+          if (attemptDetail && sessionToken) {
+            interruptionService.recordInterruptionEvent(sessionToken, {
+              attempt_id: attemptDetail.attempt_id,
+              quiz_id: attemptDetail.quiz_id || attemptDetail.attempt_id,
+              event_type: 'ASSISTANCE_REQUESTED',
+              severity_level: 1,
+            }).catch(() => {});
+          }
+        }}
+        customMessage={interruptionMessage}
+      />
     </div>
   );
 }

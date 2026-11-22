@@ -146,6 +146,11 @@ from backend.app.models.proctoring import (
     ProctoringEvent,
     ProctoringIncidentReview,
 )
+from backend.app.models.interruption import (
+    IncidentTimelineEvent,
+    DevicePreparationLog,
+    InterruptionRecoverySession,
+)
 
 __all__ = [
     "Base",
@@ -273,4 +278,8 @@ __all__ = [
     "ProctoringSession",
     "ProctoringEvent",
     "ProctoringIncidentReview",
+    # Interruption & Incident Management (Phase 27)
+    "IncidentTimelineEvent",
+    "DevicePreparationLog",
+    "InterruptionRecoverySession",
 ]

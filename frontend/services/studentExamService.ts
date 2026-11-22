@@ -157,6 +157,7 @@ export interface StudentSavedAnswer {
 
 export interface StudentAttemptDetail {
   attempt_id: string;
+  quiz_id?: string;
   quiz_title: string;
   subject_name?: string | null;
   student_name: string;

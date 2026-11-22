@@ -32,6 +32,7 @@ import { BrowserCompatibilityCheck } from '@/components/exam/BrowserCompatibilit
 import { WatermarkStatusIndicator } from '@/components/exam/WatermarkStatusIndicator';
 import { SEBCompatibilityCheck } from '@/components/desktop-security/SEBCompatibilityCheck';
 import { PreExamProctoringCheck } from '@/components/exam/PreExamProctoringCheck';
+import { DevicePreparationCheck } from '@/components/exam/DevicePreparationCheck';
 
 export default function ExamLandingPage() {
   const params = useParams();
@@ -48,6 +49,7 @@ export default function ExamLandingPage() {
   const [sebMode, setSebMode] = useState('standard_browser');
   const [proctoringCheckPassed, setProctoringCheckPassed] = useState(false);
   const [proctoringCaps, setProctoringCaps] = useState<any>(null);
+  const [devicePrepPassed, setDevicePrepPassed] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && token) {
@@ -383,6 +385,17 @@ export default function ExamLandingPage() {
                   if (typeof window !== 'undefined') {
                     localStorage.setItem(`qv_proctor_caps_${token}`, JSON.stringify(caps));
                   }
+                }}
+              />
+            )}
+
+            {/* Phase 27: Pre-Flight Device Preparation & Interruption Management */}
+            {details?.quiz_id && (
+              <DevicePreparationCheck
+                quizId={details.quiz_id}
+                sessionToken={token}
+                onCompleted={() => {
+                  setDevicePrepPassed(true);
                 }}
               />
             )}
