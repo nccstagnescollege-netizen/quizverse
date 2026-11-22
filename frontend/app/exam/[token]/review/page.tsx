@@ -145,15 +145,25 @@ export default function ExamReviewPage() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <ThemeToggle size="sm" showDropdown />
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href={`/exam/${token}/attempt`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-xs text-foreground transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated hover:bg-surface-border border border-surface-border text-xs text-foreground transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Return to Questions</span>
+              <span className="hidden sm:inline">Return to Questions</span>
+              <span className="sm:hidden">Edit</span>
             </Link>
+
+            <button
+              onClick={() => setShowConfirmModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Submit</span>
+            </button>
+
+            <ThemeToggle size="sm" showDropdown />
           </div>
         </div>
 
@@ -332,6 +342,25 @@ export default function ExamReviewPage() {
           </div>
         </div>
       )}
+
+      {/* Mobile Sticky Bottom Submit Bar */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 p-3 bg-surface-base/95 backdrop-blur-md border-t border-surface-border shadow-2xl flex items-center justify-between gap-3">
+        <Link
+          href={`/exam/${token}/attempt`}
+          className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-elevated border border-surface-border text-xs font-medium text-foreground shrink-0"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Edit</span>
+        </Link>
+
+        <button
+          onClick={() => setShowConfirmModal(true)}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 active:scale-95 transition-all cursor-pointer"
+        >
+          <Send className="w-3.5 h-3.5" />
+          <span>Submit Examination Now</span>
+        </button>
+      </div>
     </div>
   );
 }

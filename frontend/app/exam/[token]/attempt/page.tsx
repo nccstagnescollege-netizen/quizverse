@@ -847,6 +847,9 @@ export default function ExamAttemptPage() {
     is_flagged_for_review: false,
   };
   const isAnswered = currentAnswer.selected_option_ids.length > 0 || currentAnswer.text_response.trim().length > 0;
+  const isLastQuestion =
+    currentSectionIndex === sections.length - 1 &&
+    currentQuestionIndex === sectionQuestions.length - 1;
 
   return (
     <div className="min-h-screen bg-surface-base text-foreground flex flex-col justify-between selection:bg-primary-500/30 relative">
@@ -1006,6 +1009,16 @@ export default function ExamAttemptPage() {
               <Menu className="w-4 h-4" />
               <span>Palette</span>
             </button>
+
+            {/* Mobile Top Submit Examination Button */}
+            <Link
+              href={`/exam/${token}/review`}
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold lg:hidden flex items-center gap-1 shadow-md shadow-emerald-600/30 transition-all shrink-0"
+              title="Review answers and submit exam"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Submit</span>
+            </Link>
           </div>
         </div>
       </header>
@@ -1183,26 +1196,48 @@ export default function ExamAttemptPage() {
                 )}
               </div>
 
-              {/* Prev / Next Controls */}
+              {/* Prev / Next / Submit Controls */}
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 {attemptDetail.allow_previous_nav && (
                   <button
                     onClick={handlePrevQuestion}
                     disabled={currentQuestionIndex === 0 && currentSectionIndex === 0}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-elevated hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed border border-surface-border text-xs text-white font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-elevated hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed border border-surface-border text-xs text-white font-medium transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     <span>Previous</span>
                   </button>
                 )}
 
-                <button
-                  onClick={handleNextQuestion}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-xs font-semibold text-white shadow-md shadow-primary-500/20 transition-all"
-                >
-                  <span>Next Question</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                {!isLastQuestion ? (
+                  <button
+                    onClick={handleNextQuestion}
+                    className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-xs font-semibold text-white shadow-md shadow-primary-500/20 transition-all cursor-pointer"
+                  >
+                    <span>Next Question</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <Link
+                    href={`/exam/${token}/review`}
+                    className="inline-flex items-center gap-2 px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-xs font-bold text-white shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-500/40 transition-all cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Submit Examination</span>
+                  </Link>
+                )}
+
+                {/* Direct submit shortcut visible on mobile and desktop */}
+                {!isLastQuestion && (
+                  <Link
+                    href={`/exam/${token}/review`}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition-colors cursor-pointer"
+                    title="Review answers & finalize submission"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Submit</span>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -1307,6 +1342,55 @@ export default function ExamAttemptPage() {
         </aside>
       </main>
 
+      {/* Mobile Sticky Bottom Submission Bar */}
+      <div className="lg:hidden sticky bottom-0 left-0 right-0 z-30 p-3 bg-surface-base/95 backdrop-blur-md border-t border-surface-border flex items-center justify-between gap-2 shadow-2xl">
+        <button
+          type="button"
+          onClick={() => setIsMobilePaletteOpen(true)}
+          className="px-2.5 py-1.5 rounded-xl bg-surface-elevated border border-surface-border text-xs text-slate-300 font-medium flex items-center gap-1.5 shrink-0"
+        >
+          <Layers className="w-3.5 h-3.5 text-primary-400" />
+          <span>Palette ({answeredCount}/{allQuestions.length})</span>
+        </button>
+
+        <div className="flex items-center gap-1.5">
+          {attemptDetail.allow_previous_nav && (
+            <button
+              type="button"
+              onClick={handlePrevQuestion}
+              disabled={currentQuestionIndex === 0 && currentSectionIndex === 0}
+              className="p-2 rounded-xl bg-surface-elevated disabled:opacity-30 border border-surface-border text-xs text-white"
+              title="Previous Question"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+
+          {!isLastQuestion && (
+            <button
+              type="button"
+              onClick={handleNextQuestion}
+              className="px-3 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-xs font-semibold text-white shadow-md flex items-center gap-1"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          <Link
+            href={`/exam/${token}/review`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-lg flex items-center gap-1.5 transition-all ${
+              isLastQuestion
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-500/30 ring-2 ring-emerald-400/40 animate-pulse'
+                : 'bg-emerald-600 hover:bg-emerald-500'
+            }`}
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{isLastQuestion ? 'Submit Exam' : 'Submit'}</span>
+          </Link>
+        </div>
+      </div>
+
       {/* 3. Mobile Question Palette Drawer Modal */}
       {isMobilePaletteOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md lg:hidden flex justify-end">
@@ -1353,12 +1437,17 @@ export default function ExamAttemptPage() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-surface-border">
+            <div className="pt-4 border-t border-surface-border space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span>Total Answered:</span>
+                <span className="font-bold text-emerald-400">{answeredCount} of {allQuestions.length}</span>
+              </div>
               <Link
                 href={`/exam/${token}/review`}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary-600 text-white text-xs font-semibold"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 transition-all text-center"
               >
-                <span>Proceed to Review</span>
+                <Send className="w-3.5 h-3.5" />
+                <span>Submit Examination</span>
               </Link>
             </div>
           </div>
