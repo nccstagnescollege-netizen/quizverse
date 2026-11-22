@@ -1070,8 +1070,26 @@ class StudentExamService:
             "recording_enabled": bool(getattr(cfg, "recording_enabled", False)),
         }
 
+        proctoring_dict = {
+            "webcam_monitoring_enabled": bool(getattr(cfg, "webcam_monitoring_enabled", False)),
+            "microphone_monitoring_enabled": bool(getattr(cfg, "microphone_monitoring_enabled", False)),
+            "face_presence_detection": bool(getattr(cfg, "face_presence_detection", False)),
+            "multiple_person_detection": bool(getattr(cfg, "multiple_person_detection", False)),
+            "head_position_detection": bool(getattr(cfg, "head_position_detection", False)),
+            "audio_anomaly_detection": bool(getattr(cfg, "audio_anomaly_detection", False)),
+            "proctoring_mandatory": bool(getattr(cfg, "proctoring_mandatory", False)),
+            "webcam_permission_required": bool(getattr(cfg, "webcam_permission_required", False)),
+            "microphone_permission_required": bool(getattr(cfg, "microphone_permission_required", False)),
+            "monitoring_interval_seconds": int(getattr(cfg, "monitoring_interval_seconds", 10)),
+            "risk_warning_threshold": int(getattr(cfg, "risk_warning_threshold", 50)),
+            "risk_critical_threshold": int(getattr(cfg, "risk_critical_threshold", 80)),
+            "human_review_required": bool(getattr(cfg, "human_review_required", True)),
+            "recording_enabled": bool(getattr(cfg, "recording_enabled", False)),
+        } if cfg else None
+
         return StudentAttemptDetailResponse(
             attempt_id=attempt.id,
+            quiz_id=quiz.id,
             quiz_title=quiz.title,
             subject_name=quiz.subject.subject_name if quiz.subject else None,
             student_name=attempt.student.full_name,
@@ -1091,6 +1109,7 @@ class StudentExamService:
             answers=answers_dict,
             watermark_text=watermark_str,
             security_policy=policy_dict,
+            proctoring_policy=proctoring_dict,
             monitoring_acknowledged=attempt.monitoring_acknowledged_at is not None,
         )
 

@@ -108,6 +108,7 @@ class StudentExamStartResponse(BaseModel):
 
 class StudentAttemptDetailResponse(BaseModel):
     attempt_id: uuid.UUID
+    quiz_id: Optional[uuid.UUID] = None
     quiz_title: str
     subject_name: Optional[str] = None
     student_name: str
@@ -127,6 +128,7 @@ class StudentAttemptDetailResponse(BaseModel):
     answers: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     watermark_text: Optional[str] = None
     security_policy: Optional[Dict[str, Any]] = None
+    proctoring_policy: Optional[Dict[str, Any]] = None
     monitoring_acknowledged: bool = False
 
 

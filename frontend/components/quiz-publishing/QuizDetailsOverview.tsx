@@ -25,8 +25,14 @@ import {
   RefreshCw,
   Award,
   HelpCircle,
+  Video,
+  Mic,
+  Eye,
+  ShieldCheck,
+  Power,
 } from 'lucide-react';
 import { manualQuizService, QuizEditorResponse } from '@/services/manualQuizService';
+import { aiProctoringService, ProctoringPolicy } from '@/services/aiProctoringService';
 
 interface QuizDetailsOverviewProps {
   quizId: string;
@@ -41,19 +47,52 @@ export function QuizDetailsOverview({ quizId, basePath, token }: QuizDetailsOver
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'sections' | 'questions' | 'security'>('sections');
   const [copiedId, setCopiedId] = useState(false);
+  const [proctoringPolicy, setProctoringPolicy] = useState<ProctoringPolicy | null>(null);
+  const [togglingAI, setTogglingAI] = useState(false);
+  const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await manualQuizService.getEditorState(quizId, token);
+      const [res, proc] = await Promise.all([
+        manualQuizService.getEditorState(quizId, token),
+        aiProctoringService.getProctoringPolicy(quizId).catch(() => null),
+      ]);
       setData(res);
+      if (proc) setProctoringPolicy(proc);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load quiz details.');
     } finally {
       setLoading(false);
     }
   }, [quizId, token]);
+
+  const handleToggleAI = async (activate: boolean) => {
+    setTogglingAI(true);
+    setAiSuccessMsg(null);
+    try {
+      const updated = await aiProctoringService.updateProctoringPolicy(token, quizId, {
+        webcam_monitoring_enabled: activate,
+        microphone_monitoring_enabled: activate,
+        face_presence_detection: activate,
+        multiple_person_detection: activate,
+        head_position_detection: activate,
+        audio_anomaly_detection: activate,
+        proctoring_mandatory: activate,
+        webcam_permission_required: activate,
+        microphone_permission_required: activate,
+        human_review_required: true,
+      });
+      setProctoringPolicy(updated);
+      setAiSuccessMsg(activate ? 'AI Live Proctoring activated successfully!' : 'AI Live Proctoring deactivated.');
+      setTimeout(() => setAiSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update AI proctoring configuration');
+    } finally {
+      setTogglingAI(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -537,6 +576,82 @@ export function QuizDetailsOverview({ quizId, basePath, token }: QuizDetailsOver
                 <p className="text-xs text-slate-400 mt-1">
                   QUIZVERSE provides a multi-layer examination defense architecture. Configure these options in the Publishing Wizard.
                 </p>
+              </div>
+
+              {/* Primary AI Proctoring Activation Card */}
+              {aiSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>{aiSuccessMsg}</span>
+                </div>
+              )}
+
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-surface-elevated to-slate-900 border border-purple-500/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+                        <Video className="w-4 h-4" />
+                      </div>
+                      <h5 className="text-sm font-bold text-white">Advanced AI-Assisted Live Proctoring</h5>
+                      {proctoringPolicy?.webcam_monitoring_enabled || proctoringPolicy?.microphone_monitoring_enabled ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          AI Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-semibold text-slate-400">
+                          <Power className="w-3 h-3 text-slate-400" />
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      Real-time camera &amp; microphone telemetry: face presence/absence, multiple person detection, head orientation, and speech anomaly classification.
+                    </p>
+                  </div>
+
+                  <div>
+                    {proctoringPolicy?.webcam_monitoring_enabled || proctoringPolicy?.microphone_monitoring_enabled ? (
+                      <button
+                        onClick={() => handleToggleAI(false)}
+                        disabled={togglingAI}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs font-semibold text-rose-300 transition-colors disabled:opacity-50"
+                      >
+                        <Power className="w-3.5 h-3.5" />
+                        <span>{togglingAI ? 'Deactivating...' : 'Deactivate AI Proctoring'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleAI(true)}
+                        disabled={togglingAI}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-semibold text-white shadow-lg shadow-purple-900/30 transition-all disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>{togglingAI ? 'Activating...' : 'Activate AI Proctoring'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-2 border-t border-purple-900/40 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Video className={`w-3.5 h-3.5 ${proctoringPolicy?.webcam_monitoring_enabled ? 'text-emerald-400' : 'text-slate-500'}`} />
+                    <span>Webcam Video: {proctoringPolicy?.webcam_monitoring_enabled ? 'ON' : 'OFF'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Mic className={`w-3.5 h-3.5 ${proctoringPolicy?.microphone_monitoring_enabled ? 'text-emerald-400' : 'text-slate-500'}`} />
+                    <span>Microphone: {proctoringPolicy?.microphone_monitoring_enabled ? 'ON' : 'OFF'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Eye className={`w-3.5 h-3.5 ${proctoringPolicy?.face_presence_detection ? 'text-emerald-400' : 'text-slate-500'}`} />
+                    <span>Face Presence: {proctoringPolicy?.face_presence_detection ? 'ON' : 'OFF'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <ShieldCheck className={`w-3.5 h-3.5 ${proctoringPolicy?.multiple_person_detection ? 'text-emerald-400' : 'text-slate-500'}`} />
+                    <span>Multi-Person: {proctoringPolicy?.multiple_person_detection ? 'ON' : 'OFF'}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
