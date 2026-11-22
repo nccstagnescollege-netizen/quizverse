@@ -373,6 +373,14 @@ class QuizConfiguration(Base):
     recording_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     recording_retention_days = Column(Integer, nullable=False, default=30, server_default=text("30"))
 
+    # Phase 32 - Per-Quiz Webcam & Microphone Recording with Secure Supabase Storage
+    recording_storage_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))  # Master switch
+    webcam_recording_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    microphone_recording_enabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    recording_quality = Column(String(32), nullable=False, default="standard", server_default=text("'standard'"))  # standard, high, bandwidth_optimized
+    allow_invigilator_recording_access = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    allow_admin_recording_download = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+
     # 10. Examination Interruption & Incident Management Policies (Phase 27)
     interruption_handling_policy = Column(String(32), nullable=False, default="continue_with_warning", server_default=text("'continue_with_warning'"))  # continue, continue_with_warning, pause_local, pause_pending_review, strict_terminate
     allow_call_recovery = Column(Boolean, nullable=False, default=True, server_default=text("true"))

@@ -35,6 +35,7 @@ import {
   QuizValidationReport,
 } from '@/services/quizPublishingService';
 import { ValidationReportModal, PublishModal } from './PublishingModals';
+import { QuizRecordingSettingsSection } from '@/components/quiz/QuizRecordingSettingsSection';
 
 interface QuizConfigurationWizardProps {
   quizId: string;
@@ -1322,6 +1323,20 @@ export function QuizConfigurationWizard({ quizId, basePath, token }: QuizConfigu
                 </div>
               </div>
             </div>
+
+            {/* Phase 32: Per-Quiz Webcam & Microphone Recording with Secure Supabase Storage */}
+            <QuizRecordingSettingsSection
+              recordingStorageEnabled={Boolean(config.recording_storage_enabled ?? false)}
+              webcamRecordingEnabled={Boolean(config.webcam_recording_enabled ?? false)}
+              microphoneRecordingEnabled={Boolean(config.microphone_recording_enabled ?? false)}
+              recordingQuality={config.recording_quality || 'standard'}
+              recordingRetentionDays={config.recording_retention_days ?? 30}
+              allowInvigilatorAccess={config.allow_invigilator_recording_access ?? true}
+              allowAdminDownload={config.allow_admin_recording_download ?? true}
+              quizDurationMinutes={quizDetails?.duration_minutes || 60}
+              estimatedStudents={quizDetails?.total_enrolled || 50}
+              onChange={(field, value) => updateField(field as any, value)}
+            />
           </div>
         )}
 

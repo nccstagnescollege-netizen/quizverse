@@ -1582,12 +1582,13 @@ export default function ExamAttemptPage() {
         </>
       )}
 
-      {/* Phase 26: Advanced AI-Assisted Live Proctoring Monitor */}
+      {/* Phase 26 & Phase 32: Advanced AI-Assisted Live Proctoring & Stream Recording */}
       {attemptDetail?.attempt_id && attemptDetail.proctoring_policy && (
         <LiveProctoringMonitor
           attemptId={attemptDetail.attempt_id}
           policy={attemptDetail.proctoring_policy as any}
           isAccommodated={Boolean(attemptDetail.proctoring_policy?.is_accommodated_exempt)}
+          studentToken={sessionToken || token}
         />
       )}
 

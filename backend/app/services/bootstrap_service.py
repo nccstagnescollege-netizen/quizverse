@@ -1193,6 +1193,13 @@ def ensure_quiz_configuration_schema_exists(db: Session) -> None:
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS require_device_prep_acknowledgment BOOLEAN NOT NULL DEFAULT true;",
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS auto_pause_on_disconnect BOOLEAN NOT NULL DEFAULT false;",
                 "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS revalidation_code_required BOOLEAN NOT NULL DEFAULT false;",
+                # Phase 32 - Per-Quiz Webcam & Microphone Recording with Secure Supabase Storage
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS recording_storage_enabled BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS webcam_recording_enabled BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS microphone_recording_enabled BOOLEAN NOT NULL DEFAULT false;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS recording_quality VARCHAR(32) NOT NULL DEFAULT 'standard';",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS allow_invigilator_recording_access BOOLEAN NOT NULL DEFAULT true;",
+                "ALTER TABLE quiz_configurations ADD COLUMN IF NOT EXISTS allow_admin_recording_download BOOLEAN NOT NULL DEFAULT true;",
             ]
             for stmt in ddl_statements:
                 try:
@@ -1986,6 +1993,96 @@ def ensure_anti_cheating_control_center_schema_exists(db: Session) -> None:
         db.rollback()
 
 
+def ensure_recording_schema_exists(db: Session) -> None:
+    """
+    Idempotent schema upgrade ensuring Phase 32 Examination Recording & Supabase Storage tables exist in PostgreSQL.
+    """
+    from sqlalchemy import text
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # 1. Exam Recordings
+                """
+                CREATE TABLE IF NOT EXISTS exam_recordings (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    institution_id UUID,
+                    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    attempt_id UUID NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+                    session_id UUID REFERENCES media_participant_sessions(id) ON DELETE SET NULL,
+                    bucket_name VARCHAR(64) NOT NULL DEFAULT 'quiz-recordings',
+                    storage_object_path VARCHAR(512),
+                    file_name VARCHAR(255),
+                    mime_type VARCHAR(64) NOT NULL DEFAULT 'video/webm',
+                    file_size_bytes BIGINT NOT NULL DEFAULT 0,
+                    duration_seconds INTEGER NOT NULL DEFAULT 0,
+                    recording_status VARCHAR(32) NOT NULL DEFAULT 'NOT_STARTED',
+                    webcam_recorded BOOLEAN NOT NULL DEFAULT false,
+                    microphone_recorded BOOLEAN NOT NULL DEFAULT false,
+                    recording_quality VARCHAR(32) NOT NULL DEFAULT 'standard',
+                    started_at TIMESTAMPTZ,
+                    completed_at TIMESTAMPTZ,
+                    uploaded_at TIMESTAMPTZ,
+                    checksum VARCHAR(128),
+                    retention_expires_at TIMESTAMPTZ,
+                    deleted_at TIMESTAMPTZ,
+                    metadata_info JSONB,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_exam_recordings_quiz_id ON exam_recordings(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_exam_recordings_student_id ON exam_recordings(student_id);",
+                "CREATE INDEX IF NOT EXISTS ix_exam_recordings_attempt_id ON exam_recordings(attempt_id);",
+                "CREATE INDEX IF NOT EXISTS ix_exam_recordings_status ON exam_recordings(recording_status);",
+                "CREATE INDEX IF NOT EXISTS ix_exam_recordings_retention ON exam_recordings(retention_expires_at);",
+
+                # 2. Exam Recording Segments
+                """
+                CREATE TABLE IF NOT EXISTS exam_recording_segments (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    recording_id UUID NOT NULL REFERENCES exam_recordings(id) ON DELETE CASCADE,
+                    segment_index INTEGER NOT NULL DEFAULT 0,
+                    storage_object_path VARCHAR(512) NOT NULL,
+                    file_size_bytes BIGINT NOT NULL DEFAULT 0,
+                    duration_seconds INTEGER NOT NULL DEFAULT 0,
+                    checksum VARCHAR(128),
+                    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_exam_recording_segments_recording_id ON exam_recording_segments(recording_id);",
+
+                # 3. Exam Recording Audit Logs
+                """
+                CREATE TABLE IF NOT EXISTS exam_recording_audit_logs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    recording_id UUID REFERENCES exam_recordings(id) ON DELETE CASCADE,
+                    quiz_id UUID REFERENCES quizzes(id) ON DELETE CASCADE,
+                    actor_id UUID,
+                    actor_type VARCHAR(32) NOT NULL DEFAULT 'admin',
+                    action VARCHAR(64) NOT NULL,
+                    details JSONB,
+                    ip_address VARCHAR(45),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS ix_exam_recording_audit_logs_recording_id ON exam_recording_audit_logs(recording_id);",
+                "CREATE INDEX IF NOT EXISTS ix_exam_recording_audit_logs_quiz_id ON exam_recording_audit_logs(quiz_id);",
+                "CREATE INDEX IF NOT EXISTS ix_exam_recording_audit_logs_action ON exam_recording_audit_logs(action);",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"Recording schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 32 Exam Recording schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Exam Recording schema upgrade encountered non-fatal error: {e}")
+        db.rollback()
+
+
 def ensure_supabase_rls_security_policies_exist(db: Session) -> None:
     """
     Phase 29 - Advanced Security Validation & Database Hardening:
@@ -2021,6 +2118,9 @@ def ensure_supabase_rls_security_policies_exist(db: Session) -> None:
         "media_participant_sessions",
         "media_device_status_events",
         "student_monitoring_consents",
+        "exam_recordings",
+        "exam_recording_segments",
+        "exam_recording_audit_logs",
     ]
 
     for tbl in protected_tables:
@@ -2075,6 +2175,7 @@ def run_all_schema_migrations(db: Session) -> Dict[str, str]:
         ("system_audit_schema", ensure_system_audit_schema_exists),
         ("deployment_schema", ensure_deployment_schema_exists),
         ("quiz_generator_schema", ensure_quiz_generator_schema_exists),
+        ("recording_schema", ensure_recording_schema_exists),
         ("supabase_rls_security", ensure_supabase_rls_security_policies_exist),
     ]
 

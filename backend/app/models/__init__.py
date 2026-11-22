@@ -157,6 +157,11 @@ from backend.app.models.control_center import (
     SecurityAuditEvent,
     PrivacyRetentionPolicy,
 )
+from backend.app.models.recording import (
+    ExamRecording,
+    ExamRecordingSegment,
+    ExamRecordingAuditLog,
+)
 
 __all__ = [
     "Base",
@@ -293,4 +298,8 @@ __all__ = [
     "SecurityAlertRule",
     "SecurityAuditEvent",
     "PrivacyRetentionPolicy",
+    # Examination Recordings & Storage (Phase 32)
+    "ExamRecording",
+    "ExamRecordingSegment",
+    "ExamRecordingAuditLog",
 ]

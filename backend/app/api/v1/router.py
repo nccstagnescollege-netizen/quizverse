@@ -27,6 +27,7 @@ from backend.app.api.v1.endpoints import (
     proctoring,
     interruption,
     control_center,
+    recording,
 )
 
 api_router = APIRouter()
@@ -219,6 +220,13 @@ api_router.include_router(
     prefix="/security-center",
     tags=["Centralized Anti-Cheating Control Center"],
 )
+
+# 22. Per-Quiz Webcam & Microphone Recording & Storage (Phase 32)
+api_router.include_router(
+    recording.router,
+    tags=["Examination Recordings & Storage"],
+)
+
 
 
 

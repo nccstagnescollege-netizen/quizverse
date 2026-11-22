@@ -87,6 +87,11 @@ export interface StudentExamLandingDetails {
     recording_policy: string;
     is_accommodated_exempt?: boolean;
     privacy_disclosure?: string;
+    recording_storage_enabled?: boolean;
+    webcam_recording_enabled?: boolean;
+    microphone_recording_enabled?: boolean;
+    recording_quality?: string;
+    recording_retention_days?: number;
   } | null;
 }
 
@@ -222,6 +227,11 @@ export interface StudentAttemptDetail {
     recording_policy: string;
     is_accommodated_exempt?: boolean;
     privacy_disclosure?: string;
+    recording_storage_enabled?: boolean;
+    webcam_recording_enabled?: boolean;
+    microphone_recording_enabled?: boolean;
+    recording_quality?: string;
+    recording_retention_days?: number;
   } | null;
   monitoring_acknowledged?: boolean;
 }

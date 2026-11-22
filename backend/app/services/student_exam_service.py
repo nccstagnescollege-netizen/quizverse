@@ -473,6 +473,11 @@ class StudentExamService:
                 "risk_critical_threshold": int(getattr(cfg, "risk_critical_threshold", 80)),
                 "human_review_required": bool(getattr(cfg, "human_review_required", True)),
                 "recording_enabled": bool(getattr(cfg, "recording_enabled", False)),
+                "recording_storage_enabled": bool(getattr(cfg, "recording_storage_enabled", False)),
+                "webcam_recording_enabled": bool(getattr(cfg, "webcam_recording_enabled", False)),
+                "microphone_recording_enabled": bool(getattr(cfg, "microphone_recording_enabled", False)),
+                "recording_quality": getattr(cfg, "recording_quality", "standard") or "standard",
+                "recording_retention_days": int(getattr(cfg, "recording_retention_days", 30) or 30),
             } if cfg else None,
             security_policy={
                 "enforce_fullscreen": bool(getattr(cfg, "enforce_fullscreen", False)),
@@ -1085,6 +1090,11 @@ class StudentExamService:
             "risk_critical_threshold": int(getattr(cfg, "risk_critical_threshold", 80)),
             "human_review_required": bool(getattr(cfg, "human_review_required", True)),
             "recording_enabled": bool(getattr(cfg, "recording_enabled", False)),
+            "recording_storage_enabled": bool(getattr(cfg, "recording_storage_enabled", False)),
+            "webcam_recording_enabled": bool(getattr(cfg, "webcam_recording_enabled", False)),
+            "microphone_recording_enabled": bool(getattr(cfg, "microphone_recording_enabled", False)),
+            "recording_quality": getattr(cfg, "recording_quality", "standard") or "standard",
+            "recording_retention_days": int(getattr(cfg, "recording_retention_days", 30) or 30),
         } if cfg else None
 
         return StudentAttemptDetailResponse(

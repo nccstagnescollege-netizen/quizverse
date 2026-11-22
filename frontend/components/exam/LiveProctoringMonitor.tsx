@@ -25,12 +25,19 @@ import {
   AudioAnalysisResult,
 } from '@/services/aiProctoringService';
 import { monitoringService } from '@/services/monitoringService';
+import { recordingService } from '@/services/recordingService';
 
 interface LiveProctoringMonitorProps {
   attemptId: string;
-  policy: ProctoringPolicy;
+  policy: ProctoringPolicy & {
+    recording_storage_enabled?: boolean;
+    webcam_recording_enabled?: boolean;
+    microphone_recording_enabled?: boolean;
+    recording_quality?: string;
+  };
   sessionId?: string | null;
   isAccommodated?: boolean;
+  studentToken?: string;
 }
 
 export function LiveProctoringMonitor({
@@ -38,6 +45,7 @@ export function LiveProctoringMonitor({
   policy,
   sessionId: initialSessionId,
   isAccommodated = false,
+  studentToken,
 }: LiveProctoringMonitorProps) {
   // If neither webcam nor microphone monitoring is enabled, do not render
   if (!policy.webcam_monitoring_enabled && !policy.microphone_monitoring_enabled) {
@@ -57,6 +65,20 @@ export function LiveProctoringMonitor({
   const [headState, setHeadState] = useState<'facing_screen' | 'turned_away' | 'looking_down' | 'looking_up'>('facing_screen');
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [gentleTip, setGentleTip] = useState<string | null>(null);
+
+  // Phase 32 Recording States
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [recordingDurationSeconds, setRecordingDurationSeconds] = useState<number>(0);
+  const recordingIdRef = useRef<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const formatRecDuration = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -171,6 +193,97 @@ export function LiveProctoringMonitor({
       }
     };
   }, [policy]);
+
+  // 2.1. Phase 32: Candidate Stream Recording & Private Storage
+  useEffect(() => {
+    if (!policy.recording_storage_enabled || !stream || !studentToken) {
+      return;
+    }
+
+    let isMounted = true;
+    recordedChunksRef.current = [];
+
+    let mimeType = 'video/webm;codecs=vp8,opus';
+    if (typeof MediaRecorder !== 'undefined' && !MediaRecorder.isTypeSupported(mimeType)) {
+      if (MediaRecorder.isTypeSupported('video/webm')) {
+        mimeType = 'video/webm';
+      } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+        mimeType = 'video/mp4';
+      } else {
+        mimeType = '';
+      }
+    }
+
+    let recorder: MediaRecorder | null = null;
+    let localSeconds = 0;
+
+    try {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstart = async () => {
+        if (!isMounted) return;
+        setIsRecording(true);
+        recordingTimerRef.current = setInterval(() => {
+          localSeconds += 1;
+          setRecordingDurationSeconds((prev) => prev + 1);
+        }, 1000);
+
+        try {
+          const recItem = await recordingService.startRecording(studentToken, {
+            webcam_recorded: Boolean(policy.webcam_recording_enabled),
+            microphone_recorded: Boolean(policy.microphone_recording_enabled),
+            recording_quality: policy.recording_quality || 'standard',
+          });
+          recordingIdRef.current = recItem.id;
+        } catch (e) {
+          console.warn('Candidate startRecording deferred:', e);
+        }
+      };
+
+      recorder.start(10000);
+    } catch (e) {
+      console.warn('MediaRecorder initialization failed:', e);
+    }
+
+    return () => {
+      isMounted = false;
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch {}
+      }
+
+      const currentRecId = recordingIdRef.current;
+      if (currentRecId && studentToken && recordedChunksRef.current.length > 0) {
+        const fullBlob = new Blob(recordedChunksRef.current, { type: mimeType || 'video/webm' });
+        recordingService
+          .uploadRecording(studentToken, currentRecId, fullBlob, localSeconds, 0, true)
+          .then(() => recordingService.stopRecording(studentToken, { reason: 'submission' }))
+          .catch((err) => {
+            console.warn('Exam recording upload warning (non-punitive):', err);
+          });
+      }
+      setIsRecording(false);
+    };
+  }, [
+    policy.recording_storage_enabled,
+    policy.webcam_recording_enabled,
+    policy.microphone_recording_enabled,
+    policy.recording_quality,
+    stream,
+    studentToken,
+  ]);
 
   // Connect video element when stream is ready
   useEffect(() => {
@@ -351,6 +464,13 @@ export function LiveProctoringMonitor({
               )}
             </div>
 
+            {isRecording && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-mono font-bold animate-pulse ml-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <span>REC {formatRecDuration(recordingDurationSeconds)}</span>
+              </div>
+            )}
+
             <ChevronUp className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
           </div>
         ) : (
@@ -361,6 +481,12 @@ export function LiveProctoringMonitor({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-xs font-bold text-slate-200">Live AI Proctoring</span>
+                {isRecording && (
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[9px] font-mono font-bold animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    REC {formatRecDuration(recordingDurationSeconds)}
+                  </span>
+                )}
               </div>
               <button
                 type="button"

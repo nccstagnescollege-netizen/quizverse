@@ -21,6 +21,11 @@ interface DeviceReadinessVerificationProps {
   quizId: string;
   attemptId?: string;
   studentToken?: string;
+  recordingNotice?: {
+    enabled: boolean;
+    retentionDays?: number;
+    quality?: string;
+  };
   onVerificationComplete: (stream: MediaStream, deviceInfo: { camera: string; microphone: string }) => void;
   onCancel?: () => void;
 }
@@ -29,6 +34,7 @@ export function DeviceReadinessVerification({
   quizId,
   attemptId,
   studentToken,
+  recordingNotice,
   onVerificationComplete,
   onCancel,
 }: DeviceReadinessVerificationProps) {
@@ -419,10 +425,27 @@ export function DeviceReadinessVerification({
           <Lock className="w-4 h-4 text-primary" />
           <span>Privacy & Monitoring Disclosure</span>
         </div>
+
+        {recordingNotice?.enabled ? (
+          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 space-y-1">
+            <span className="font-bold flex items-center gap-1.5 text-rose-400">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse inline-block" />
+              Examination Recording Notice (Phase 32 Active)
+            </span>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Your webcam video and microphone audio will be recorded throughout this examination and securely stored in institutional private cloud storage for <strong>{recordingNotice.retentionDays || 30} days</strong> under strict role-based access controls for academic audit purposes.
+            </p>
+          </div>
+        ) : (
+          <div className="p-2.5 rounded-lg bg-slate-900/40 border border-slate-800 text-[11px] text-slate-400">
+            <strong>Permanent Recording Disabled:</strong> Live webcam &amp; audio invigilation is transient. No permanent recordings or video files will be stored in cloud buckets.
+          </div>
+        )}
+
         <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
           <li>Your live webcam video and microphone audio are accessible exclusively to authorized invigilators during the examination.</li>
           <li>Video and audio streams are encrypted end-to-end via WebRTC (DTLS-SRTP).</li>
-          <li><strong>Recording is strictly disabled by default</strong> and will only occur if explicitly authorized by your institution and separately disclosed.</li>
+          <li>{recordingNotice?.enabled ? 'Recording is stored in private, non-public cloud buckets accessed solely by authorized administrators.' : 'Recording is strictly disabled by default.'}</li>
           <li>Technical interruptions (network drops or hardware glitches) will never result in automatic disqualification.</li>
         </ul>
         <label className="flex items-start space-x-2 pt-2 cursor-pointer">
@@ -433,7 +456,7 @@ export function DeviceReadinessVerification({
             className="mt-0.5 rounded border-border text-primary focus:ring-primary"
           />
           <span className="text-xs text-foreground font-medium select-none">
-            I confirm that my webcam and microphone are operational and I consent to authorized live examination proctoring.
+            I confirm that my webcam and microphone are operational and I consent to authorized examination proctoring{recordingNotice?.enabled ? ' and secure recording retention' : ''}.
           </span>
         </label>
       </div>

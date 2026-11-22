@@ -123,6 +123,14 @@ export interface QuizConfiguration {
   proctoring_critical_threshold?: number;
   proctoring_human_review_required?: boolean;
   recording_policy?: 'disabled' | 'incident_only' | 'continuous_consent';
+  // Phase 32 Per-Quiz Webcam & Microphone Recording with Secure Supabase Storage
+  recording_storage_enabled?: boolean;
+  webcam_recording_enabled?: boolean;
+  microphone_recording_enabled?: boolean;
+  recording_quality?: 'standard' | 'high' | 'bandwidth_optimized';
+  recording_retention_days?: number;
+  allow_invigilator_recording_access?: boolean;
+  allow_admin_recording_download?: boolean;
   created_at: string;
   updated_at: string;
 }

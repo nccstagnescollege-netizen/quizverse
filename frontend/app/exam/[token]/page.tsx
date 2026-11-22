@@ -390,12 +390,17 @@ export default function ExamLandingPage() {
               />
             )}
 
-            {/* Phase 31: Mandatory Real-Time Device Readiness Verification */}
+            {/* Phase 31 & Phase 32: Mandatory Real-Time Device Readiness & Recording Verification */}
             {details?.proctoring_policy && (details.proctoring_policy.webcam_monitoring_enabled || details.proctoring_policy.microphone_monitoring_enabled) && details?.quiz_id && (
               <DeviceReadinessVerification
                 quizId={details.quiz_id}
                 attemptId={(details as any)?.attempt_id}
                 studentToken={token}
+                recordingNotice={{
+                  enabled: Boolean(details.proctoring_policy.recording_storage_enabled),
+                  retentionDays: details.proctoring_policy.recording_retention_days || 30,
+                  quality: details.proctoring_policy.recording_quality || 'standard',
+                }}
                 onVerificationComplete={(mediaStream, devInfo) => {
                   setProctoringCheckPassed(true);
                 }}
