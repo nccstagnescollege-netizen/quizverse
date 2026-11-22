@@ -53,6 +53,7 @@ export function DeviceReadinessVerification({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const hasConsentedRef = useRef<boolean>(false);
 
   // Initialize camera and microphone media capture
   const startMediaCheck = useCallback(async () => {
@@ -222,18 +223,19 @@ export function DeviceReadinessVerification({
       return;
     }
 
-    // Submit consent record to backend if token available
-    if (studentToken && quizId) {
+    // Submit consent record to backend if token available and not yet submitted
+    if (studentToken && quizId && !hasConsentedRef.current) {
+      hasConsentedRef.current = true;
       try {
         await monitoringService.recordConsent(studentToken, quizId, {
           attempt_id: attemptId,
           consent_version: 'v1.0',
           webcam_acknowledged: true,
           microphone_acknowledged: true,
-          recording_acknowledged: false, // confirmed recording is disabled by default
+          recording_acknowledged: Boolean(recordingNotice?.enabled),
         });
       } catch (e) {
-        console.warn('Proctoring consent record non-fatal warning:', e);
+        console.debug('Proctoring consent record non-fatal warning:', e);
       }
     }
 

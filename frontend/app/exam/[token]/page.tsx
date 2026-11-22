@@ -395,7 +395,7 @@ export default function ExamLandingPage() {
               <DeviceReadinessVerification
                 quizId={details.quiz_id}
                 attemptId={(details as any)?.attempt_id}
-                studentToken={token}
+                studentToken={studentExamService.getSession(token).sessionToken || token}
                 recordingNotice={{
                   enabled: Boolean(details.proctoring_policy.recording_storage_enabled),
                   retentionDays: details.proctoring_policy.recording_retention_days || 30,
@@ -411,7 +411,7 @@ export default function ExamLandingPage() {
             {details?.quiz_id && (
               <DevicePreparationCheck
                 quizId={details.quiz_id}
-                sessionToken={token}
+                sessionToken={studentExamService.getSession(token).sessionToken || token}
                 onCompleted={() => {
                   setDevicePrepPassed(true);
                 }}

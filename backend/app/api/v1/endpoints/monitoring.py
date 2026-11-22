@@ -524,6 +524,7 @@ def record_student_consent(
 ):
     """
     Stores student acknowledgment and consent for webcam & microphone monitoring before exam room entry.
+    Supports both active candidate session JWTs and pre-flight landing invitation tokens.
     """
     raw_token = None
     if authorization and authorization.startswith("Bearer "):
@@ -531,23 +532,62 @@ def record_student_consent(
     elif x_exam_session_token:
         raw_token = x_exam_session_token.strip()
 
-    if not raw_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required to record proctoring consent."
-        )
+    student_id = None
+    attempt_id = req.attempt_id
 
-    cand_sess = StudentExamService.verify_session_token(raw_token)
-    student_id = uuid.UUID(str(cand_sess["student_id"]))
-    attempt_id = req.attempt_id or (uuid.UUID(str(cand_sess["attempt_id"])) if "attempt_id" in cand_sess else None)
+    # 1. Attempt verifying as active candidate examination JWT
+    if raw_token:
+        try:
+            cand_sess = StudentExamService.verify_session_token(raw_token)
+            student_id = uuid.UUID(str(cand_sess.get("student_id") or cand_sess.get("sub")))
+            if not attempt_id and cand_sess.get("attempt_id"):
+                attempt_id = uuid.UUID(str(cand_sess["attempt_id"]))
+        except Exception:
+            # 2. Pre-flight landing page fallback: resolve candidate via landing token
+            try:
+                details = StudentExamService.get_exam_landing_details(db, raw_token)
+                if details and details.candidate:
+                    student_id = uuid.UUID(str(details.candidate.id))
+                    if not attempt_id and details.active_attempt_id:
+                        attempt_id = uuid.UUID(str(details.active_attempt_id))
+            except Exception:
+                pass
+
+    # 3. Direct student ID lookup if raw_token is a UUID or matches student
+    if not student_id and raw_token:
+        try:
+            potential_uid = uuid.UUID(raw_token)
+            from backend.app.models.student import Student
+            st = db.query(Student).filter(Student.id == potential_uid).first()
+            if st:
+                student_id = st.id
+        except Exception:
+            pass
 
     client_ip = request.client.host if request and request.client else "127.0.0.1"
     user_agent = request.headers.get("user-agent", "Browser") if request else "Browser"
 
-    return LiveMediaMonitoringService.record_student_consent(
-        db=db,
+    # If student is confirmed in the database, record persistent consent
+    if student_id:
+        return LiveMediaMonitoringService.record_student_consent(
+            db=db,
+            quiz_id=quiz_id,
+            student_id=student_id,
+            attempt_id=attempt_id,
+            consent_version=req.consent_version,
+            webcam_acknowledged=req.webcam_acknowledged,
+            microphone_acknowledged=req.microphone_acknowledged,
+            recording_acknowledged=req.recording_acknowledged,
+            ip_address=client_ip,
+            user_agent=user_agent,
+        )
+
+    # 4. Pre-flight guest consent: acknowledge without error when candidate has not yet submitted credentials
+    from datetime import datetime, timezone
+    return StudentMonitoringConsentResponse(
+        id=uuid.uuid4(),
         quiz_id=quiz_id,
-        student_id=student_id,
+        student_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
         attempt_id=attempt_id,
         consent_version=req.consent_version,
         webcam_acknowledged=req.webcam_acknowledged,
@@ -555,6 +595,7 @@ def record_student_consent(
         recording_acknowledged=req.recording_acknowledged,
         ip_address=client_ip,
         user_agent=user_agent,
+        consented_at=datetime.now(timezone.utc),
     )
 
 

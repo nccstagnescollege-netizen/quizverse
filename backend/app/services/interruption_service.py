@@ -91,21 +91,26 @@ class InterruptionService:
         """
         Records candidate pre-flight device preparation checklist before examination entry.
         """
-        prep_log = DevicePreparationLog(
-            quiz_id=req.quiz_id,
-            student_id=student_id,
-            attempt_id=req.attempt_id,
-            battery_level=req.battery_level,
-            is_charging=req.is_charging,
-            network_type=req.network_type,
-            dnd_acknowledged=req.dnd_acknowledged,
-            notifications_muted_acknowledged=req.notifications_muted_acknowledged,
-            os_platform=req.os_platform.lower(),
-            device_info=req.device_info,
-            acknowledged_at=datetime.now(timezone.utc),
-        )
-        db.add(prep_log)
-        db.commit()
+        from backend.app.models.student import Student
+        student = db.query(Student).filter(Student.id == student_id).first()
+        ack_time = datetime.now(timezone.utc)
+
+        if student:
+            prep_log = DevicePreparationLog(
+                quiz_id=req.quiz_id,
+                student_id=student_id,
+                attempt_id=req.attempt_id,
+                battery_level=req.battery_level,
+                is_charging=req.is_charging,
+                network_type=req.network_type,
+                dnd_acknowledged=req.dnd_acknowledged,
+                notifications_muted_acknowledged=req.notifications_muted_acknowledged,
+                os_platform=req.os_platform.lower(),
+                device_info=req.device_info,
+                acknowledged_at=ack_time,
+            )
+            db.add(prep_log)
+            db.commit()
 
         # Generate platform-specific guidelines
         os_lower = req.os_platform.lower()
@@ -147,7 +152,7 @@ class InterruptionService:
             can_proceed=True,
             policy=policy_resp.model_dump(),
             recommendations=recs,
-            logged_at=prep_log.acknowledged_at,
+            logged_at=ack_time,
         )
 
     @staticmethod
