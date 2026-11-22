@@ -26,6 +26,7 @@ import {
   FileText,
   BookCheck,
   History,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -93,6 +94,7 @@ export function QuizGeneratorWizard({ basePath, token: propToken }: QuizGenerato
 
   // Step 5: Generation
   const [generating, setGenerating] = useState<boolean>(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // Load cascading academic options
   useEffect(() => {
@@ -145,6 +147,7 @@ export function QuizGeneratorWizard({ basePath, token: propToken }: QuizGenerato
   // Execute Generation
   const handleExecuteGenerate = async () => {
     setGenerating(true);
+    setGenerationError(null);
     try {
       const session = await quizGeneratorService.generatePaper({
         academic_scope: academicScope,
@@ -160,7 +163,14 @@ export function QuizGeneratorWizard({ basePath, token: propToken }: QuizGenerato
       router.push(`${basePath}/quiz-generator/${session.id}`);
     } catch (err: any) {
       console.error('Generation failed', err);
-      alert(err.message || 'Generation failed.');
+      const msg =
+        err.payload?.error?.message ||
+        err.payload?.detail?.message ||
+        (typeof err.payload?.detail === 'string' ? err.payload.detail : null) ||
+        err.message ||
+        'Generation failed.';
+      setGenerationError(msg);
+      alert(msg);
       setGenerating(false);
     }
   };
@@ -204,6 +214,17 @@ export function QuizGeneratorWizard({ basePath, token: propToken }: QuizGenerato
           <span>Generation History</span>
         </Link>
       </div>
+
+      {/* Generation Error Banner */}
+      {generationError && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400 mt-0.5" />
+          <div className="space-y-1">
+            <div className="font-semibold text-rose-200">Question Paper Generation Error</div>
+            <p className="text-slate-300">{generationError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Progress Steps Header */}
       <div className="p-3.5 rounded-2xl glass-card border border-surface-border overflow-x-auto scrollbar-none">

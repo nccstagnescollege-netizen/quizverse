@@ -831,4 +831,35 @@ def ensure_deployment_schema_exists(db: Session) -> None:
         logger.warning(f"Deployment schema upgrade encountered non-fatal error: {e}")
         db.rollback()
 
+
+def ensure_quiz_generator_schema_exists(db: Session) -> None:
+    """
+    Ensures Phase 8 Automatic Quiz Generator schema, columns, and constraints
+    are up-to-date and backward-compatible on PostgreSQL (Supabase / Render).
+    """
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            ddl_statements = [
+                # 1. Ensure generation_rule_snapshot allows NULL on generation_history
+                "ALTER TABLE generation_history ALTER COLUMN generation_rule_snapshot DROP NOT NULL;",
+                # 2. Ensure JSON columns exist
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS academic_scope JSONB DEFAULT '{}'::jsonb;",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS configuration JSONB DEFAULT '{}'::jsonb;",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS exam_settings JSONB DEFAULT '{}'::jsonb;",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS selected_questions JSONB DEFAULT '[]'::jsonb;",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS validation_report JSONB DEFAULT '{}'::jsonb;",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS seed VARCHAR(64);",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS session_title VARCHAR(255);",
+                "ALTER TABLE generation_history ADD COLUMN IF NOT EXISTS subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE;",
+            ]
+            for stmt in ddl_statements:
+                try:
+                    db.execute(text(stmt))
+                except Exception as ex:
+                    logger.debug(f"Quiz generator schema statement note: {ex}")
+            db.commit()
+            logger.info("Phase 8 Quiz Generator schema verified/upgraded successfully.")
+    except Exception as e:
+        logger.warning(f"Quiz generator schema upgrade encountered non-fatal error: {e}")
         db.rollback()

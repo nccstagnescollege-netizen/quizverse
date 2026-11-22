@@ -444,22 +444,24 @@ def generate_question_paper(
 
     # 9. Persist Generation Session to GenerationHistory
     subject = db.query(Subject).filter(Subject.id == req.academic_scope.subject_id).first()
+    configuration_payload = {
+        "total_questions": req.total_questions,
+        "difficulty": req.difficulty.model_dump(mode="json"),
+        "question_types": req.question_types,
+        "marks_config": req.marks_config.model_dump(mode="json"),
+        "negative_marking": req.negative_marking.model_dump(mode="json"),
+        "unit_distribution": req.unit_distribution.model_dump(mode="json"),
+        "reuse_policy": req.reuse_policy,
+    }
     gen_session = GenerationHistory(
         id=uuid.uuid4(),
         session_title=req.exam_settings.title,
         subject_id=subject.id if subject else None,
         generated_by=admin.id,
         questions_selected_count=len(selected_items),
+        generation_rule_snapshot=configuration_payload,
         academic_scope=req.academic_scope.model_dump(mode="json"),
-        configuration={
-            "total_questions": req.total_questions,
-            "difficulty": req.difficulty.model_dump(mode="json"),
-            "question_types": req.question_types,
-            "marks_config": req.marks_config.model_dump(mode="json"),
-            "negative_marking": req.negative_marking.model_dump(mode="json"),
-            "unit_distribution": req.unit_distribution.model_dump(mode="json"),
-            "reuse_policy": req.reuse_policy,
-        },
+        configuration=configuration_payload,
         exam_settings=req.exam_settings.model_dump(mode="json"),
         selected_questions=[item.model_dump(mode="json") for item in selected_items],
         validation_report={
