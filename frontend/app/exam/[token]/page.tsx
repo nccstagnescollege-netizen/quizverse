@@ -27,6 +27,8 @@ import {
   StudentExamLandingDetails,
 } from '@/services/studentExamService';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { BrowserCompatibilityCheck } from '@/components/exam/BrowserCompatibilityCheck';
+import { WatermarkStatusIndicator } from '@/components/exam/WatermarkStatusIndicator';
 
 export default function ExamLandingPage() {
   const params = useParams();
@@ -317,6 +319,9 @@ export default function ExamLandingPage() {
                 </div>
               )}
             </div>
+
+            {/* Phase 22 & Phase 23: Pre-Examination Browser Compatibility Check */}
+            <BrowserCompatibilityCheck token={token} />
           </div>
 
           {/* Right Column: Candidate Status & Actions */}

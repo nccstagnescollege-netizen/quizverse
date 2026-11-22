@@ -21,6 +21,7 @@ import {
   StudentResultDetail,
 } from '@/services/studentExamService';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { WatermarkOverlay } from '@/components/exam/WatermarkOverlay';
 
 function ExamResultContent() {
   const params = useParams();
@@ -216,11 +217,16 @@ function ExamResultContent() {
   return (
     <div className="min-h-screen bg-surface-base text-foreground py-12 px-4 flex flex-col items-center justify-center relative">
       {/* Top right theme toggle */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 z-20">
         <ThemeToggle size="sm" showDropdown />
       </div>
 
-      <div className="max-w-xl w-full glass-card rounded-3xl border border-surface-border p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+      <WatermarkOverlay
+        mode="results"
+        watermarkText={`QUIZVERSE | ${result.student_name || 'CANDIDATE'} | ${result.quiz_title}`}
+        className="max-w-xl w-full"
+      >
+        <div className="w-full glass-card rounded-3xl border border-surface-border p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
         {/* Accent top gradient strip */}
         <div
           className={`absolute top-0 left-0 right-0 h-2 bg-gradient-to-r ${
@@ -363,6 +369,7 @@ function ExamResultContent() {
           </Link>
         </div>
       </div>
+      </WatermarkOverlay>
     </div>
   );
 }

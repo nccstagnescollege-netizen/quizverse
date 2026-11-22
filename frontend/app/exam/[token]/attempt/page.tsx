@@ -849,7 +849,38 @@ export default function ExamAttemptPage() {
   const isAnswered = currentAnswer.selected_option_ids.length > 0 || currentAnswer.text_response.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-surface-base text-foreground flex flex-col justify-between selection:bg-primary-500/30">
+    <div className="min-h-screen bg-surface-base text-foreground flex flex-col justify-between selection:bg-primary-500/30 relative">
+      {/* Phase 23: Dynamic Student Watermark Overlay */}
+      {attemptDetail?.watermark_text && (
+        <DynamicWatermark
+          watermarkText={attemptDetail.watermark_text}
+          watermarkCode={attemptDetail.security_policy?.watermark_code}
+          opacity={attemptDetail.security_policy?.watermark_opacity ?? 0.06}
+          fontSize={attemptDetail.security_policy?.watermark_font_size ?? 12}
+          rotationDeg={attemptDetail.security_policy?.watermark_rotation_deg ?? -25}
+          spacingPx={attemptDetail.security_policy?.watermark_spacing_px ?? 140}
+          updateIntervalSec={attemptDetail.security_policy?.watermark_update_interval_sec ?? 30}
+          showTimestamp={true}
+          className="z-10"
+        />
+      )}
+
+      {/* Phase 23: Anti-Capture Signals & Shortcut Deterrence */}
+      {sessionToken && attemptDetail?.attempt_id && (
+        <>
+          <CaptureSignalMonitor
+            attemptId={attemptDetail.attempt_id}
+            sessionToken={sessionToken}
+            watermarkCode={attemptDetail.security_policy?.watermark_code}
+            enabled={attemptDetail.security_policy?.track_screenshot_signals ?? true}
+          />
+          <CaptureCapabilityCheck
+            attemptId={attemptDetail.attempt_id}
+            sessionToken={sessionToken}
+          />
+        </>
+      )}
+
       {/* 1. Header Toolbar */}
       <header className="sticky top-0 z-40 bg-surface-elevated/90 backdrop-blur-md border-b border-surface-border px-4 py-2.5 sm:px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
