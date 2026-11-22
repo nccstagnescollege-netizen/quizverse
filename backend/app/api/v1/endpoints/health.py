@@ -31,11 +31,25 @@ async def get_health(request: Request) -> HealthResponse:
         is_connected = check_db_connection()
         db_status = "connected" if is_connected else "disconnected"
 
+    # Assess Redis connectivity
+    redis_status = "unconfigured"
+    if settings.REDIS_URL:
+        try:
+            import redis
+            r = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=2)
+            if r.ping():
+                redis_status = "connected"
+            else:
+                redis_status = "disconnected"
+        except Exception:
+            redis_status = "disconnected"
+
     features = ServiceFeatures(
         auth=bool(settings.SUPABASE_URL and settings.SUPABASE_KEY),
         storage=bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY),
         realtime=bool(settings.SUPABASE_URL),
         database_configured=bool(settings.DATABASE_URL),
+        redis_configured=bool(settings.REDIS_URL),
     )
 
     data = HealthResponseData(
@@ -45,6 +59,7 @@ async def get_health(request: Request) -> HealthResponse:
         environment=settings.ENVIRONMENT,
         uptime_seconds=uptime,
         database_status=db_status,
+        redis_status=redis_status,
         features=features,
     )
 

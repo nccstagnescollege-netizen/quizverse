@@ -12,7 +12,8 @@ from pathlib import Path
 ENDPOINTS = {
     "Vercel Edge Frontend": "https://quizverse-iota.vercel.app",
     "Render FastAPI Docs": "https://quizverse-ymsg.onrender.com/docs",
-    "Render Health API": "https://quizverse-ymsg.onrender.com/api/v1/system/audit/health",
+    "Render Health API": "https://quizverse-ymsg.onrender.com/api/v1/health",
+    "Render Audit Health": "https://quizverse-ymsg.onrender.com/api/v1/system/audit/health",
     "Render Public Validate": "https://quizverse-ymsg.onrender.com/api/v1/public/invitations/eef84119-3d23-4d9a-956a-71044826a121/validate",
 }
 

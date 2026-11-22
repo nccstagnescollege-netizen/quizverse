@@ -8,6 +8,7 @@ class ServiceFeatures(BaseModel):
     storage: bool = False
     realtime: bool = False
     database_configured: bool = False
+    redis_configured: bool = False
 
 
 class HealthResponseData(BaseModel):
@@ -17,6 +18,7 @@ class HealthResponseData(BaseModel):
     environment: str = Field(..., description="Runtime environment")
     uptime_seconds: float = Field(..., description="Elapsed process uptime")
     database_status: str = Field(..., description="'connected' | 'unconfigured' | 'disconnected'")
+    redis_status: str = Field("unconfigured", description="'connected' | 'unconfigured' | 'disconnected'")
     features: ServiceFeatures
 
 
