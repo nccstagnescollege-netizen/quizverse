@@ -316,6 +316,32 @@ class QuizConfiguration(Base):
     concurrent_session_block = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     suspicious_activity_flagging = Column(Boolean, nullable=False, default=True, server_default=text("true"))
 
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy = Column(String(32), nullable=False, default="warning_only", server_default=text("'warning_only'"))  # warning_only, record_incident, pause_exam, flag_review
+    max_focus_loss_count = Column(Integer, nullable=False, default=5, server_default=text("5"))
+    disable_copy = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    disable_paste = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    disable_context_menu = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    print_restrictions = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    navigation_warning = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    network_interruption_policy = Column(String(32), nullable=False, default="buffer_and_resume", server_default=text("'buffer_and_resume'"))  # buffer_and_resume, pause_on_disconnect
+    require_invigilator_review = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity = Column(Numeric(3, 2), nullable=False, default=0.06, server_default=text("0.06"))
+    watermark_font_size = Column(Integer, nullable=False, default=12, server_default=text("12"))
+    watermark_rotation_deg = Column(Integer, nullable=False, default=-25, server_default=text("-25"))
+    watermark_spacing_px = Column(Integer, nullable=False, default=140, server_default=text("140"))
+    watermark_update_interval_sec = Column(Integer, nullable=False, default=30, server_default=text("30"))
+    watermark_mask_student_id = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    watermark_show_timestamp = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    watermark_show_exam_id = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    watermark_custom_text = Column(String(255), nullable=True)
+    require_watermark_validation = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    block_screen_capture_api = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    track_screenshot_signals = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    track_screen_recording_signals = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now, server_default=func.now())
 

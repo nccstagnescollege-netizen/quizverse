@@ -31,6 +31,7 @@ import {
   Eye,
   Sparkles,
   Info,
+  Fingerprint,
 } from 'lucide-react';
 import {
   studentExamService,
@@ -40,6 +41,9 @@ import {
 } from '@/services/studentExamService';
 import { securityService } from '@/services/securityService';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { DynamicWatermark } from '@/components/exam/DynamicWatermark';
+import { CaptureSignalMonitor } from '@/components/exam/CaptureSignalMonitor';
+import { CaptureCapabilityCheck } from '@/components/exam/CaptureCapabilityCheck';
 
 export default function ExamAttemptPage() {
   const params = useParams();
@@ -82,6 +86,12 @@ export default function ExamAttemptPage() {
   const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
   const [fullscreenRequiredPrompt, setFullscreenRequiredPrompt] = useState<boolean>(false);
   const eventSequenceRef = useRef<number>(1);
+
+  // Phase 22 Advanced Browser Examination Lockdown State
+  const [fullscreenExitCount, setFullscreenExitCount] = useState<number>(0);
+  const [isExamPaused, setIsExamPaused] = useState<boolean>(false);
+  const [showFullscreenModal, setShowFullscreenModal] = useState<boolean>(false);
+  const lastFocusLossTimestampRef = useRef<number>(0);
 
   // 0. Guard against accessing concluded examinations
   useEffect(() => {
@@ -133,6 +143,17 @@ export default function ExamAttemptPage() {
           initialVisited.add(qid);
         });
 
+        // Phase 22: Restore any locally cached un-synced answers from accidental reloads
+        try {
+          if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(`qv_cached_answers_${session.attemptId}`);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              Object.assign(initialAnswers, parsed);
+            }
+          }
+        } catch {}
+
         setLocalAnswers(initialAnswers);
         setVisitedQuestionIds(initialVisited);
       } catch (err: any) {
@@ -153,15 +174,55 @@ export default function ExamAttemptPage() {
     initExam();
   }, [token, router]);
 
+  // 2. Offline Queue Flusher
+  const flushOfflineQueues = useCallback(async (attId: string, sessToken: string) => {
+    try {
+      const pendingEventsRaw = localStorage.getItem(`qv_pending_events_${attId}`);
+      if (pendingEventsRaw) {
+        const events = JSON.parse(pendingEventsRaw);
+        if (Array.isArray(events) && events.length > 0) {
+          await securityService.submitSecurityEvents(attId, sessToken, events);
+          localStorage.removeItem(`qv_pending_events_${attId}`);
+        }
+      }
+    } catch {}
+
+    try {
+      const pendingAnswersRaw = localStorage.getItem(`qv_pending_answers_${attId}`);
+      if (pendingAnswersRaw) {
+        const answersMap = JSON.parse(pendingAnswersRaw);
+        const entries = Object.entries(answersMap);
+        for (const [qid, ansData] of entries) {
+          await studentExamService.saveAttemptAnswer(attId, sessToken, {
+            quiz_question_id: qid,
+            selected_option_ids: (ansData as any).selected_option_ids || [],
+            text_response: (ansData as any).text_response || '',
+            is_flagged_for_review: (ansData as any).is_flagged_for_review || false,
+            time_spent_seconds: 5,
+          });
+        }
+        localStorage.removeItem(`qv_pending_answers_${attId}`);
+      }
+    } catch {}
+  }, []);
+
   // 2. Network connectivity listeners
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setSyncStatus('saved');
+      if (attemptDetail && sessionToken) {
+        flushOfflineQueues(attemptDetail.attempt_id, sessionToken);
+        sendSecurityEvent('NETWORK', 'NETWORK_RECONNECTED');
+      }
     };
     const handleOffline = () => {
       setIsOnline(false);
       setSyncStatus('offline');
+      setSecurityWarning('Network Disconnected: Your answers are saved locally on this device and will sync automatically when reconnected.');
+      if (attemptDetail && sessionToken) {
+        sendSecurityEvent('NETWORK', 'NETWORK_DISCONNECTED');
+      }
     };
 
     window.addEventListener('online', handleOnline);
@@ -171,9 +232,9 @@ export default function ExamAttemptPage() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [attemptDetail, sessionToken, flushOfflineQueues]);
 
-  // 2b. Phase 14 Security Telemetry Sender
+  // 2b. Phase 14 & 22 Security Telemetry Sender
   const sendSecurityEvent = useCallback(async (
     category: string,
     eventName: string,
@@ -181,25 +242,58 @@ export default function ExamAttemptPage() {
     metadata?: Record<string, any>
   ) => {
     if (!attemptDetail || !sessionToken) return;
+    const seq = eventSequenceRef.current++;
+    const eventItem = {
+      event_category: category,
+      event_name: eventName,
+      client_timestamp: new Date().toISOString(),
+      duration_ms: durationMs,
+      sequence_number: seq,
+      event_metadata: metadata,
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        const existing = JSON.parse(localStorage.getItem(`qv_pending_events_${attemptDetail.attempt_id}`) || '[]');
+        existing.push(eventItem);
+        localStorage.setItem(`qv_pending_events_${attemptDetail.attempt_id}`, JSON.stringify(existing.slice(-50)));
+      } catch {}
+      return;
+    }
+
     try {
-      const seq = eventSequenceRef.current++;
-      const res = await securityService.submitSecurityEvents(attemptDetail.attempt_id, sessionToken, [{
-        event_category: category,
-        event_name: eventName,
-        client_timestamp: new Date().toISOString(),
-        duration_ms: durationMs,
-        sequence_number: seq,
-        event_metadata: metadata,
-      }]);
+      const res = await securityService.submitSecurityEvents(attemptDetail.attempt_id, sessionToken, [eventItem]);
       if (res.warnings && res.warnings.length > 0) {
         setSecurityWarning(res.warnings[0]);
       }
     } catch {
-      // Non-blocking: Telemetry errors must never disrupt exam flow
+      try {
+        const existing = JSON.parse(localStorage.getItem(`qv_pending_events_${attemptDetail.attempt_id}`) || '[]');
+        existing.push(eventItem);
+        localStorage.setItem(`qv_pending_events_${attemptDetail.attempt_id}`, JSON.stringify(existing.slice(-50)));
+      } catch {}
     }
   }, [attemptDetail, sessionToken]);
 
-  // 2c. Phase 14 Browser Event Listeners
+  // Explicit Fullscreen Requester
+  const requestFullscreenExplicit = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      } else if ((document.documentElement as any).webkitRequestFullscreen) {
+        await (document.documentElement as any).webkitRequestFullscreen();
+      }
+      setIsFullscreen(true);
+      setShowFullscreenModal(false);
+      setIsExamPaused(false);
+      setFullscreenRequiredPrompt(false);
+      sendSecurityEvent('FULLSCREEN', 'FULLSCREEN_ENTER');
+    } catch (err) {
+      console.warn('Fullscreen entry declined or unsupported on device:', err);
+    }
+  };
+
+  // 2c. Phase 22 Browser Event Listeners
   useEffect(() => {
     if (!attemptDetail || !sessionToken) return;
     const policy = attemptDetail.security_policy;
@@ -207,87 +301,207 @@ export default function ExamAttemptPage() {
 
     let hiddenStartTime: number | null = null;
 
-    // Visibility Change listener
+    // Helper: Is active target inside an editable answer input
+    const isInsideAnswerInput = (target: EventTarget | null) => {
+      if (!target || !(target as HTMLElement).tagName) return false;
+      const tag = (target as HTMLElement).tagName.toUpperCase();
+      return tag === 'INPUT' || tag === 'TEXTAREA' || (target as HTMLElement).isContentEditable;
+    };
+
+    // 500ms Debounced Focus Loss & Tab Switch Handler
+    const handleFocusLoss = (source: string) => {
+      const now = Date.now();
+      if (now - lastFocusLossTimestampRef.current < 500) {
+        return; // Deduplicate simultaneous events
+      }
+      lastFocusLossTimestampRef.current = now;
+
+      setTabSwitchCount((prev) => {
+        const next = prev + 1;
+        const maxPermitted = policy.max_focus_loss_count || policy.max_focus_losses_warning || 5;
+        if (next >= maxPermitted) {
+          setSecurityWarning(
+            `Focus loss threshold reached (${next}/${maxPermitted}). All background transitions are timestamped for invigilator review.`
+          );
+        }
+        return next;
+      });
+
+      sendSecurityEvent('FOCUS_LOSS', source === 'blur' ? 'WINDOW_FOCUS_LOST' : 'TAB_HIDDEN', undefined, { source });
+    };
+
+    const handleFocusGained = (source: string) => {
+      const dur = hiddenStartTime ? Date.now() - hiddenStartTime : undefined;
+      hiddenStartTime = null;
+      sendSecurityEvent('FOCUS_LOSS', source === 'focus' ? 'WINDOW_FOCUS_GAINED' : 'TAB_VISIBLE', dur, { source });
+    };
+
+    // Visibility Change
     const handleVisibilityChange = () => {
       if (document.hidden) {
         hiddenStartTime = Date.now();
-        setTabSwitchCount((prev) => prev + 1);
-        sendSecurityEvent('TAB_SWITCH', 'TAB_HIDDEN');
+        handleFocusLoss('visibilitychange');
       } else {
-        const dur = hiddenStartTime ? Date.now() - hiddenStartTime : undefined;
-        hiddenStartTime = null;
-        sendSecurityEvent('TAB_SWITCH', 'TAB_VISIBLE', dur);
+        handleFocusGained('visibilitychange');
       }
     };
 
     // Window Focus / Blur
     const handleWindowBlur = () => {
-      sendSecurityEvent('FOCUS_LOSS', 'WINDOW_FOCUS_LOST');
+      handleFocusLoss('blur');
     };
     const handleWindowFocus = () => {
-      sendSecurityEvent('FOCUS_LOSS', 'WINDOW_FOCUS_GAINED');
+      handleFocusGained('focus');
     };
 
     // Fullscreen change
     const handleFullscreenChange = () => {
-      const isFs = !!document.fullscreenElement;
+      const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
       setIsFullscreen(isFs);
-      if (!isFs && policy.track_fullscreen_exit) {
+
+      // Back up answers to localStorage on fullscreen transitions
+      try {
+        localStorage.setItem(`qv_cached_answers_${attemptDetail.attempt_id}`, JSON.stringify(localAnswers));
+      } catch {}
+
+      if (!isFs) {
+        setFullscreenExitCount((prev) => prev + 1);
         sendSecurityEvent('FULLSCREEN', 'FULLSCREEN_EXIT');
-        if (policy.require_fullscreen) {
-          setFullscreenRequiredPrompt(true);
+
+        const fsPolicy = policy.fullscreen_exit_policy || (policy.require_fullscreen ? 'warning_only' : 'none');
+        if (fsPolicy === 'pause_exam') {
+          setIsExamPaused(true);
+        } else if (fsPolicy === 'record_incident' || fsPolicy === 'flag_review' || policy.require_fullscreen) {
+          setShowFullscreenModal(true);
         }
-      } else if (isFs) {
+      } else {
+        setIsExamPaused(false);
+        setShowFullscreenModal(false);
         setFullscreenRequiredPrompt(false);
+        sendSecurityEvent('FULLSCREEN', 'FULLSCREEN_ENTER');
       }
     };
 
-    // Clipboard protection
+    // Keyboard Shortcut Interception & Deterrence
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const inInput = isInsideAnswerInput(e.target);
+
+      // 1. Deter Print shortcut: Ctrl+P / Cmd+P
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setSecurityWarning('Printing examination material is restricted.');
+        sendSecurityEvent('PRINT', 'PRINT_ATTEMPT');
+        return;
+      }
+
+      // 2. Deter DevTools shortcuts (F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U)
+      if (
+        e.key === 'F12' ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) ||
+        ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U'))
+      ) {
+        e.preventDefault();
+        setSecurityWarning('Developer console shortcuts are restricted within the examination interface.');
+        return;
+      }
+
+      // 3. Copy / Cut shortcut deterrence outside answer inputs
+      if ((e.ctrlKey || e.metaKey) && ['c', 'C', 'x', 'X'].includes(e.key)) {
+        if (policy.disable_copy !== false || policy.block_copy_paste) {
+          if (!inInput) {
+            e.preventDefault();
+            setSecurityWarning('Copying question text is prohibited.');
+            sendSecurityEvent('CLIPBOARD', 'RESTRICTED_COPY_ATTEMPT');
+          }
+        }
+      }
+
+      // 4. Paste shortcut deterrence
+      if ((e.ctrlKey || e.metaKey) && ['v', 'V'].includes(e.key)) {
+        if (policy.disable_paste) {
+          e.preventDefault();
+          setSecurityWarning('Pasting into answer response fields is restricted.');
+          sendSecurityEvent('CLIPBOARD', 'RESTRICTED_PASTE_ATTEMPT');
+        }
+      }
+    };
+
+    // Clipboard events
     const handleCopy = (e: ClipboardEvent) => {
-      if (policy.block_copy_paste) {
-        e.preventDefault();
-      }
-      if (policy.track_copy_paste) {
-        sendSecurityEvent('CLIPBOARD', 'COPY_ATTEMPT');
+      if (policy.disable_copy !== false || policy.block_copy_paste) {
+        if (!isInsideAnswerInput(e.target)) {
+          e.preventDefault();
+          setSecurityWarning('Copying question text is prohibited.');
+          sendSecurityEvent('CLIPBOARD', 'RESTRICTED_COPY_ATTEMPT');
+        }
       }
     };
+
     const handlePaste = (e: ClipboardEvent) => {
-      if (policy.block_copy_paste) {
+      if (policy.disable_paste) {
         e.preventDefault();
-      }
-      if (policy.track_copy_paste) {
-        sendSecurityEvent('CLIPBOARD', 'PASTE_ATTEMPT');
+        setSecurityWarning('Pasting is restricted in this examination.');
+        sendSecurityEvent('CLIPBOARD', 'RESTRICTED_PASTE_ATTEMPT');
       }
     };
+
     const handleCut = (e: ClipboardEvent) => {
-      if (policy.block_copy_paste) {
-        e.preventDefault();
-      }
-      if (policy.track_copy_paste) {
-        sendSecurityEvent('CLIPBOARD', 'CUT_ATTEMPT');
+      if (policy.disable_copy !== false || policy.block_copy_paste) {
+        if (!isInsideAnswerInput(e.target)) {
+          e.preventDefault();
+          sendSecurityEvent('CLIPBOARD', 'RESTRICTED_COPY_ATTEMPT');
+        }
       }
     };
 
     // Context menu deterrence
     const handleContextMenu = (e: MouseEvent) => {
-      if (policy.block_context_menu) {
+      if (policy.disable_context_menu !== false || policy.block_context_menu) {
         e.preventDefault();
+        setSecurityWarning('Context menu is restricted during the examination.');
+        sendSecurityEvent('CONTEXT_MENU', 'CONTEXT_MENU_ATTEMPT');
       }
-      sendSecurityEvent('CONTEXT_MENU', 'CONTEXT_MENU');
     };
 
-    if (policy.track_tab_switch) {
+    // BeforePrint
+    const handleBeforePrint = () => {
+      setSecurityWarning('Printing examination material is restricted.');
+      sendSecurityEvent('PRINT', 'PRINT_ATTEMPT');
+    };
+
+    // Navigation Protection: beforeunload warning
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (policy.navigation_warning !== false) {
+        e.preventDefault();
+        e.returnValue = 'You have an active examination attempt in progress. Leaving may finalize your submission.';
+        return e.returnValue;
+      }
+    };
+
+    // History popstate trap for browser back button
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      setSecurityWarning('Browser back navigation is restricted during the examination.');
+      sendSecurityEvent('NAVIGATION', 'NAVIGATION_ATTEMPT');
+    };
+
+    if (policy.track_tab_switch !== false) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
-    if (policy.track_focus_loss) {
+    if (policy.track_focus_loss !== false) {
       window.addEventListener('blur', handleWindowBlur);
       window.addEventListener('focus', handleWindowFocus);
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('copy', handleCopy);
     document.addEventListener('paste', handlePaste);
     document.addEventListener('cut', handleCut);
     document.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
 
     if (policy.require_fullscreen && !document.fullscreenElement) {
       setFullscreenRequiredPrompt(true);
@@ -298,12 +512,16 @@ export default function ExamAttemptPage() {
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('paste', handlePaste);
       document.removeEventListener('cut', handleCut);
       document.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [attemptDetail, sessionToken, sendSecurityEvent]);
+  }, [attemptDetail, sessionToken, sendSecurityEvent, localAnswers]);
 
   // 3. Countdown Timer Engine
   useEffect(() => {
@@ -375,18 +593,43 @@ export default function ExamAttemptPage() {
     const timeSpent = Math.max(1, Math.round((Date.now() - questionStartTimeRef.current) / 1000));
     questionStartTimeRef.current = Date.now();
 
+    const ansPayload = {
+      quiz_question_id: questionId,
+      selected_option_ids: selectedOptionIds,
+      text_response: textResponse,
+      is_flagged_for_review: isFlagged,
+      time_spent_seconds: timeSpent,
+    };
+
+    // Cache locally immediately in localStorage for crash / accidental reload recovery
+    try {
+      const cache = JSON.parse(localStorage.getItem(`qv_cached_answers_${attemptDetail.attempt_id}`) || '{}');
+      cache[questionId] = { selected_option_ids: selectedOptionIds, text_response: textResponse, is_flagged_for_review: isFlagged };
+      localStorage.setItem(`qv_cached_answers_${attemptDetail.attempt_id}`, JSON.stringify(cache));
+    } catch {}
+
+    // If offline, buffer in offline queue
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSyncStatus('offline');
+      try {
+        const pending = JSON.parse(localStorage.getItem(`qv_pending_answers_${attemptDetail.attempt_id}`) || '{}');
+        pending[questionId] = ansPayload;
+        localStorage.setItem(`qv_pending_answers_${attemptDetail.attempt_id}`, JSON.stringify(pending));
+      } catch {}
+      return;
+    }
+
     try {
       setSyncStatus('syncing');
-      await studentExamService.saveAttemptAnswer(attemptDetail.attempt_id, sessionToken, {
-        quiz_question_id: questionId,
-        selected_option_ids: selectedOptionIds,
-        text_response: textResponse,
-        is_flagged_for_review: isFlagged,
-        time_spent_seconds: timeSpent,
-      });
+      await studentExamService.saveAttemptAnswer(attemptDetail.attempt_id, sessionToken, ansPayload);
       setSyncStatus('saved');
     } catch (err) {
       setSyncStatus('failed');
+      try {
+        const pending = JSON.parse(localStorage.getItem(`qv_pending_answers_${attemptDetail.attempt_id}`) || '{}');
+        pending[questionId] = ansPayload;
+        localStorage.setItem(`qv_pending_answers_${attemptDetail.attempt_id}`, JSON.stringify(pending));
+      } catch {}
     }
   };
 
@@ -633,6 +876,35 @@ export default function ExamAttemptPage() {
 
           {/* Right Header: Timer, Status Pill, Fullscreen */}
           <div className="flex items-center gap-3 shrink-0">
+            {/* Phase 22 Unobtrusive Browser Lockdown Status */}
+            <div
+              className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
+                tabSwitchCount > 0
+                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                  : 'bg-primary-500/10 text-primary-400 border-primary-500/30'
+              }`}
+              title={`Browser Lockdown Active • Focus Switches: ${tabSwitchCount}`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-primary-400" />
+              <span>Lockdown Active</span>
+              {tabSwitchCount > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-[10px] font-mono text-amber-300">
+                  {tabSwitchCount}
+                </span>
+              )}
+            </div>
+
+            {/* Phase 23 Watermark Status Pill */}
+            {attemptDetail.security_policy?.watermark_code && (
+              <div
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                title={`Forensic Watermark Active: ${attemptDetail.security_policy.watermark_code}`}
+              >
+                <Fingerprint className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{attemptDetail.security_policy.watermark_code}</span>
+              </div>
+            )}
+
             {/* Connection Status Indicator */}
             <div
               className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
@@ -779,7 +1051,7 @@ export default function ExamAttemptPage() {
 
             {/* Question Body Text & Equations */}
             <div className="space-y-4">
-              <p className="text-sm sm:text-base font-medium text-white leading-relaxed whitespace-pre-line">
+              <p className="text-sm sm:text-base font-medium text-white leading-relaxed whitespace-pre-line select-none">
                 {currentQuestion.question_text}
               </p>
 
@@ -1062,18 +1334,34 @@ export default function ExamAttemptPage() {
         </div>
       )}
 
-      {/* Phase 14: Dynamic Anti-Screenshot Watermark */}
+      {/* Phase 23: Dynamic Student Watermark & Content Traceability */}
       {attemptDetail?.watermark_text && (
-        <div
-          aria-hidden="true"
-          className="fixed inset-0 pointer-events-none z-30 overflow-hidden select-none opacity-[0.035] flex flex-wrap gap-24 p-8 transform -rotate-12 items-center justify-center font-mono text-xs text-white"
-        >
-          {Array.from({ length: 36 }).map((_, i) => (
-            <span key={i} className="whitespace-nowrap tracking-widest font-bold">
-              {attemptDetail.watermark_text}
-            </span>
-          ))}
-        </div>
+        <DynamicWatermark
+          watermarkText={attemptDetail.watermark_text}
+          watermarkCode={attemptDetail.security_policy?.watermark_code}
+          opacity={attemptDetail.security_policy?.watermark_opacity ?? 0.06}
+          fontSize={attemptDetail.security_policy?.watermark_font_size ?? 12}
+          rotationDeg={attemptDetail.security_policy?.watermark_rotation_deg ?? -25}
+          spacingPx={attemptDetail.security_policy?.watermark_spacing_px ?? 140}
+          updateIntervalSec={attemptDetail.security_policy?.watermark_update_interval_sec ?? 30}
+          showTimestamp={true}
+        />
+      )}
+
+      {/* Phase 23: Browser Capture Signal Monitor & Deterrence */}
+      {attemptDetail?.attempt_id && sessionToken && (
+        <>
+          <CaptureSignalMonitor
+            attemptId={attemptDetail.attempt_id}
+            sessionToken={sessionToken}
+            watermarkCode={attemptDetail.security_policy?.watermark_code}
+            enabled={attemptDetail.security_policy?.track_screenshot_signals ?? true}
+          />
+          <CaptureCapabilityCheck
+            attemptId={attemptDetail.attempt_id}
+            sessionToken={sessionToken}
+          />
+        </>
       )}
 
       {/* Phase 14: Non-Accusatory Security Reminder Modal */}
@@ -1105,8 +1393,65 @@ export default function ExamAttemptPage() {
         </div>
       )}
 
+      {/* Phase 22: Print Masking Styles */}
+      <style jsx global>{`
+        @media print {
+          body, html, main, header, aside, div {
+            display: none !important;
+            visibility: hidden !important;
+          }
+        }
+      `}</style>
+
+      {/* Phase 22: Fullscreen Policy: Examination Paused Overlay */}
+      {isExamPaused && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full glass-card rounded-2xl border border-rose-500/40 p-8 space-y-5 shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Examination Session Paused</h2>
+              <p className="text-xs text-rose-300 font-mono mt-1">Fullscreen exit detected • Policy: Pause on Exit</p>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Your examination has been temporarily paused because full-screen mode was exited. Answers recorded prior to exit are securely saved. Return to full-screen mode to resume your examination.
+            </p>
+            <div className="pt-2">
+              <button
+                onClick={requestFullscreenExplicit}
+                className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Maximize2 className="w-4 h-4" />
+                <span>Return to Fullscreen &amp; Resume</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 22: Fullscreen Exit Recovery Dialog */}
+      {showFullscreenModal && !isExamPaused && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-card rounded-2xl border border-purple-500/40 p-6 space-y-4 text-center">
+            <Maximize2 className="w-12 h-12 text-purple-400 mx-auto" />
+            <h3 className="text-base font-bold text-white">Fullscreen Mode Exited</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Fullscreen exit has been logged for invigilator review ({fullscreenExitCount} exits detected). Your answers remain saved safely. Please return to fullscreen mode to continue without further integrity warnings.
+            </p>
+            <button
+              onClick={requestFullscreenExplicit}
+              className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs transition shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>Re-enter Full-Screen Mode</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Phase 14: Full-Screen Required Prompt Modal */}
-      {fullscreenRequiredPrompt && (
+      {fullscreenRequiredPrompt && !showFullscreenModal && !isExamPaused && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="max-w-md w-full glass-card rounded-2xl border border-primary-500/40 p-6 space-y-4 text-center">
             <Maximize2 className="w-12 h-12 text-primary-400 mx-auto" />
@@ -1115,15 +1460,8 @@ export default function ExamAttemptPage() {
               This examination configuration requires full-screen continuity. Please click below to resume your examination.
             </p>
             <button
-              onClick={async () => {
-                try {
-                  await document.documentElement.requestFullscreen();
-                  setFullscreenRequiredPrompt(false);
-                } catch {
-                  setFullscreenRequiredPrompt(false);
-                }
-              }}
-              className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs transition shadow-lg shadow-primary-500/25"
+              onClick={requestFullscreenExplicit}
+              className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs transition shadow-lg shadow-primary-500/25 cursor-pointer"
             >
               Enter Full-Screen Mode
             </button>

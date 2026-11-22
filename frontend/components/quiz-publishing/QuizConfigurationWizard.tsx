@@ -647,35 +647,313 @@ export function QuizConfigurationWizard({ quizId, basePath, token }: QuizConfigu
 
         {/* STEP 9: Security Settings */}
         {currentStep === 9 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-primary-400" />
-              <span>Step 9: Security &amp; Anti-Cheating Controls</span>
-            </h2>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary-400" />
+                <span>Step 9: Advanced Browser Examination Lockdown</span>
+              </h2>
+              <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                Phase 22 Compliant
+              </span>
+            </div>
 
-            <div className="space-y-3">
+            {/* Technical Limitation Advisory */}
+            <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-semibold text-white">Browser Security &amp; Fairness Advisory:</span>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Web-based lockdown relies on modern browser APIs to detect defocus, clipboard tampering, and fullscreen exit. Standard web browsers cannot prevent operating-system screenshots, screen recording, phone calls, or external cameras. All telemetry requires human invigilator review before any academic penalty is imposed.
+                </p>
+              </div>
+            </div>
+
+            {/* Core Browser Deterrence Toggles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
-                { field: 'enable_tab_switch_detection', title: 'Tab Switch & Focus Loss Detection', desc: 'Track and log window blur events to detect cheating.' },
-                { field: 'enable_copy_paste_prevention', title: 'Clipboard Restriction', desc: 'Disable copy, paste, and cut inside examination environment.' },
-                { field: 'enable_right_click_prevention', title: 'Context Menu Protection', desc: 'Prevent right-click inspection and developer tool shortcuts.' },
-                { field: 'enable_fullscreen_enforcement', title: 'Fullscreen Enforcement', desc: 'Prompt for and enforce fullscreen mode during examination.' },
+                { field: 'enable_fullscreen_enforcement', title: 'Fullscreen Examination Mode', desc: 'Require candidate to take the examination in continuous full-screen mode.' },
+                { field: 'enable_tab_switch_detection', title: 'Focus & Visibility Monitoring', desc: 'Timestamp and log tab switches, window blur events, and page defocus.' },
+                { field: 'disable_copy', title: 'Disable Question Copying', desc: 'Prevent selecting and copying question stems to the clipboard.' },
+                { field: 'disable_paste', title: 'Disable Answer Pasting', desc: 'Prohibit pasting external clipboard content into answer text fields.' },
+                { field: 'enable_right_click_prevention', title: 'Context Menu Restrictions', desc: 'Disable right-click context menu and inspection shortcuts.' },
+                { field: 'print_restrictions', title: 'Print Interdiction', desc: 'Block Ctrl+P / Cmd+P and mask printable viewports with blank sheets.' },
+                { field: 'navigation_warning', title: 'Navigation Safeguards', desc: 'Trigger beforeunload and browser back button traps against accidental exits.' },
+                { field: 'require_invigilator_review', title: 'Require Human Invigilator Review', desc: 'Ensure no candidate is disqualified automatically without invigilator review.' },
               ].map((item) => (
                 <label
                   key={item.field}
-                  className="flex items-center gap-3 p-3.5 rounded-xl bg-surface-elevated border border-surface-border cursor-pointer"
+                  className="flex items-start gap-3 p-3.5 rounded-xl bg-surface-elevated border border-surface-border cursor-pointer hover:border-slate-700 transition-colors"
                 >
                   <input
                     type="checkbox"
-                    checked={Boolean(config[item.field as keyof QuizConfiguration])}
+                    checked={Boolean(config[item.field as keyof QuizConfiguration] ?? true)}
                     onChange={(e) => updateField(item.field as keyof QuizConfiguration, e.target.checked)}
-                    className="rounded border-slate-700 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                    className="mt-0.5 rounded border-slate-700 text-primary-600 focus:ring-primary-500 w-4 h-4 cursor-pointer"
                   />
                   <div>
                     <div className="text-xs font-bold text-white">{item.title}</div>
-                    <div className="text-[11px] text-slate-400">{item.desc}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{item.desc}</div>
                   </div>
                 </label>
               ))}
+            </div>
+
+            {/* Configurable Policy Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              {/* Fullscreen Exit Policy */}
+              <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                <label className="text-xs font-semibold text-white block">
+                  Fullscreen-Exit Policy
+                </label>
+                <select
+                  value={config.fullscreen_exit_policy || 'warning_only'}
+                  onChange={(e) => updateField('fullscreen_exit_policy', e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-primary-500"
+                >
+                  <option value="warning_only">Warning Only</option>
+                  <option value="record_incident">Warning &amp; Record Incident</option>
+                  <option value="pause_exam">Pause Exam Pending Return</option>
+                  <option value="flag_review">Flag Attempt for Review</option>
+                </select>
+                <p className="text-[10px] text-slate-400">
+                  Defines server reaction when fullscreen mode is exited.
+                </p>
+              </div>
+
+              {/* Maximum Permitted Focus Losses */}
+              <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                <label className="text-xs font-semibold text-white block">
+                  Max Permitted Focus Losses
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={config.max_focus_loss_count ?? 5}
+                  onChange={(e) => updateField('max_focus_loss_count', parseInt(e.target.value, 10) || 5)}
+                  className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-primary-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Threshold before automated security alert is raised.
+                </p>
+              </div>
+
+              {/* Network Interruption Policy */}
+              <div className="space-y-1.5 p-3.5 rounded-xl bg-surface-elevated border border-surface-border">
+                <label className="text-xs font-semibold text-white block">
+                  Network Interruption Policy
+                </label>
+                <select
+                  value={config.network_interruption_policy || 'buffer_and_resume'}
+                  onChange={(e) => updateField('network_interruption_policy', e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-primary-500"
+                >
+                  <option value="buffer_and_resume">Buffer Offline &amp; Auto-Sync</option>
+                  <option value="pause_on_disconnect">Pause on Disconnect</option>
+                </select>
+                <p className="text-[10px] text-slate-400">
+                  Handles network loss without altering server timer deadline.
+                </p>
+              </div>
+            </div>
+
+            {/* Phase 23: Dynamic Student Watermark & Content Traceability */}
+            <div className="space-y-4 pt-3 border-t border-surface-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider">
+                    <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                    <span>Dynamic Student Watermark &amp; Content Traceability</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Embeds unique, semi-transparent diagonal watermarks containing student name, masked ID, exam ID, and live timestamps.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(config.watermark_enabled ?? true)}
+                    onChange={(e) => updateField('watermark_enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {Boolean(config.watermark_enabled ?? true) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-2">
+                  {/* Left Column: Watermark Customization Sliders & Controls */}
+                  <div className="space-y-3.5 p-4 rounded-xl bg-surface-elevated border border-surface-border">
+                    {/* Custom Banner / Institution Prefix */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-300">
+                        Custom Institution / Watermark Banner
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. QUIZVERSE ACADEMY"
+                        value={config.watermark_custom_text || ''}
+                        onChange={(e) => updateField('watermark_custom_text', e.target.value || null)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-surface-base border border-surface-border text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      />
+                    </div>
+
+                    {/* Opacity Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-medium text-slate-300">Watermark Opacity</span>
+                        <span className="font-mono text-indigo-400">
+                          {Math.round((config.watermark_opacity ?? 0.06) * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.02"
+                        max="0.25"
+                        step="0.01"
+                        value={config.watermark_opacity ?? 0.06}
+                        onChange={(e) => updateField('watermark_opacity', parseFloat(e.target.value))}
+                        className="w-full accent-indigo-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[9px] text-slate-500">
+                        <span>2% (Subtle)</span>
+                        <span>25% (High Contrast)</span>
+                      </div>
+                    </div>
+
+                    {/* Rotation Angle Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-medium text-slate-300">Rotation Angle</span>
+                        <span className="font-mono text-indigo-400">
+                          {config.watermark_rotation_deg ?? -25}&deg;
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="-45"
+                        max="0"
+                        step="5"
+                        value={config.watermark_rotation_deg ?? -25}
+                        onChange={(e) => updateField('watermark_rotation_deg', parseInt(e.target.value, 10))}
+                        className="w-full accent-indigo-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Spacing Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-medium text-slate-300">Pattern Spacing</span>
+                        <span className="font-mono text-indigo-400">
+                          {config.watermark_spacing_px ?? 140}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="80"
+                        max="240"
+                        step="10"
+                        value={config.watermark_spacing_px ?? 140}
+                        onChange={(e) => updateField('watermark_spacing_px', parseInt(e.target.value, 10))}
+                        className="w-full accent-indigo-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Checkbox Options */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-300">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(config.watermark_mask_student_id ?? true)}
+                          onChange={(e) => updateField('watermark_mask_student_id', e.target.checked)}
+                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                        />
+                        <span>Mask Register Number</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(config.watermark_show_timestamp ?? true)}
+                          onChange={(e) => updateField('watermark_show_timestamp', e.target.checked)}
+                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                        />
+                        <span>Live UTC Timestamp</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(config.track_screenshot_signals ?? true)}
+                          onChange={(e) => updateField('track_screenshot_signals', e.target.checked)}
+                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                        />
+                        <span>PrintScreen Key Detection</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(config.track_screen_recording_signals ?? true)}
+                          onChange={(e) => updateField('track_screen_recording_signals', e.target.checked)}
+                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                        />
+                        <span>Screen Capture API Monitor</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Live Interactive Watermark Preview Box */}
+                  <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                      <span>Live Candidate Preview</span>
+                      <span className="text-[10px] font-mono text-indigo-400">Sample Question</span>
+                    </div>
+
+                    {/* Mock Question Box with Live Watermark Layer */}
+                    <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-900 p-4 space-y-3 min-h-[200px]">
+                      {/* Live SVG Watermark Overlay */}
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(
+                            `<svg xmlns='http://www.w3.org/2000/svg' width='${Math.max(200, (config.watermark_spacing_px ?? 140) * 2.5)}' height='${Math.max(100, (config.watermark_spacing_px ?? 140) * 1.4)}'>
+                              <g transform='rotate(${config.watermark_rotation_deg ?? -25} ${Math.max(200, (config.watermark_spacing_px ?? 140) * 2.5) / 2} ${Math.max(100, (config.watermark_spacing_px ?? 140) * 1.4) / 2})'>
+                                <text x='50%' y='50%' text-anchor='middle' dominant-baseline='middle' font-family='monospace' font-size='${config.watermark_font_size ?? 12}px' font-weight='700' fill='rgba(255,255,255,${config.watermark_opacity ?? 0.06})'>
+                                  ${(config.watermark_custom_text || 'QUIZVERSE').toUpperCase()} | CANDIDATE | STU-****4821 | WM-SAMPLE
+                                </text>
+                              </g>
+                            </svg>`
+                          )}")`,
+                          backgroundRepeat: 'repeat',
+                        }}
+                        className="absolute inset-0 pointer-events-none z-10"
+                      />
+
+                      {/* Mock Content */}
+                      <div className="relative z-0 space-y-2 text-xs">
+                        <div className="font-bold text-white flex items-center justify-between">
+                          <span>Question 1 of 25</span>
+                          <span className="text-[10px] text-slate-400 font-mono">2.0 Marks</span>
+                        </div>
+                        <p className="text-slate-300 text-[11px] leading-relaxed">
+                          What is the worst-case asymptotic time complexity of searching for an element in a balanced binary search tree containing N elements?
+                        </p>
+                        <div className="space-y-1.5 pt-1">
+                          {['A. O(1)', 'B. O(log N)', 'C. O(N)', 'D. O(N log N)'].map((opt) => (
+                            <div key={opt} className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950/60 text-[11px] text-slate-300 flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full border border-slate-600 inline-block" />
+                              <span>{opt}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 text-center">
+                      The dynamic watermark pattern is rendered continuously without obstructing question readability or candidate inputs.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

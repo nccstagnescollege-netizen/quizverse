@@ -112,6 +112,19 @@ export interface ParticipantMonitoringItem {
   has_active_incident: boolean;
   ip_address?: string;
   browser?: string;
+  browser_compatibility_status?: string;
+  fullscreen_status?: string;
+  focus_loss_count?: number;
+  fullscreen_exit_count?: number;
+  incident_count?: number;
+  review_status?: string;
+  latest_incident?: string;
+  // Phase 23 Watermark & Capture Telemetry
+  watermark_status?: string;
+  watermark_code?: string;
+  capture_capability?: string;
+  capture_signals_count?: number;
+  latest_capture_signal?: string;
 }
 
 export interface AttemptEventItem {

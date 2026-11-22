@@ -101,7 +101,7 @@ export function UserAdminSidebar({
       },
       {
         label: 'Student Registrations',
-        href: '/admin/dashboard#students',
+        href: '/admin/invitations',
         icon: GraduationCap,
         authorized: hasPermission('student.view'),
       },

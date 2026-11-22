@@ -23,6 +23,9 @@ from backend.app.models.security_audit import (
     SecurityAlert,
     SecurityInvestigationNote,
     AuditLog,
+    BrowserCompatibilityRecord,
+    WatermarkSession,
+    CaptureCapabilityReport,
 )
 from backend.app.models.examination import (
     ExaminationAttempt,
@@ -49,6 +52,16 @@ from backend.app.schemas.security import (
     InvestigationDetailResponse,
     SecurityDashboardSummaryResponse,
     SecurityRetentionPurgeResponse,
+    BrowserCompatibilityCheckItem,
+    BrowserCompatibilitySubmitRequest,
+    BrowserCompatibilityResponse,
+    WatermarkSessionResponse,
+    WatermarkVerificationRequest,
+    WatermarkVerificationResponse,
+    CaptureCapabilitySubmitRequest,
+    CaptureCapabilityResponse,
+    CaptureSignalSubmitRequest,
+    CaptureSignalResponse,
 )
 from backend.app.services.audit_service import log_audit_event
 
@@ -299,6 +312,98 @@ class SecurityService:
             "message": "Security and monitoring notice acknowledged successfully.",
         }
 
+    @staticmethod
+    def record_browser_compatibility(
+        db: Session,
+        quiz_id: uuid.UUID,
+        req: BrowserCompatibilitySubmitRequest,
+        student_id: Optional[uuid.UUID] = None,
+        attempt_id: Optional[uuid.UUID] = None,
+        session_id: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> BrowserCompatibilityResponse:
+        """Saves pre-flight browser compatibility test results and determines if candidate may proceed."""
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+
+        has_action_required = any(c.status in ["action_required", "unsupported"] for c in req.checks)
+        has_warning = any(c.status == "warning" for c in req.checks)
+
+        if has_action_required:
+            overall = "ACTION_REQUIRED"
+            can_proceed = False
+            msg = "One or more critical browser security checks failed. Please address required items before entering."
+        elif has_warning:
+            overall = "WARNING"
+            can_proceed = True
+            msg = "Some browser security warnings were detected, but you may proceed to the examination."
+        else:
+            overall = "PASSED"
+            can_proceed = True
+            msg = "All browser security compatibility checks passed successfully."
+
+        checks_json = [c.model_dump() for c in req.checks]
+
+        record = BrowserCompatibilityRecord(
+            attempt_id=attempt_id or req.attempt_id,
+            quiz_id=quiz_id,
+            student_id=student_id,
+            session_id=session_id,
+            browser_name=req.browser_name,
+            browser_version=req.browser_version,
+            os_name=req.os_name,
+            os_version=req.os_version,
+            device_type=req.device_type,
+            is_secure_context=req.is_secure_context,
+            javascript_enabled=req.javascript_enabled,
+            fullscreen_supported=req.fullscreen_supported,
+            visibility_api_supported=req.visibility_api_supported,
+            storage_available=req.storage_available,
+            screen_width=req.screen_width,
+            screen_height=req.screen_height,
+            viewport_width=req.viewport_width,
+            viewport_height=req.viewport_height,
+            network_online=req.network_online,
+            network_downlink=Decimal(str(req.network_downlink)) if req.network_downlink is not None else None,
+            network_rtt=req.network_rtt,
+            is_seb_detected=req.is_seb_detected,
+            checks_summary=checks_json,
+            overall_status=overall,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        db.add(record)
+
+        if (attempt_id or req.attempt_id) and not can_proceed:
+            eff_attempt_id = attempt_id or req.attempt_id
+            ev = SecurityEvent(
+                student_id=student_id,
+                quiz_id=quiz_id,
+                attempt_id=eff_attempt_id,
+                event_category="COMPATIBILITY",
+                severity="MEDIUM",
+                event_name="COMPATIBILITY_FAILURE",
+                description=f"Candidate environment compatibility failure: {overall}",
+                event_metadata={"checks": checks_json, "device_type": req.device_type},
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            db.add(ev)
+
+        db.commit()
+        db.refresh(record)
+
+        return BrowserCompatibilityResponse(
+            success=True,
+            record_id=record.id,
+            overall_status=overall,
+            can_proceed=can_proceed,
+            message=msg,
+            checks=req.checks,
+        )
+
     # -----------------------------------------------------------------------
     # 3. Secure Event Collection & Server Validation
     # -----------------------------------------------------------------------
@@ -444,14 +549,45 @@ class SecurityService:
     @staticmethod
     def _classify_event_severity(event_name: str, category: str) -> str:
         """Classifies individual raw events into LOW, MEDIUM, or HIGH."""
-        high_events = {"SESSION_CONFLICT", "UNAUTHORIZED_SUBMISSION_ATTEMPT"}
-        med_events = {"FULLSCREEN_EXIT", "COPY_ATTEMPT", "PASTE_ATTEMPT", "CUT_ATTEMPT"}
+        high_events = {
+            "SESSION_CONFLICT",
+            "UNAUTHORIZED_SUBMISSION_ATTEMPT",
+            "SCREEN_RECORDING_SIGNAL_DETECTED",
+            "CONTENT_EXPORT_ATTEMPT",
+        }
+        med_events = {
+            "FULLSCREEN_EXIT",
+            "COPY_ATTEMPT",
+            "PASTE_ATTEMPT",
+            "CUT_ATTEMPT",
+            "RESTRICTED_COPY_ATTEMPT",
+            "RESTRICTED_PASTE_ATTEMPT",
+            "PRINT_ATTEMPT",
+            "PRINT_RESTRICTION_TRIGGERED",
+            "NAVIGATION_ATTEMPT",
+            "COMPATIBILITY_FAILURE",
+            "SCREENSHOT_SIGNAL_DETECTED",
+            "CAPTURE_API_ACTIVITY",
+            "WATERMARK_VALIDATION_FAILED",
+        }
+        info_events = {
+            "TAB_VISIBLE",
+            "WINDOW_FOCUS_GAINED",
+            "WINDOW_FOCUS",
+            "PAGE_VISIBLE",
+            "FULLSCREEN_ENTER",
+            "NETWORK_RECONNECTED",
+            "WATERMARK_RENDERED",
+            "WATERMARK_CONFIGURATION_CHANGED",
+        }
         name_up = event_name.upper()
 
         if name_up in high_events:
             return "HIGH"
         if name_up in med_events:
             return "MEDIUM"
+        if name_up in info_events:
+            return "INFO"
         return "LOW"
 
     # -----------------------------------------------------------------------
@@ -469,6 +605,7 @@ class SecurityService:
         - Paste Attempt: 8 pts
         - Cut Attempt: 8 pts
         - Context Menu: 3 pts
+        - Print / Navigation Attempt: 6 pts
         - Session Conflict: 15 pts
 
         Cumulative Score Mapping:
@@ -483,18 +620,32 @@ class SecurityService:
         score = 0.0
         for ev in events:
             name = (ev.event_name or "").upper()
-            if name == "TAB_HIDDEN":
+            if name in ["TAB_HIDDEN", "TAB_SWITCH", "PAGE_HIDDEN"]:
                 score += 5.0
-            elif name == "WINDOW_FOCUS_LOST":
+            elif name in ["WINDOW_FOCUS_LOST", "WINDOW_BLUR"]:
                 score += 3.0
             elif name == "FULLSCREEN_EXIT":
                 score += 10.0
-            elif name in ["COPY_ATTEMPT", "PASTE_ATTEMPT", "CUT_ATTEMPT"]:
+            elif name in ["COPY_ATTEMPT", "PASTE_ATTEMPT", "CUT_ATTEMPT", "RESTRICTED_COPY_ATTEMPT", "RESTRICTED_PASTE_ATTEMPT"]:
                 score += 8.0
-            elif name == "CONTEXT_MENU":
+            elif name in ["CONTEXT_MENU", "CONTEXT_MENU_ATTEMPT"]:
                 score += 3.0
+            elif name in ["PRINT_ATTEMPT", "NAVIGATION_ATTEMPT", "PRINT_RESTRICTION_TRIGGERED"]:
+                score += 6.0
+            elif name == "SCREENSHOT_SIGNAL_DETECTED":
+                score += 8.0
+            elif name == "SCREEN_RECORDING_SIGNAL_DETECTED":
+                score += 15.0
+            elif name == "CAPTURE_API_ACTIVITY":
+                score += 10.0
+            elif name == "WATERMARK_VALIDATION_FAILED":
+                score += 8.0
+            elif name == "CONTENT_EXPORT_ATTEMPT":
+                score += 12.0
             elif name == "SESSION_CONFLICT":
                 score += 15.0
+            elif name == "COMPATIBILITY_FAILURE":
+                score += 10.0
 
         score = round(min(score, 100.0), 2)
         if score >= 56.0:
@@ -571,6 +722,36 @@ class SecurityService:
                 now=now,
             )
             warnings.append("Notice: Clipboard copy/paste is monitored during this examination.")
+
+        # 4. Phase 22 Focus Loss Limit check
+        max_focus = getattr(policy, "max_focus_loss_count", 5) or 5
+        focus_losses = db.query(func.count(SecurityEvent.id)).filter(
+            SecurityEvent.attempt_id == attempt.id,
+            SecurityEvent.event_name.in_(["WINDOW_FOCUS_LOST", "WINDOW_BLUR", "PAGE_HIDDEN"])
+        ).scalar() or 0
+
+        if focus_losses >= max_focus:
+            SecurityService._upsert_alert(
+                db=db,
+                attempt=attempt,
+                alert_type="FOCUS_LOSS_EXCEEDED",
+                severity="HIGH" if focus_losses >= (max_focus + 3) else "MEDIUM",
+                occurrences=focus_losses,
+                now=now,
+            )
+            warnings.append(f"Notice: Focus loss threshold reached ({focus_losses}/{max_focus}). This activity is recorded for invigilator review.")
+
+        # 5. Fullscreen policy flag check
+        fs_policy = getattr(policy, "fullscreen_exit_policy", "warning_only")
+        if fs_policy in ["flag_review", "pause_exam"] and fullscreen_exits > 0:
+            SecurityService._upsert_alert(
+                db=db,
+                attempt=attempt,
+                alert_type="FULLSCREEN_POLICY_FLAGGED",
+                severity="HIGH" if fs_policy == "pause_exam" else "MEDIUM",
+                occurrences=fullscreen_exits,
+                now=now,
+            )
 
         active_count = db.query(func.count(SecurityAlert.id)).filter(
             SecurityAlert.attempt_id == attempt.id,
@@ -732,8 +913,18 @@ class SecurityService:
             )
 
         now = datetime.now(timezone.utc)
-        new_status = req.status.upper()
-        if new_status not in ["UNDER_REVIEW", "RESOLVED", "DISMISSED", "ESCALATED"]:
+        new_status = req.status.upper().replace(" ", "_")
+        valid_statuses = [
+            "NEW",
+            "UNREVIEWED",
+            "UNDER_REVIEW",
+            "VERIFIED",
+            "NOT_A_VIOLATION",
+            "DISMISSED",
+            "ESCALATED",
+            "RESOLVED",
+        ]
+        if new_status not in valid_statuses:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid alert status: {req.status}")
 
         alert.status = new_status
@@ -1089,3 +1280,196 @@ class SecurityService:
             preserved_investigations_count=len(investigated_attempt_ids),
             message=f"Purged {purged_count} security events older than {retention_days} days. {len(investigated_attempt_ids)} active investigations preserved.",
         )
+
+    # -----------------------------------------------------------------------
+    # 10. Dynamic Student Watermark & Capture Signals (Phase 23)
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def generate_or_get_watermark_session(
+        db: Session,
+        attempt: ExaminationAttempt,
+    ) -> WatermarkSession:
+        """
+        Retrieves or generates a tamper-resistant, server-authoritative WatermarkSession
+        for the active examination attempt using authentic DB records.
+        """
+        session = db.query(WatermarkSession).filter(WatermarkSession.attempt_id == attempt.id).first()
+        if session:
+            return session
+
+        quiz = attempt.quiz
+        config = db.query(QuizConfiguration).filter(QuizConfiguration.quiz_id == attempt.quiz_id).first()
+        policy = db.query(ExaminationSecurityPolicy).filter(ExaminationSecurityPolicy.quiz_id == attempt.quiz_id).first()
+
+        opacity = float(getattr(config, "watermark_opacity", getattr(policy, "watermark_opacity", 0.06)))
+        font_size = int(getattr(config, "watermark_font_size", getattr(policy, "watermark_font_size", 12)))
+        rotation_deg = int(getattr(config, "watermark_rotation_deg", getattr(policy, "watermark_rotation_deg", -25)))
+        spacing_px = int(getattr(config, "watermark_spacing_px", getattr(policy, "watermark_spacing_px", 140)))
+        update_interval_sec = int(getattr(config, "watermark_update_interval_sec", getattr(policy, "watermark_update_interval_sec", 30)))
+        mask_student_id = bool(getattr(config, "watermark_mask_student_id", getattr(policy, "watermark_mask_student_id", True)))
+        show_exam_id = bool(getattr(config, "watermark_show_exam_id", getattr(policy, "watermark_show_exam_id", True)))
+        custom_prefix = getattr(config, "watermark_custom_text", getattr(policy, "watermark_custom_text", None))
+
+        student = attempt.student
+        student_name = student.full_name if student else "Candidate"
+        raw_reg = None
+        if student and getattr(student, "profile", None) and student.profile.student_identifier:
+            raw_reg = student.profile.student_identifier
+        elif student and getattr(student, "register_number", None):
+            raw_reg = student.register_number
+        if not raw_reg:
+            raw_reg = f"STU-{str(attempt.student_id)[:4].upper()}" if attempt.student_id else "STU-0000"
+        masked_reg = _mask_identifier(raw_reg) if mask_student_id else raw_reg
+
+        institution_name = "QUIZVERSE"
+        if student and getattr(student, "profile", None) and student.profile.institution:
+            institution_name = student.profile.institution
+        elif quiz and quiz.subject and getattr(quiz.subject, "curriculum", None):
+            curriculum = quiz.subject.curriculum
+            if curriculum and getattr(curriculum, "programme", None):
+                prog = curriculum.programme
+                if getattr(prog, "institution", None) and prog.institution.name:
+                    institution_name = prog.institution.name
+                elif prog.name:
+                    institution_name = prog.name
+
+        watermark_code = f"WM-{secrets.token_hex(4).upper()}"
+        while db.query(WatermarkSession).filter(WatermarkSession.watermark_code == watermark_code).first():
+            watermark_code = f"WM-{secrets.token_hex(4).upper()}"
+
+        parts = []
+        if custom_prefix and custom_prefix.strip():
+            parts.append(custom_prefix.strip())
+        else:
+            parts.append(institution_name.upper())
+
+        parts.append(student_name.upper())
+        parts.append(masked_reg)
+        if show_exam_id:
+            short_quiz = str(attempt.quiz_id)[:8].upper()
+            parts.append(f"EXAM-{short_quiz}")
+        parts.append(watermark_code)
+
+        watermark_text = " | ".join(parts)
+
+        session = WatermarkSession(
+            attempt_id=attempt.id,
+            quiz_id=attempt.quiz_id,
+            student_id=attempt.student_id,
+            watermark_code=watermark_code,
+            watermark_text=watermark_text,
+            student_display_name=student_name,
+            student_masked_identifier=masked_reg,
+            institution_name=institution_name,
+            opacity=opacity,
+            font_size=font_size,
+            rotation_deg=rotation_deg,
+            spacing_px=spacing_px,
+            update_interval_sec=update_interval_sec,
+            is_valid=True,
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @staticmethod
+    def verify_watermark_session(
+        db: Session,
+        attempt_id: uuid.UUID,
+        watermark_code: str,
+        client_timestamp: Optional[datetime] = None,
+    ) -> Tuple[bool, str]:
+        session = db.query(WatermarkSession).filter(WatermarkSession.attempt_id == attempt_id).first()
+        if not session:
+            return False, "No active watermark session found for this attempt."
+        if session.watermark_code != watermark_code:
+            session.tamper_flag = True
+            db.commit()
+            ev = SecurityEvent(
+                attempt_id=attempt_id,
+                student_id=session.student_id,
+                quiz_id=session.quiz_id,
+                event_category="WATERMARK",
+                severity="HIGH",
+                event_name="WATERMARK_VALIDATION_FAILED",
+                description=f"Watermark mismatch detected. Expected {session.watermark_code}, received {watermark_code}.",
+                client_timestamp=client_timestamp,
+            )
+            db.add(ev)
+            db.commit()
+            return False, "Watermark validation code mismatch."
+
+        session.last_verified_at = datetime.now(timezone.utc)
+        session.verification_count += 1
+        session.is_valid = True
+        db.commit()
+        return True, "Watermark verified successfully."
+
+    @staticmethod
+    def record_capture_capability(
+        db: Session,
+        attempt: ExaminationAttempt,
+        payload: CaptureCapabilitySubmitRequest,
+    ) -> CaptureCapabilityReport:
+        report = CaptureCapabilityReport(
+            attempt_id=attempt.id,
+            quiz_id=attempt.quiz_id,
+            student_id=attempt.student_id,
+            screen_capture_api_supported=payload.screen_capture_api_supported,
+            screenshot_shortcut_supported=payload.screenshot_shortcut_supported,
+            display_media_active=payload.display_media_active,
+            detection_tier=payload.detection_tier,
+            browser_vendor=payload.browser_vendor,
+            os_platform=payload.os_platform,
+            notes=payload.notes,
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+        return report
+
+    @staticmethod
+    def record_capture_signal(
+        db: Session,
+        attempt: ExaminationAttempt,
+        payload: CaptureSignalSubmitRequest,
+    ) -> SecurityEvent:
+        event_name = "SCREENSHOT_SIGNAL_DETECTED"
+        sig_up = payload.signal_type.upper()
+        if "MEDIA" in sig_up or "RECORD" in sig_up:
+            event_name = "SCREEN_RECORDING_SIGNAL_DETECTED"
+        elif "API" in sig_up:
+            event_name = "CAPTURE_API_ACTIVITY"
+        elif "PRINT_SCREEN" in sig_up or "PRTSCN" in sig_up or "SNIP" in sig_up or "SCREENSHOT" in sig_up:
+            event_name = "SCREENSHOT_SIGNAL_DETECTED"
+        elif "PRINT" in sig_up:
+            event_name = "PRINT_RESTRICTION_TRIGGERED"
+
+        severity = "MEDIUM"
+        if payload.confidence_level == "high" or event_name == "SCREEN_RECORDING_SIGNAL_DETECTED":
+            severity = "HIGH"
+        elif payload.confidence_level == "low":
+            severity = "LOW"
+
+        ev = SecurityEvent(
+            attempt_id=attempt.id,
+            student_id=attempt.student_id,
+            quiz_id=attempt.quiz_id,
+            event_category="CAPTURE_DETECTION",
+            severity=severity,
+            event_name=event_name,
+            description=f"Capture signal detected via {payload.detection_source} (confidence: {payload.confidence_level}). Signal: {payload.signal_type}",
+            client_timestamp=payload.client_timestamp,
+        )
+        db.add(ev)
+        db.commit()
+        db.refresh(ev)
+
+        # Re-evaluate alerts
+        policy = db.query(ExaminationSecurityPolicy).filter(ExaminationSecurityPolicy.quiz_id == attempt.quiz_id).first()
+        if policy:
+            SecurityService._evaluate_alerts(db, attempt, policy, datetime.now(timezone.utc))
+
+        return ev

@@ -4,6 +4,7 @@ from sqlalchemy import (
     String,
     Text,
     Integer,
+    Numeric,
     Boolean,
     DateTime,
     Uuid,
@@ -69,6 +70,32 @@ class ExaminationSecurityPolicy(Base):
     # Transparency & Student Notice
     student_notice_text = Column(Text, nullable=True)
     student_acknowledgement_required = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy = Column(String(32), nullable=False, default="warning_only", server_default=text("'warning_only'"))  # warning_only, record_incident, pause_exam, flag_review
+    max_focus_loss_count = Column(Integer, nullable=False, default=5, server_default=text("5"))
+    disable_copy = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    disable_paste = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    disable_context_menu = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    print_restrictions = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    navigation_warning = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    network_interruption_policy = Column(String(32), nullable=False, default="buffer_and_resume", server_default=text("'buffer_and_resume'"))  # buffer_and_resume, pause_on_disconnect
+    require_invigilator_review = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity = Column(Numeric(3, 2), nullable=False, default=0.06, server_default=text("0.06"))
+    watermark_font_size = Column(Integer, nullable=False, default=12, server_default=text("12"))
+    watermark_rotation_deg = Column(Integer, nullable=False, default=-25, server_default=text("-25"))
+    watermark_spacing_px = Column(Integer, nullable=False, default=140, server_default=text("140"))
+    watermark_update_interval_sec = Column(Integer, nullable=False, default=30, server_default=text("30"))
+    watermark_mask_student_id = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    watermark_show_timestamp = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    watermark_show_exam_id = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    watermark_custom_text = Column(String(255), nullable=True)
+    require_watermark_validation = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    block_screen_capture_api = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    track_screenshot_signals = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    track_screen_recording_signals = Column(Boolean, nullable=False, default=True, server_default=text("true"))
 
     created_by = Column(Uuid, ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
@@ -160,3 +187,102 @@ class AccessLog(Base):
     response_time_ms = Column(Integer, nullable=False)
     ip_address = Column(String(45), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+
+
+class BrowserCompatibilityRecord(Base):
+    __tablename__ = "browser_compatibility_records"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="SET NULL"), nullable=True, index=True)
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Uuid, ForeignKey("students.id", ondelete="SET NULL"), nullable=True, index=True)
+    session_id = Column(String(128), nullable=True)
+
+    browser_name = Column(String(64), nullable=False)
+    browser_version = Column(String(64), nullable=False)
+    os_name = Column(String(64), nullable=False)
+    os_version = Column(String(64), nullable=False)
+    device_type = Column(String(32), nullable=False, default="desktop", server_default=text("'desktop'"))
+
+    is_secure_context = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    javascript_enabled = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    fullscreen_supported = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    visibility_api_supported = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    storage_available = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+    screen_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    screen_height = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    viewport_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    viewport_height = Column(Integer, nullable=False, default=0, server_default=text("0"))
+
+    network_online = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    network_downlink = Column(Numeric(6, 2), nullable=True)
+    network_rtt = Column(Integer, nullable=True)
+    is_seb_detected = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
+    checks_summary = Column(JSONType, nullable=True)
+    overall_status = Column(String(32), nullable=False, default="PASSED", server_default=text("'PASSED'"))
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+
+    # Relationships
+    quiz = relationship("Quiz")
+    student = relationship("Student")
+    attempt = relationship("ExaminationAttempt")
+
+
+class WatermarkSession(Base):
+    __tablename__ = "watermark_sessions"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    watermark_code = Column(String(32), nullable=False, unique=True, index=True)
+    watermark_text = Column(String(512), nullable=False)
+    student_display_name = Column(String(255), nullable=False)
+    student_masked_identifier = Column(String(128), nullable=False)
+    institution_name = Column(String(255), nullable=False, default="QUIZVERSE", server_default=text("'QUIZVERSE'"))
+
+    opacity = Column(Numeric(3, 2), nullable=False, default=0.06, server_default=text("0.06"))
+    font_size = Column(Integer, nullable=False, default=12, server_default=text("12"))
+    rotation_deg = Column(Integer, nullable=False, default=-25, server_default=text("-25"))
+    spacing_px = Column(Integer, nullable=False, default=140, server_default=text("140"))
+    update_interval_sec = Column(Integer, nullable=False, default=30, server_default=text("30"))
+
+    issued_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    last_verified_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+    verification_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    is_valid = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    tamper_flag = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    metadata_json = Column(JSONType, nullable=True)
+
+    # Relationships
+    attempt = relationship("ExaminationAttempt")
+    quiz = relationship("Quiz")
+    student = relationship("Student")
+
+
+class CaptureCapabilityReport(Base):
+    __tablename__ = "capture_capability_reports"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    attempt_id = Column(Uuid, ForeignKey("examination_attempts.id", ondelete="CASCADE"), nullable=False, index=True)
+    quiz_id = Column(Uuid, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    screen_capture_api_supported = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    screenshot_shortcut_supported = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    display_media_active = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    detection_tier = Column(String(32), nullable=False, default="detection_limited", server_default=text("'detection_limited'"))  # detection_supported, detection_limited, unsupported
+    browser_vendor = Column(String(64), nullable=False, default="Unknown", server_default=text("'Unknown'"))
+    os_platform = Column(String(64), nullable=False, default="Unknown", server_default=text("'Unknown'"))
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now())
+
+    # Relationships
+    attempt = relationship("ExaminationAttempt")
+    quiz = relationship("Quiz")
+    student = relationship("Student")

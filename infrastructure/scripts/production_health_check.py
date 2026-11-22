@@ -1,8 +1,3 @@
-"""
-QUIZVERSE Production Multi-Cloud Health Probe
-Phase 20 - Production Integration & Backup Automation
-Validates end-to-end connectivity across Vercel, Render, and Supabase.
-"""
 
 import time
 import urllib.request

@@ -74,6 +74,32 @@ class QuizConfigurationBase(BaseModel):
     concurrent_session_block: bool = True
     suspicious_activity_flagging: bool = True
 
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy: str = "warning_only"  # warning_only, record_incident, pause_exam, flag_review
+    max_focus_loss_count: int = 5
+    disable_copy: bool = True
+    disable_paste: bool = True
+    disable_context_menu: bool = True
+    print_restrictions: bool = True
+    navigation_warning: bool = True
+    network_interruption_policy: str = "buffer_and_resume"  # buffer_and_resume, pause_on_disconnect
+    require_invigilator_review: bool = True
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity: float = 0.06
+    watermark_font_size: int = 12
+    watermark_rotation_deg: int = -25
+    watermark_spacing_px: int = 140
+    watermark_update_interval_sec: int = 30
+    watermark_mask_student_id: bool = True
+    watermark_show_timestamp: bool = True
+    watermark_show_exam_id: bool = True
+    watermark_custom_text: Optional[str] = None
+    require_watermark_validation: bool = False
+    block_screen_capture_api: bool = True
+    track_screenshot_signals: bool = True
+    track_screen_recording_signals: bool = True
+
 
 class QuizConfigurationResponse(QuizConfigurationBase):
     id: uuid.UUID
@@ -149,6 +175,32 @@ class QuizConfigurationUpdateRequest(BaseModel):
     concurrent_session_block: Optional[bool] = None
     suspicious_activity_flagging: Optional[bool] = None
 
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy: Optional[str] = None
+    max_focus_loss_count: Optional[int] = None
+    disable_copy: Optional[bool] = None
+    disable_paste: Optional[bool] = None
+    disable_context_menu: Optional[bool] = None
+    print_restrictions: Optional[bool] = None
+    navigation_warning: Optional[bool] = None
+    network_interruption_policy: Optional[str] = None
+    require_invigilator_review: Optional[bool] = None
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity: Optional[float] = None
+    watermark_font_size: Optional[int] = None
+    watermark_rotation_deg: Optional[int] = None
+    watermark_spacing_px: Optional[int] = None
+    watermark_update_interval_sec: Optional[int] = None
+    watermark_mask_student_id: Optional[bool] = None
+    watermark_show_timestamp: Optional[bool] = None
+    watermark_show_exam_id: Optional[bool] = None
+    watermark_custom_text: Optional[str] = None
+    require_watermark_validation: Optional[bool] = None
+    block_screen_capture_api: Optional[bool] = None
+    track_screenshot_signals: Optional[bool] = None
+    track_screen_recording_signals: Optional[bool] = None
+
 
 # -------------------------------------------------------------
 # Dedicated Subsection Update Schemas
@@ -214,6 +266,32 @@ class QuizSecurityUpdateRequest(BaseModel):
     watermark_enabled: bool = False
     concurrent_session_block: bool = True
     suspicious_activity_flagging: bool = True
+
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy: str = "warning_only"  # warning_only, record_incident, pause_exam, flag_review
+    max_focus_loss_count: int = 5
+    disable_copy: bool = True
+    disable_paste: bool = True
+    disable_context_menu: bool = True
+    print_restrictions: bool = True
+    navigation_warning: bool = True
+    network_interruption_policy: str = "buffer_and_resume"  # buffer_and_resume, pause_on_disconnect
+    require_invigilator_review: bool = True
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity: float = 0.06
+    watermark_font_size: int = 12
+    watermark_rotation_deg: int = -25
+    watermark_spacing_px: int = 140
+    watermark_update_interval_sec: int = 30
+    watermark_mask_student_id: bool = True
+    watermark_show_timestamp: bool = True
+    watermark_show_exam_id: bool = True
+    watermark_custom_text: Optional[str] = None
+    require_watermark_validation: bool = False
+    block_screen_capture_api: bool = True
+    track_screenshot_signals: bool = True
+    track_screen_recording_signals: bool = True
 
 
 # -------------------------------------------------------------

@@ -453,9 +453,14 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
                         <tr key={p.student_id} className="hover:bg-slate-900/40 transition-colors">
                           <td className="py-3 px-4">
                             <div className="font-semibold text-white truncate max-w-xs">{p.full_name}</div>
-                            <div className="text-[11px] text-slate-400 font-mono">
-                              {p.register_number || p.email}
-                              {p.student_group ? ` • ${p.student_group}` : ''}
+                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 flex-wrap">
+                              <span>{p.register_number || p.email}</span>
+                              {p.student_group && <span>• {p.student_group}</span>}
+                              {p.watermark_code && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                  {p.watermark_code}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -498,14 +503,27 @@ export function ExaminationMonitoringRoom({ token, quizId, basePath }: Examinati
                           </td>
 
                           <td className="py-3 px-3 text-center">
-                            {p.security_alerts_count > 0 ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 px-1.5 py-0.5 rounded bg-rose-500/10">
-                                <ShieldAlert className="w-3 h-3" />
-                                {p.security_alerts_count} Events
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-slate-500 font-medium">Nominal</span>
-                            )}
+                            <div className="inline-flex flex-col items-center gap-1">
+                              {p.security_alerts_count > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 px-1.5 py-0.5 rounded bg-rose-500/10">
+                                  <ShieldAlert className="w-3 h-3" />
+                                  {p.security_alerts_count} Events
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 font-medium">Nominal</span>
+                              )}
+                              {/* Phase 23 Watermark & Capture Status */}
+                              {p.watermark_status === 'ACTIVE' && (
+                                <span className="text-[9px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                                  Watermarked
+                                </span>
+                              )}
+                              {(p.capture_signals_count ?? 0) > 0 && (
+                                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
+                                  {p.capture_signals_count} Capture Signal{(p.capture_signals_count ?? 0) > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="py-3 px-4 text-right">

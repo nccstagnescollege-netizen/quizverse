@@ -26,6 +26,7 @@ import {
   StudentExamLandingDetails,
 } from '@/services/studentExamService';
 import { securityService } from '@/services/securityService';
+import { BrowserCompatibilityCheck } from '@/components/exam/BrowserCompatibilityCheck';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function ExamInstructionsPage() {
@@ -37,6 +38,7 @@ export default function ExamInstructionsPage() {
   const [instructions, setInstructions] = useState<StudentExamInstructions | null>(null);
   const [landingDetails, setLandingDetails] = useState<StudentExamLandingDetails | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [compatibilityPassed, setCompatibilityPassed] = useState<boolean>(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -279,6 +281,13 @@ export default function ExamInstructionsPage() {
           </div>
         </div>
 
+        {/* Phase 22: Pre-Flight Browser Security & Compatibility Check */}
+        <BrowserCompatibilityCheck
+          token={token}
+          sessionToken={landingDetails?.session_token || undefined}
+          onValidationComplete={(canProceed) => setCompatibilityPassed(canProceed)}
+        />
+
         {/* Phase 14: Examination Integrity & Anti-Cheating Transparency Notice */}
         <div className="glass-card rounded-2xl border border-indigo-500/30 p-6 space-y-4 bg-indigo-950/20">
           <div className="flex items-center gap-3">
@@ -349,11 +358,13 @@ export default function ExamInstructionsPage() {
 
             <button
               onClick={handleStartExam}
-              disabled={!acknowledged || !canProceed || starting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all"
+              disabled={!acknowledged || !canProceed || !compatibilityPassed || starting}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
             >
               {starting ? (
                 <span>Entering Examination Room...</span>
+              ) : !compatibilityPassed ? (
+                <span>Compatibility Action Required</span>
               ) : (
                 <>
                   <span>Enter Examination Room</span>

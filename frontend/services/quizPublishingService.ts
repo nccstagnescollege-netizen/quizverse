@@ -65,6 +65,30 @@ export interface QuizConfiguration {
   enable_fullscreen_enforcement: boolean;
   watermark_enabled: boolean;
   watermark_text: string | null;
+  // Phase 22 Advanced Browser Examination Lockdown
+  fullscreen_exit_policy?: 'warning_only' | 'record_incident' | 'pause_exam' | 'flag_review';
+  max_focus_loss_count?: number;
+  disable_copy?: boolean;
+  disable_paste?: boolean;
+  disable_context_menu?: boolean;
+  print_restrictions?: boolean;
+  navigation_warning?: boolean;
+  network_interruption_policy?: 'buffer_and_resume' | 'pause_on_disconnect';
+  require_invigilator_review?: boolean;
+  // Phase 23 Screenshot, Screen Recording & Dynamic Watermark
+  watermark_opacity?: number;
+  watermark_font_size?: number;
+  watermark_rotation_deg?: number;
+  watermark_spacing_px?: number;
+  watermark_update_interval_sec?: number;
+  watermark_mask_student_id?: boolean;
+  watermark_show_timestamp?: boolean;
+  watermark_show_exam_id?: boolean;
+  watermark_custom_text?: string | null;
+  require_watermark_validation?: boolean;
+  block_screen_capture_api?: boolean;
+  track_screenshot_signals?: boolean;
+  track_screen_recording_signals?: boolean;
   created_at: string;
   updated_at: string;
 }

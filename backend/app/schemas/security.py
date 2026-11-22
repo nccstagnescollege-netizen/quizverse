@@ -41,6 +41,32 @@ class SecurityPolicyBase(BaseModel):
     student_notice_text: Optional[str] = Field(None, description="Custom transparent security notice text")
     student_acknowledgement_required: bool = Field(True, description="Require candidate to accept policy before starting")
 
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy: str = Field("warning_only", description="warning_only, record_incident, pause_exam, flag_review")
+    max_focus_loss_count: int = Field(5, ge=1, le=100, description="Maximum permitted focus loss incidents before alert")
+    disable_copy: bool = Field(True, description="Prohibit clipboard copy within exam interface")
+    disable_paste: bool = Field(True, description="Prohibit clipboard paste into exam inputs unless permitted")
+    disable_context_menu: bool = Field(True, description="Prohibit browser right-click context menu")
+    print_restrictions: bool = Field(True, description="Interdict print attempts and mask print viewports")
+    navigation_warning: bool = Field(True, description="Trigger beforeunload and history traps against accidental navigation")
+    network_interruption_policy: str = Field("buffer_and_resume", description="buffer_and_resume, pause_on_disconnect")
+    require_invigilator_review: bool = Field(True, description="Require human invigilator review before any academic penalty")
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity: float = Field(0.06, ge=0.01, le=1.0, description="Watermark opacity")
+    watermark_font_size: int = Field(12, ge=8, le=36, description="Watermark font size in pt/px")
+    watermark_rotation_deg: int = Field(-25, ge=-90, le=90, description="Watermark rotation angle")
+    watermark_spacing_px: int = Field(140, ge=40, le=400, description="Grid spacing in pixels")
+    watermark_update_interval_sec: int = Field(30, ge=5, le=300, description="Timestamp rotation interval")
+    watermark_mask_student_id: bool = Field(True, description="Mask register numbers for student privacy")
+    watermark_show_timestamp: bool = Field(True, description="Include live server-synced timestamp")
+    watermark_show_exam_id: bool = Field(True, description="Include exam attempt reference")
+    watermark_custom_text: Optional[str] = Field(None, description="Optional institution prefix or watermark banner")
+    require_watermark_validation: bool = Field(False, description="Verify active watermark rendering")
+    block_screen_capture_api: bool = Field(True, description="Interdict Screen Capture MediaDevices requests")
+    track_screenshot_signals: bool = Field(True, description="Log PrintScreen and Snipping Tool keyboard combos")
+    track_screen_recording_signals: bool = Field(True, description="Monitor screen capture API invocations")
+
 
 class SecurityPolicyCreateRequest(SecurityPolicyBase):
     quiz_id: Optional[UUID] = Field(None, description="Quiz ID for override; null for platform default")
@@ -69,6 +95,32 @@ class SecurityPolicyUpdateRequest(BaseModel):
     randomize_option_order: Optional[bool] = None
     student_notice_text: Optional[str] = None
     student_acknowledgement_required: Optional[bool] = None
+
+    # Phase 22 - Advanced Browser Lockdown Controls
+    fullscreen_exit_policy: Optional[str] = None
+    max_focus_loss_count: Optional[int] = None
+    disable_copy: Optional[bool] = None
+    disable_paste: Optional[bool] = None
+    disable_context_menu: Optional[bool] = None
+    print_restrictions: Optional[bool] = None
+    navigation_warning: Optional[bool] = None
+    network_interruption_policy: Optional[str] = None
+    require_invigilator_review: Optional[bool] = None
+
+    # Phase 23 - Screenshot, Screen Recording & Dynamic Watermark Controls
+    watermark_opacity: Optional[float] = None
+    watermark_font_size: Optional[int] = None
+    watermark_rotation_deg: Optional[int] = None
+    watermark_spacing_px: Optional[int] = None
+    watermark_update_interval_sec: Optional[int] = None
+    watermark_mask_student_id: Optional[bool] = None
+    watermark_show_timestamp: Optional[bool] = None
+    watermark_show_exam_id: Optional[bool] = None
+    watermark_custom_text: Optional[str] = None
+    require_watermark_validation: Optional[bool] = None
+    block_screen_capture_api: Optional[bool] = None
+    track_screenshot_signals: Optional[bool] = None
+    track_screen_recording_signals: Optional[bool] = None
 
 
 class SecurityPolicyResponse(SecurityPolicyBase):
@@ -265,3 +317,119 @@ class SecurityRetentionPurgeResponse(BaseModel):
     retention_cutoff_date: datetime
     preserved_investigations_count: int
     message: str
+
+
+# ---------------------------------------------------------------------------
+# 7. Browser Security Compatibility & Pre-Flight Lockdown (Phase 22)
+# ---------------------------------------------------------------------------
+
+class BrowserCompatibilityCheckItem(BaseModel):
+    key: str
+    title: str
+    status: str  # passed, warning, unsupported, action_required
+    details: Optional[str] = None
+    message: Optional[str] = None
+    is_mandatory: bool = False
+
+
+class BrowserCompatibilitySubmitRequest(BaseModel):
+    browser_name: str
+    browser_version: str
+    os_name: str
+    os_version: str
+    device_type: str = "desktop"
+    is_secure_context: bool = True
+    javascript_enabled: bool = True
+    fullscreen_supported: bool = True
+    visibility_api_supported: bool = True
+    storage_available: bool = True
+    screen_width: int
+    screen_height: int
+    viewport_width: int
+    viewport_height: int
+    network_online: bool = True
+    network_downlink: Optional[float] = None
+    network_rtt: Optional[int] = None
+    is_seb_detected: bool = False
+    checks: List[BrowserCompatibilityCheckItem] = []
+    overall_status: str = "PASSED"
+    attempt_id: Optional[UUID] = None
+
+
+class BrowserCompatibilityResponse(BaseModel):
+    success: bool
+    record_id: Optional[UUID] = None
+    overall_status: str
+    can_proceed: bool
+    message: str
+    unsupported_notice: str = "Note: Standard web browsers cannot prevent operating-system screenshots, screen recording, external cameras, or second devices."
+    checks: List[BrowserCompatibilityCheckItem] = []
+
+
+# ---------------------------------------------------------------------------
+# 8. Dynamic Watermark & Anti-Capture Signals (Phase 23)
+# ---------------------------------------------------------------------------
+
+class WatermarkSessionResponse(BaseModel):
+    watermark_code: str
+    watermark_text: str
+    student_display_name: str
+    student_masked_identifier: str
+    institution_name: str
+    opacity: float
+    font_size: int
+    rotation_deg: int
+    spacing_px: int
+    update_interval_sec: int
+    issued_at: datetime
+    server_time: datetime
+    is_valid: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WatermarkVerificationRequest(BaseModel):
+    watermark_code: str
+    rendered_text: Optional[str] = None
+    client_timestamp: Optional[datetime] = None
+
+
+class WatermarkVerificationResponse(BaseModel):
+    valid: bool
+    watermark_code: str
+    server_time: datetime
+    message: str
+
+
+class CaptureCapabilitySubmitRequest(BaseModel):
+    screen_capture_api_supported: bool = False
+    screenshot_shortcut_supported: bool = True
+    display_media_active: bool = False
+    detection_tier: str = "detection_limited"  # detection_supported, detection_limited, unsupported
+    browser_vendor: str = "Unknown"
+    os_platform: str = "Unknown"
+    notes: Optional[str] = None
+
+
+class CaptureCapabilityResponse(BaseModel):
+    id: UUID
+    attempt_id: UUID
+    detection_tier: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CaptureSignalSubmitRequest(BaseModel):
+    signal_type: str  # SCREENSHOT_KEY_COMBO, PRINT_SCREEN_KEY, DISPLAY_MEDIA_STARTED, BLUR_CAPTURE_CORRELATION
+    detection_source: str  # keyboard_shortcut, media_devices_api, window_blur_correlation
+    confidence_level: str = "low"  # low, medium, high
+    client_timestamp: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class CaptureSignalResponse(BaseModel):
+    success: bool
+    signal_id: Optional[UUID] = None
+    event_category: str
+    message: str
+    requires_human_review: bool = True
+

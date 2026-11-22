@@ -968,34 +968,50 @@ class StudentExamService:
 
         remaining = max(0, int((expires_at - now).total_seconds())) if attempt.status == "in_progress" else 0
 
-        # Phase 14 Security Policy & Dynamic Watermark
+        # Phase 14 & Phase 23 Security Policy & Dynamic Watermark
         from backend.app.services.security_service import SecurityService, _mask_identifier
         sec_policy = SecurityService.get_effective_policy(db, quiz.id)
+        wm_session = None
         watermark_str = None
-        if sec_policy.enable_watermark and attempt.student:
-            stud = attempt.student
-            masked_code = _mask_identifier(stud.profile.student_identifier if stud.profile else None)
-            att_slug = str(attempt.id)[:8].upper()
-            watermark_str = sec_policy.watermark_pattern.format(
-                student_name=stud.full_name,
-                masked_reg=masked_code,
-                attempt_id=att_slug,
-            )
+        watermark_enabled = bool(getattr(cfg, "watermark_enabled", sec_policy.enable_watermark))
+        if watermark_enabled and attempt.student:
+            wm_session = SecurityService.generate_or_get_watermark_session(db, attempt)
+            watermark_str = wm_session.watermark_text
 
         policy_dict = {
             "track_tab_switch": sec_policy.track_tab_switch,
             "track_focus_loss": sec_policy.track_focus_loss,
-            "require_fullscreen": sec_policy.require_fullscreen,
+            "require_fullscreen": sec_policy.require_fullscreen or (cfg.enforce_fullscreen if cfg else False),
             "track_fullscreen_exit": sec_policy.track_fullscreen_exit,
-            "block_copy_paste": sec_policy.block_copy_paste,
+            "block_copy_paste": sec_policy.block_copy_paste or (cfg.disable_copy if cfg else False),
             "track_copy_paste": sec_policy.track_copy_paste,
-            "block_context_menu": sec_policy.block_context_menu,
+            "block_context_menu": sec_policy.block_context_menu or (cfg.disable_context_menu if cfg else True),
             "track_page_reload": sec_policy.track_page_reload,
-            "enable_watermark": sec_policy.enable_watermark,
+            "enable_watermark": watermark_enabled,
             "max_tab_switches_warning": sec_policy.max_tab_switches_warning,
             "max_tab_switches_critical": sec_policy.max_tab_switches_critical,
             "max_focus_losses_warning": sec_policy.max_focus_losses_warning,
             "max_fullscreen_exits_warning": sec_policy.max_fullscreen_exits_warning,
+            # Phase 22 Advanced Browser Lockdown Settings
+            "fullscreen_exit_policy": getattr(cfg, "fullscreen_exit_policy", getattr(sec_policy, "fullscreen_exit_policy", "warning_only")),
+            "max_focus_loss_count": getattr(cfg, "max_focus_loss_count", getattr(sec_policy, "max_focus_loss_count", 5)),
+            "disable_copy": getattr(cfg, "disable_copy", getattr(sec_policy, "disable_copy", True)),
+            "disable_paste": getattr(cfg, "disable_paste", getattr(sec_policy, "disable_paste", True)),
+            "disable_context_menu": getattr(cfg, "disable_context_menu", getattr(sec_policy, "disable_context_menu", True)),
+            "print_restrictions": getattr(cfg, "print_restrictions", getattr(sec_policy, "print_restrictions", True)),
+            "navigation_warning": getattr(cfg, "navigation_warning", getattr(sec_policy, "navigation_warning", True)),
+            "network_interruption_policy": getattr(cfg, "network_interruption_policy", getattr(sec_policy, "network_interruption_policy", "buffer_and_resume")),
+            "require_invigilator_review": getattr(cfg, "require_invigilator_review", getattr(sec_policy, "require_invigilator_review", True)),
+            # Phase 23 Screenshot, Screen Recording & Dynamic Watermark Settings
+            "watermark_code": wm_session.watermark_code if wm_session else None,
+            "watermark_opacity": float(getattr(cfg, "watermark_opacity", getattr(sec_policy, "watermark_opacity", 0.06))),
+            "watermark_font_size": int(getattr(cfg, "watermark_font_size", getattr(sec_policy, "watermark_font_size", 12))),
+            "watermark_rotation_deg": int(getattr(cfg, "watermark_rotation_deg", getattr(sec_policy, "watermark_rotation_deg", -25))),
+            "watermark_spacing_px": int(getattr(cfg, "watermark_spacing_px", getattr(sec_policy, "watermark_spacing_px", 140))),
+            "watermark_update_interval_sec": int(getattr(cfg, "watermark_update_interval_sec", getattr(sec_policy, "watermark_update_interval_sec", 30))),
+            "block_screen_capture_api": bool(getattr(cfg, "block_screen_capture_api", getattr(sec_policy, "block_screen_capture_api", True))),
+            "track_screenshot_signals": bool(getattr(cfg, "track_screenshot_signals", getattr(sec_policy, "track_screenshot_signals", True))),
+            "track_screen_recording_signals": bool(getattr(cfg, "track_screen_recording_signals", getattr(sec_policy, "track_screen_recording_signals", True))),
         }
 
         return StudentAttemptDetailResponse(

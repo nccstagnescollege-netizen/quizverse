@@ -16,7 +16,13 @@ from backend.app.models.examination import (
     AttemptEvent,
     AttemptSession,
 )
-from backend.app.models.security_audit import SecurityEvent, SecurityAlert
+from backend.app.models.security_audit import (
+    SecurityEvent,
+    SecurityAlert,
+    BrowserCompatibilityRecord,
+    WatermarkSession,
+    CaptureCapabilityReport,
+)
 from backend.app.models.academic import Subject, Programme, Semester
 from backend.app.models.monitoring import (
     InvigilatorAssignment,
@@ -608,8 +614,14 @@ class LiveMonitoringService:
                     "review": 0,
                 }
 
-        # Fetch security alerts per attempt
+        # Fetch security events & browser lockdown telemetry per attempt
         security_counts = {}
+        focus_counts = {}
+        fullscreen_counts = {}
+        compat_statuses = {}
+        inc_counts = {}
+        review_statuses = {}
+
         if attempt_ids:
             sec_rows = db.query(
                 SecurityEvent.attempt_id,
@@ -619,6 +631,82 @@ class LiveMonitoringService:
             ).group_by(SecurityEvent.attempt_id).all()
             for r in sec_rows:
                 security_counts[r[0]] = r[1] or 0
+
+            focus_rows = db.query(
+                SecurityEvent.attempt_id,
+                func.count(SecurityEvent.id)
+            ).filter(
+                SecurityEvent.attempt_id.in_(attempt_ids),
+                SecurityEvent.event_name.in_(["WINDOW_FOCUS_LOST", "WINDOW_BLUR", "PAGE_HIDDEN", "TAB_HIDDEN", "TAB_SWITCH"])
+            ).group_by(SecurityEvent.attempt_id).all()
+            for r in focus_rows:
+                focus_counts[r[0]] = r[1] or 0
+
+            fs_rows = db.query(
+                SecurityEvent.attempt_id,
+                func.count(SecurityEvent.id)
+            ).filter(
+                SecurityEvent.attempt_id.in_(attempt_ids),
+                SecurityEvent.event_name == "FULLSCREEN_EXIT"
+            ).group_by(SecurityEvent.attempt_id).all()
+            for r in fs_rows:
+                fullscreen_counts[r[0]] = r[1] or 0
+
+            compat_rows = db.query(
+                BrowserCompatibilityRecord.attempt_id,
+                BrowserCompatibilityRecord.overall_status,
+            ).filter(
+                BrowserCompatibilityRecord.attempt_id.in_(attempt_ids)
+            ).order_by(BrowserCompatibilityRecord.created_at.desc()).all()
+            for r in compat_rows:
+                if r[0] not in compat_statuses:
+                    compat_statuses[r[0]] = r[1]
+
+            inc_rows = db.query(
+                ExaminationIncident.attempt_id,
+                func.count(ExaminationIncident.id),
+                func.max(ExaminationIncident.status)
+            ).filter(
+                ExaminationIncident.attempt_id.in_(attempt_ids)
+            ).group_by(ExaminationIncident.attempt_id).all()
+            for r in inc_rows:
+                inc_counts[r[0]] = r[1] or 0
+                review_statuses[r[0]] = r[2] or "NEW"
+
+            # Phase 23 Watermark & Capture Telemetry
+            wm_sessions: Dict[uuid.UUID, WatermarkSession] = {}
+            capture_tiers: Dict[uuid.UUID, str] = {}
+            capture_signal_counts: Dict[uuid.UUID, int] = {}
+            latest_capture_signals: Dict[uuid.UUID, str] = {}
+
+            wm_rows = db.query(WatermarkSession).filter(WatermarkSession.attempt_id.in_(attempt_ids)).all()
+            for w in wm_rows:
+                wm_sessions[w.attempt_id] = w
+
+            cap_rows = db.query(
+                CaptureCapabilityReport.attempt_id,
+                CaptureCapabilityReport.detection_tier
+            ).filter(CaptureCapabilityReport.attempt_id.in_(attempt_ids)).order_by(CaptureCapabilityReport.created_at.desc()).all()
+            for c in cap_rows:
+                if c[0] not in capture_tiers:
+                    capture_tiers[c[0]] = c[1]
+
+            sig_rows = db.query(
+                SecurityEvent.attempt_id,
+                func.count(SecurityEvent.id),
+                func.max(SecurityEvent.event_name)
+            ).filter(
+                SecurityEvent.attempt_id.in_(attempt_ids),
+                SecurityEvent.event_name.in_([
+                    "SCREENSHOT_SIGNAL_DETECTED",
+                    "SCREEN_RECORDING_SIGNAL_DETECTED",
+                    "CAPTURE_API_ACTIVITY",
+                    "PRINT_RESTRICTION_TRIGGERED",
+                ])
+            ).group_by(SecurityEvent.attempt_id).all()
+            for s in sig_rows:
+                capture_signal_counts[s[0]] = s[1] or 0
+                latest_capture_signals[s[0]] = s[2] or "SCREENSHOT_SIGNAL_DETECTED"
 
         items: List[ParticipantMonitoringItem] = []
 
@@ -725,6 +813,19 @@ class LiveMonitoringService:
                 has_active_incident=has_incident,
                 ip_address=ip_addr,
                 browser=browser_info,
+                browser_compatibility_status=compat_statuses.get(att.id, "PASSED") if att else "NOT_CHECKED",
+                fullscreen_status="EXITED" if (att and fullscreen_counts.get(att.id, 0) > 0) else ("ACTIVE" if att else "NOT_REQUIRED"),
+                focus_loss_count=focus_counts.get(att.id, 0) if att else 0,
+                fullscreen_exit_count=fullscreen_counts.get(att.id, 0) if att else 0,
+                incident_count=inc_counts.get(att.id, 0) if att else 0,
+                review_status=review_statuses.get(att.id, "NONE") if att else "NONE",
+                latest_incident=f"Incident recorded: {review_statuses.get(att.id, 'NEW')}" if (att and inc_counts.get(att.id, 0) > 0) else None,
+                # Phase 23 Watermark & Capture Telemetry
+                watermark_status="ACTIVE" if (att and att.id in wm_sessions and wm_sessions[att.id].is_valid) else ("NOT_RENDERED" if att else "DISABLED"),
+                watermark_code=wm_sessions[att.id].watermark_code if (att and att.id in wm_sessions) else None,
+                capture_capability=capture_tiers.get(att.id, "detection_limited") if att else "detection_limited",
+                capture_signals_count=capture_signal_counts.get(att.id, 0) if att else 0,
+                latest_capture_signal=latest_capture_signals.get(att.id, None) if att else None,
             )
 
             # Apply Search Filter
@@ -917,6 +1018,13 @@ class LiveMonitoringService:
             has_active_incident=len(incidents_list) > 0,
             ip_address=attempt.ip_address if attempt else None,
             browser=attempt.user_agent if attempt else None,
+            browser_compatibility_status="PASSED",
+            fullscreen_status="EXITED" if any(e.event_type == "FULLSCREEN_EXIT" for e in events_timeline) else ("ACTIVE" if attempt else "NOT_REQUIRED"),
+            focus_loss_count=sum(1 for e in events_timeline if e.event_type in ["WINDOW_FOCUS_LOST", "WINDOW_BLUR", "TAB_HIDDEN", "PAGE_HIDDEN"]),
+            fullscreen_exit_count=sum(1 for e in events_timeline if e.event_type == "FULLSCREEN_EXIT"),
+            incident_count=len(incidents_list),
+            review_status=incidents_list[0].status if incidents_list else "NONE",
+            latest_incident=incidents_list[0].title if incidents_list else None,
         )
 
         return ParticipantDetailMonitoringResponse(

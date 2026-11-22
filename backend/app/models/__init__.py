@@ -101,6 +101,9 @@ from backend.app.models.security_audit import (
     SecurityAlert,
     SecurityInvestigationNote,
     AccessLog,
+    BrowserCompatibilityRecord,
+    WatermarkSession,
+    CaptureCapabilityReport,
 )
 from backend.app.models.notification import (
     Notification,
@@ -217,6 +220,9 @@ __all__ = [
     "SecurityAlert",
     "SecurityInvestigationNote",
     "AccessLog",
+    "BrowserCompatibilityRecord",
+    "WatermarkSession",
+    "CaptureCapabilityReport",
     # Notifications
     "Notification",
     "NotificationPreference",

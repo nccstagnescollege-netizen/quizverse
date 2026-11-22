@@ -165,6 +165,20 @@ class ParticipantMonitoringItem(BaseModel):
     has_active_incident: bool = False
     ip_address: Optional[str] = None
     browser: Optional[str] = None
+    browser_compatibility_status: Optional[str] = "PASSED"
+    fullscreen_status: Optional[str] = "ACTIVE"
+    focus_loss_count: int = 0
+    fullscreen_exit_count: int = 0
+    incident_count: int = 0
+    review_status: Optional[str] = "NONE"
+    latest_incident: Optional[str] = None
+
+    # Phase 23 - Watermark & Capture Monitoring
+    watermark_status: Optional[str] = "ACTIVE"
+    watermark_code: Optional[str] = None
+    capture_capability: Optional[str] = "detection_limited"
+    capture_signals_count: int = 0
+    latest_capture_signal: Optional[str] = None
 
 
 class ParticipantMonitoringListResponse(BaseModel):

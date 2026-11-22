@@ -70,6 +70,7 @@ export interface StudentExamLandingDetails {
     registration_code?: string | null;
   } | null;
   allowed_actions: Array<'register' | 'view_instructions' | 'start' | 'resume' | 'view_result'>;
+  session_token?: string | null;
 }
 
 export interface StudentExamInstructions {
@@ -168,6 +169,24 @@ export interface StudentAttemptDetail {
     enable_watermark: boolean;
     max_tab_switches_warning: number;
     single_session_enforced: boolean;
+    fullscreen_exit_policy?: 'warning_only' | 'record_incident' | 'pause_exam' | 'flag_review' | string;
+    max_focus_loss_count?: number;
+    max_focus_losses_warning?: number;
+    disable_copy?: boolean;
+    disable_paste?: boolean;
+    disable_context_menu?: boolean;
+    disable_printing?: boolean;
+    navigation_warning?: boolean;
+    require_preflight_compatibility?: boolean;
+    watermark_code?: string | null;
+    watermark_opacity?: number;
+    watermark_font_size?: number;
+    watermark_rotation_deg?: number;
+    watermark_spacing_px?: number;
+    watermark_update_interval_sec?: number;
+    block_screen_capture_api?: boolean;
+    track_screenshot_signals?: boolean;
+    track_screen_recording_signals?: boolean;
   } | null;
   monitoring_acknowledged?: boolean;
 }
@@ -210,6 +229,90 @@ export interface StudentResultDetail {
   total_correct?: number;
   total_incorrect?: number;
   total_unanswered?: number;
+}
+
+export interface CompatibilityCheckItem {
+  key: string;
+  title: string;
+  status: 'passed' | 'warning' | 'unsupported' | 'action_required';
+  details?: string;
+  message?: string;
+  is_mandatory?: boolean;
+}
+
+export interface CompatibilityPayload {
+  browser_name: string;
+  browser_version: string;
+  os_name: string;
+  os_version: string;
+  device_type: string;
+  is_secure_context: boolean;
+  javascript_enabled: boolean;
+  fullscreen_supported: boolean;
+  visibility_api_supported: boolean;
+  storage_available: boolean;
+  screen_width: number;
+  screen_height: number;
+  viewport_width: number;
+  viewport_height: number;
+  network_online: boolean;
+  network_downlink?: number;
+  network_rtt?: number;
+  is_seb_detected: boolean;
+  checks: CompatibilityCheckItem[];
+  overall_status: string;
+  attempt_id?: string;
+}
+
+export interface CompatibilityResponse {
+  success: boolean;
+  record_id?: string;
+  overall_status: string;
+  can_proceed: boolean;
+  message: string;
+  unsupported_notice: string;
+  checks: CompatibilityCheckItem[];
+}
+
+export interface WatermarkSessionData {
+  watermark_code: string;
+  watermark_text: string;
+  student_display_name: string;
+  student_masked_identifier: string;
+  institution_name: string;
+  opacity: number;
+  font_size: number;
+  rotation_deg: number;
+  spacing_px: number;
+  update_interval_sec: number;
+  issued_at: string;
+  server_time: string;
+  is_valid: boolean;
+}
+
+export interface WatermarkVerificationResult {
+  valid: boolean;
+  watermark_code: string;
+  server_time: string;
+  message: string;
+}
+
+export interface CaptureCapabilityPayload {
+  screen_capture_api_supported: boolean;
+  screenshot_shortcut_supported: boolean;
+  display_media_active: boolean;
+  detection_tier: 'detection_supported' | 'detection_limited' | 'unsupported';
+  browser_vendor: string;
+  os_platform: string;
+  notes?: string;
+}
+
+export interface CaptureSignalPayload {
+  signal_type: string;
+  detection_source: string;
+  confidence_level: 'low' | 'medium' | 'high';
+  client_timestamp?: string;
+  metadata?: Record<string, any>;
 }
 
 export const studentExamService = {
@@ -493,6 +596,86 @@ export const studentExamService = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error?.message || err.detail || 'Failed to retrieve examination results');
+    }
+    return res.json();
+  },
+
+  async submitCompatibilityCheck(
+    token: string,
+    payload: CompatibilityPayload,
+    sessionToken?: string
+  ): Promise<CompatibilityResponse> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
+
+    const res = await fetch(`${API_BASE_URL}/student/exams/${token}/compatibility`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to submit browser compatibility record');
+    }
+    return res.json();
+  },
+
+  async getAttemptWatermark(attemptId: string, sessionToken: string): Promise<WatermarkSessionData> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/watermark`, {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to retrieve watermark session');
+    }
+    return res.json();
+  },
+
+  async verifyAttemptWatermark(attemptId: string, sessionToken: string, watermarkCode: string): Promise<WatermarkVerificationResult> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/watermark/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ watermark_code: watermarkCode, client_timestamp: new Date().toISOString() }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Watermark verification failed');
+    }
+    return res.json();
+  },
+
+  async submitCaptureCapability(attemptId: string, sessionToken: string, payload: CaptureCapabilityPayload): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/capture-capability`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to submit capture capability');
+    }
+    return res.json();
+  },
+
+  async submitCaptureSignal(attemptId: string, sessionToken: string, payload: CaptureSignalPayload): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/student/attempts/${attemptId}/capture-signal`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || err.detail || 'Failed to submit capture signal');
     }
     return res.json();
   },

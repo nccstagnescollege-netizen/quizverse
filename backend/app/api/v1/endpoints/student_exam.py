@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, Header, Request, Path, Query, status, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
+from backend.app.models.examination import ExaminationAttempt
 from backend.app.services.student_exam_service import StudentExamService
 from backend.app.schemas.student_exam import (
     StudentExamLandingResponse,
@@ -34,6 +36,15 @@ from backend.app.schemas.security import (
     SecurityNoticeResponse,
     SecurityNoticeAcknowledgeRequest,
     SecurityNoticeAcknowledgeResponse,
+    BrowserCompatibilitySubmitRequest,
+    BrowserCompatibilityResponse,
+    WatermarkSessionResponse,
+    WatermarkVerificationRequest,
+    WatermarkVerificationResponse,
+    CaptureCapabilitySubmitRequest,
+    CaptureCapabilityResponse,
+    CaptureSignalSubmitRequest,
+    CaptureSignalResponse,
 )
 from backend.app.services.security_service import SecurityService
 
@@ -420,6 +431,55 @@ def get_security_notice(
     return SecurityService.get_student_security_notice(db, details.quiz_id)
 
 
+@router.post("/exams/{token}/compatibility", response_model=BrowserCompatibilityResponse)
+def submit_exam_compatibility(
+    request: Request,
+    token: str = Path(..., description="Invitation Token"),
+    req: BrowserCompatibilitySubmitRequest = ...,
+    db: Session = Depends(get_db),
+):
+    """
+    Submits pre-flight browser security compatibility check results.
+    Validates token and logs compatibility details.
+    """
+    details = StudentExamService.get_exam_landing_details(db, token)
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    return SecurityService.record_browser_compatibility(
+        db=db,
+        quiz_id=details.quiz_id,
+        req=req,
+        ip_address=ip,
+        user_agent=ua,
+    )
+
+
+@router.post("/attempts/{attempt_id}/compatibility", response_model=BrowserCompatibilityResponse)
+def submit_attempt_compatibility(
+    request: Request,
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: BrowserCompatibilitySubmitRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Submits or updates browser compatibility check results associated with an active attempt.
+    """
+    student_id = uuid.UUID(session["sub"])
+    quiz_id = uuid.UUID(session["quiz_id"])
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    return SecurityService.record_browser_compatibility(
+        db=db,
+        quiz_id=quiz_id,
+        req=req,
+        student_id=student_id,
+        attempt_id=attempt_id,
+        ip_address=ip,
+        user_agent=ua,
+    )
+
+
 @router.post("/attempts/{attempt_id}/acknowledge-monitoring", response_model=SecurityNoticeAcknowledgeResponse)
 def acknowledge_monitoring(
     attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
@@ -480,4 +540,131 @@ def acknowledge_announcement(
         announcement_id=announcement_id,
         attempt_id=attempt_id,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 23: Dynamic Watermark & Capture Detection Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/attempts/{attempt_id}/watermark", response_model=WatermarkSessionResponse)
+def get_attempt_watermark(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves or initializes the server-authoritative, tamper-resistant watermark
+    session for this candidate examination attempt.
+    """
+    student_id = uuid.UUID(session["sub"])
+    attempt = db.query(ExaminationAttempt).filter(
+        ExaminationAttempt.id == attempt_id,
+        ExaminationAttempt.student_id == student_id,
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Examination attempt not found.")
+
+    wm_session = SecurityService.generate_or_get_watermark_session(db, attempt)
+    now = datetime.now(timezone.utc)
+    return WatermarkSessionResponse(
+        watermark_code=wm_session.watermark_code,
+        watermark_text=wm_session.watermark_text,
+        student_display_name=wm_session.student_display_name,
+        student_masked_identifier=wm_session.student_masked_identifier,
+        institution_name=wm_session.institution_name,
+        opacity=float(wm_session.opacity),
+        font_size=wm_session.font_size,
+        rotation_deg=wm_session.rotation_deg,
+        spacing_px=wm_session.spacing_px,
+        update_interval_sec=wm_session.update_interval_sec,
+        issued_at=wm_session.issued_at,
+        server_time=now,
+        is_valid=wm_session.is_valid,
+    )
+
+
+@router.post("/attempts/{attempt_id}/watermark/verify", response_model=WatermarkVerificationResponse)
+def verify_attempt_watermark(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: WatermarkVerificationRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Client verification ping: validates that the active watermark rendered in the client
+    matches the expected server-authoritative cryptographic watermark code.
+    """
+    student_id = uuid.UUID(session["sub"])
+    attempt = db.query(ExaminationAttempt).filter(
+        ExaminationAttempt.id == attempt_id,
+        ExaminationAttempt.student_id == student_id,
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Examination attempt not found.")
+
+    valid, msg = SecurityService.verify_watermark_session(
+        db=db,
+        attempt_id=attempt_id,
+        watermark_code=req.watermark_code,
+        client_timestamp=req.client_timestamp,
+    )
+    return WatermarkVerificationResponse(
+        valid=valid,
+        watermark_code=req.watermark_code,
+        server_time=datetime.now(timezone.utc),
+        message=msg,
+    )
+
+
+@router.post("/attempts/{attempt_id}/capture-capability", response_model=CaptureCapabilityResponse)
+def report_capture_capability(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: CaptureCapabilitySubmitRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Submits client browser screen capture capability telemetry.
+    Accurately classifies support tiers without falsely claiming operating-system interception.
+    """
+    student_id = uuid.UUID(session["sub"])
+    attempt = db.query(ExaminationAttempt).filter(
+        ExaminationAttempt.id == attempt_id,
+        ExaminationAttempt.student_id == student_id,
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Examination attempt not found.")
+
+    report = SecurityService.record_capture_capability(db, attempt, req)
+    return CaptureCapabilityResponse.model_validate(report)
+
+
+@router.post("/attempts/{attempt_id}/capture-signal", response_model=CaptureSignalResponse)
+def report_capture_signal(
+    attempt_id: uuid.UUID = Path(..., description="Active Examination Attempt ID"),
+    req: CaptureSignalSubmitRequest = ...,
+    session: Dict[str, Any] = Depends(get_current_student_session),
+    db: Session = Depends(get_db),
+):
+    """
+    Records available browser-level screenshot and screen recording signals (e.g. PrintScreen key,
+    Snipping Tool combo, getDisplayMedia invocation). Flags incidents for human invigilator review.
+    """
+    student_id = uuid.UUID(session["sub"])
+    attempt = db.query(ExaminationAttempt).filter(
+        ExaminationAttempt.id == attempt_id,
+        ExaminationAttempt.student_id == student_id,
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Examination attempt not found.")
+
+    ev = SecurityService.record_capture_signal(db, attempt, req)
+    return CaptureSignalResponse(
+        success=True,
+        signal_id=ev.id,
+        event_category=ev.event_category,
+        message=f"Capture signal recorded ({ev.event_name}). Flagged for invigilator review.",
+        requires_human_review=True,
+    )
+
 
